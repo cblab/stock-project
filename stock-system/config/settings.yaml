@@ -1,0 +1,50 @@
+tickers:
+  - IWDA
+  - VHYL
+  - TDIV
+  - FGEQ
+  - GOOGL
+  - NVDA
+  - MUV2
+  - ALV
+  - BRK.B
+  - RTX
+  - ENR
+  - LITE
+  - AAOI
+  - AXTI
+  - AEHR
+  - AIXA
+  - SIVE
+  - JNJ
+  - PG
+  - PEP
+  - WM
+  - UNP
+  - SO
+  - ENB
+  - CME
+
+market_data_period: "6mo"
+market_data_interval: "1d"
+news_limit_per_ticker: 10
+etf_holdings_news_limit: 3
+kronos_lookback: 128
+run_timezone: "Europe/Berlin"
+
+forecast:
+  data_frequency: "1d"
+  horizon_steps: 3
+  horizon_label: "3 Handelstage"
+  score_validity_hours: 24
+
+score_model:
+  score_range: "[-1, 1]"
+  kronos_return_scale: 0.05
+  merge_weights:
+    kronos: 0.6
+    sentiment: 0.4
+  thresholds:
+    entry: 0.35
+    watch: 0.15
+    no_trade: -0.15

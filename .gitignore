@@ -1,21 +1,24 @@
-# Ignore external repos completely
-/repos/
-/repos/**
+# External repos: keep only an optional folder README.
+/repos/*
+!/repos/README.md
 
-# Ignore all local model weights completely
-/models/
-/models/**
+# Local model files and downloaded weights: keep only an optional folder README.
+/models/*
+!/models/README.md
 
-# Ignore run artifacts
+# Generated pipeline runs and local caches.
 /runs/
 /runs/**
+/.deps/
+/.cache/
+/.hf-cache/
 
-# Environment / secrets
+# Environment files and secrets.
 .env
 .env.*
 *.env
 
-# Python cache / build
+# Python caches, virtualenvs, and build outputs.
 __pycache__/
 *.py[cod]
 *.pyo
@@ -26,26 +29,12 @@ __pycache__/
 venv/
 env/
 ENV/
+build/
+dist/
+*.egg-info/
 
-# Jupyter
+# Jupyter and test artifacts.
 .ipynb_checkpoints/
-
-# Logs
-*.log
-logs/
-*.out
-*.err
-
-# OS / editor files
-.DS_Store
-Thumbs.db
-desktop.ini
-
-# VS Code / JetBrains
-.vscode/
-.idea/
-
-# Test / coverage artifacts
 .pytest_cache/
 .coverage
 .coverage.*
@@ -53,7 +42,20 @@ htmlcov/
 .mypy_cache/
 .ruff_cache/
 
-# Temporary files
+# Logs.
+*.log
+logs/
+*.out
+*.err
+
+# OS and editor files.
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# Temporary files.
 tmp/
 temp/
 *.tmp
