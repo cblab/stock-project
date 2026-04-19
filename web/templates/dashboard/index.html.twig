@@ -8,11 +8,18 @@
             <p class="text-sm font-medium uppercase text-slate-500">Persistierte Analyse-Runs</p>
             <h1 class="mt-1 text-2xl font-semibold text-slate-950">Stock Pipeline Dashboard</h1>
         </div>
-        <form method="post" action="{{ path('app_runs_start') }}">
-            <button class="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm ring-1 ring-emerald-700/20 hover:bg-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2" type="submit" title="Startet lokal die Python-Pipeline fuer alle aktiven Portfolio-Instrumente.">
-                Portfolio-Run starten
-            </button>
-        </form>
+        <div class="flex flex-wrap gap-2">
+            <form method="post" action="{{ path('app_runs_start', {source: 'portfolio'}) }}">
+                <button class="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm ring-1 ring-emerald-700/20 hover:bg-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2" type="submit" title="Startet die Pipeline fuer aktive Portfolio-Instrumente.">
+                    Portfolio-Run starten
+                </button>
+            </form>
+            <form method="post" action="{{ path('app_runs_start', {source: 'watchlist'}) }}">
+                <button class="rounded-md bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow-sm ring-1 ring-sky-700/20 hover:bg-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2" type="submit" title="Startet die Pipeline fuer aktive Watchlist-Instrumente.">
+                    Watchlist-Run starten
+                </button>
+            </form>
+        </div>
     </div>
 
     {% if runs is empty %}
@@ -47,6 +54,7 @@
                     <tr>
                         <th>Run</th>
                         <th>Status</th>
+                        <th>Scope</th>
                         <th>Start</th>
                         <th>Ticker</th>
                         <th>ENTRY</th>
@@ -59,9 +67,15 @@
                 </thead>
                 <tbody class="divide-y divide-slate-100">
                     {% for run in runs %}
-                        <tr class="hover:bg-slate-50">
+                        {% set isWatchlist = run.runScope == 'watchlist' %}
+                        <tr class="{{ isWatchlist ? 'bg-sky-50/35' : 'bg-emerald-50/25' }} hover:bg-slate-50">
                             <td class="font-medium text-slate-950">{{ run.runId }}</td>
                             <td><span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">{{ run.status }}</span></td>
+                            <td>
+                                <span class="rounded-full px-2.5 py-1 text-xs font-medium ring-1 {{ isWatchlist ? 'bg-sky-50 text-sky-700 ring-sky-200' : 'bg-emerald-50 text-emerald-700 ring-emerald-200' }}">
+                                    {{ isWatchlist ? 'Watchlist' : 'Portfolio' }}
+                                </span>
+                            </td>
                             <td>{{ run.startedAt ? run.startedAt|date('d.m.Y H:i') : '-' }}</td>
                             <td>{{ run.displayItems|length }}</td>
                             <td>{{ run.decisionEntryCount }}</td>
@@ -70,7 +84,12 @@
                             <td>{{ run.decisionNoTradeCount }}</td>
                             <td>{{ run.scoreMean is not null ? run.scoreMean|number_format(3) : '-' }}</td>
                             <td class="text-right">
-                                <a class="font-medium text-slate-950 underline decoration-slate-300 underline-offset-4 hover:decoration-slate-900" href="{{ path('app_run_show', {id: run.id}) }}">Details</a>
+                                <div class="flex items-center justify-end gap-3">
+                                    <a class="font-medium text-slate-950 underline decoration-slate-300 underline-offset-4 hover:decoration-slate-900" href="{{ path('app_run_show', {id: run.id}) }}">Details</a>
+                                    <form method="post" action="{{ path('app_run_delete', {id: run.id}) }}" onsubmit="return confirm('Run {{ run.runId }} wirklich löschen?');">
+                                        <button class="text-sm font-medium text-rose-700 underline decoration-rose-200 underline-offset-4 hover:decoration-rose-700" type="submit">Löschen</button>
+                                    </form>
+                                </div>
                             </td>
                         </tr>
                     {% endfor %}

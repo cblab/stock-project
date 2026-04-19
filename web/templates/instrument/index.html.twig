@@ -7,10 +7,14 @@
         <div>
             <p class="text-sm font-medium uppercase text-slate-500">{{ pageEyebrow }}</p>
             <h1 class="mt-1 text-2xl font-semibold text-slate-950">{{ pageTitle }}</h1>
+            <p class="mt-1 text-sm text-slate-600">Standardmäßig werden nur aktive Instrumente angezeigt. Inaktive Werte bleiben erhalten und können separat reaktiviert werden.</p>
         </div>
-        {% if showCreateButton %}
-            <a class="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm ring-1 ring-emerald-700/20 hover:bg-emerald-500" href="{{ path('app_instrument_new') }}">Instrument anlegen</a>
-        {% endif %}
+        <div class="flex flex-wrap gap-2">
+            <a class="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50" href="{{ path('app_instruments_inactive') }}">Inaktive anzeigen</a>
+            {% if showCreateButton %}
+                <a class="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm ring-1 ring-emerald-700/20 hover:bg-emerald-500" href="{{ path('app_instrument_new') }}">Instrument anlegen</a>
+            {% endif %}
+        </div>
     </div>
 
     <section class="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
@@ -24,7 +28,7 @@
                     <th>Asset</th>
                     <th>Region</th>
                     {% if showPortfolioColumn %}<th>Portfolio</th>{% endif %}
-                    <th>Aktiv</th>
+                    {% if showActiveColumn %}<th>Aktiv</th>{% endif %}
                     <th></th>
                 </tr>
             </thead>
@@ -37,14 +41,34 @@
                         <td>{{ instrument.wkn ?: '-' }}</td>
                         <td>{{ instrument.assetClass }}</td>
                         <td>{{ instrument.region ?: '-' }}</td>
-                        {% if showPortfolioColumn %}<td>{{ instrument.portfolio ? 'Ja' : 'Nein' }}</td>{% endif %}
-                        <td>{{ instrument.active ? 'Ja' : 'Nein' }}</td>
+                        {% if showPortfolioColumn %}
+                            <td>
+                                <form method="post" action="{{ path('app_instrument_toggle_portfolio', {id: instrument.id}) }}">
+                                    <input type="hidden" name="return_route" value="{{ returnRoute }}">
+                                    <label class="inline-flex items-center gap-2 text-xs font-medium text-slate-600">
+                                        <input class="h-4 w-4 rounded border-slate-300 text-emerald-600" type="checkbox" {{ instrument.portfolio ? 'checked' : '' }} onchange="this.form.requestSubmit()">
+                                        <span>{{ instrument.portfolio ? 'Portfolio' : 'Watchlist' }}</span>
+                                    </label>
+                                </form>
+                            </td>
+                        {% endif %}
+                        {% if showActiveColumn %}
+                            <td>
+                                <form method="post" action="{{ path('app_instrument_toggle_active', {id: instrument.id}) }}">
+                                    <input type="hidden" name="return_route" value="{{ returnRoute }}">
+                                    <label class="inline-flex items-center gap-2 text-xs font-medium text-slate-600">
+                                        <input class="h-4 w-4 rounded border-slate-300 text-emerald-600" type="checkbox" {{ instrument.active ? 'checked' : '' }} onchange="this.form.requestSubmit()">
+                                        <span>{{ instrument.active ? 'Aktiv' : 'Inaktiv' }}</span>
+                                    </label>
+                                </form>
+                            </td>
+                        {% endif %}
                         <td class="text-right">
                             <a class="font-medium text-slate-950 underline decoration-slate-300 underline-offset-4 hover:decoration-slate-900" href="{{ path('app_instrument_show', {id: instrument.id}) }}">Details</a>
                         </td>
                     </tr>
                 {% else %}
-                    <tr><td class="px-4 py-6 text-center text-slate-500" colspan="{{ showPortfolioColumn ? 9 : 8 }}">{{ emptyMessage }}</td></tr>
+                    <tr><td class="px-4 py-6 text-center text-slate-500" colspan="9">{{ emptyMessage }}</td></tr>
                 {% endfor %}
             </tbody>
         </table>

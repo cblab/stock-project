@@ -47,6 +47,7 @@ class RunImportService
         $run
             ->setRunId($runId)
             ->setRunKey($runId)
+            ->setRunScope('portfolio')
             ->setStatus('completed')
             ->setRunPath(str_replace('/', DIRECTORY_SEPARATOR, $runPath))
             ->setStartedAt($this->parseStartedAt($runId))

@@ -25,12 +25,18 @@ class InstrumentRepository extends ServiceEntityRepository
     /** @return Instrument[] */
     public function findPortfolioInstruments(): array
     {
-        return $this->findBy(['isPortfolio' => true], ['inputTicker' => 'ASC']);
+        return $this->findBy(['active' => true, 'isPortfolio' => true], ['inputTicker' => 'ASC']);
     }
 
     /** @return Instrument[] */
     public function findWatchlistInstruments(): array
     {
-        return $this->findBy(['isPortfolio' => false], ['inputTicker' => 'ASC']);
+        return $this->findBy(['active' => true, 'isPortfolio' => false], ['inputTicker' => 'ASC']);
+    }
+
+    /** @return Instrument[] */
+    public function findInactiveInstruments(): array
+    {
+        return $this->findBy(['active' => false], ['inputTicker' => 'ASC']);
     }
 }
