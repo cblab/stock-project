@@ -21,6 +21,19 @@
     <span class="rounded-full px-2 py-1 text-xs font-medium ring-1 {{ classes }}" title="Status aus Pipeline-Run: {{ status ?: '-' }}">{{ status ?: '-' }}</span>
 {% endmacro %}
 
+{% macro relevance_badge(relevance) %}
+    {% set classes = relevance == 'direct' ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : (relevance == 'related' ? 'bg-blue-50 text-blue-700 ring-blue-200' : 'bg-slate-100 text-slate-700 ring-slate-200') %}
+    {% set tooltip = relevance == 'direct' ? 'Direct: Titel oder Snippet enthaelt das Ticker-/Provider-Symbol.' : (relevance == 'related' ? 'Related: Kontext, Holdings oder ETF-Lookthrough passt zum Ticker.' : 'Weak: nur lose thematische Naehe; heuristische Relevanz.') %}
+    <span class="rounded-full px-2 py-1 text-xs font-medium ring-1 {{ classes }}" title="{{ tooltip }}">{{ relevance }}</span>
+{% endmacro %}
+
+{% macro clamp_badge(clamp) %}
+    {% if clamp %}
+        {% set classes = clamp.tone == 'upper' ? 'bg-amber-50 text-amber-800 ring-amber-200' : 'bg-rose-50 text-rose-700 ring-rose-200' %}
+        <span class="rounded-full px-2 py-1 text-xs font-medium ring-1 {{ classes }}" title="Normalisierung hat die Grenze erreicht; starkes Signal, aber kein perfekter Score.">{{ clamp.label }}</span>
+    {% endif %}
+{% endmacro %}
+
 {% macro score_bar(value, marker, label) %}
     {% set display = value is not null ? value|number_format(3) : '-' %}
     <div class="space-y-1" title="{{ label }} im Bereich [-1, 1]. Positive Werte sprechen fuer Long-/Watch-Signale, negative Werte dagegen.">
