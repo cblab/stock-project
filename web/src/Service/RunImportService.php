@@ -112,12 +112,63 @@ class RunImportService
     private function readExplain(string $runPath, string $inputTicker, array $row): array
     {
         $explainPath = $runPath.'/signals/merged/'.$inputTicker.'_explain.json';
+        $sentimentPath = $runPath.'/signals/sentiment/'.$inputTicker.'.json';
+        $newsPath = $runPath.'/input/'.$inputTicker.'_news.json';
+        $explain = $row;
 
-        if (!is_file($explainPath)) {
-            return $row;
+        if (is_file($explainPath)) {
+            $explain = array_replace_recursive($explain, $this->readJsonFile($explainPath));
         }
 
-        return array_replace_recursive($row, $this->readJsonFile($explainPath));
+        if (is_file($sentimentPath)) {
+            $sentiment = $this->readJsonFile($sentimentPath);
+            $explain = array_replace_recursive($explain, $sentiment);
+        }
+
+        if (is_file($newsPath)) {
+            $newsArticles = $this->readJsonFile($newsPath);
+            $explain['news_articles'] = $newsArticles;
+            $explain['article_scores'] = $this->enrichArticleScores($explain['article_scores'] ?? [], $newsArticles);
+        }
+
+        return $explain;
+    }
+
+    /**
+     * @param mixed $articleScores
+     * @param array<int, mixed> $newsArticles
+     * @return array<int, array<string, mixed>>
+     */
+    private function enrichArticleScores(mixed $articleScores, array $newsArticles): array
+    {
+        if (!is_array($articleScores)) {
+            return [];
+        }
+
+        $newsByTitle = [];
+        foreach ($newsArticles as $article) {
+            if (!is_array($article) || !isset($article['title']) || !is_string($article['title'])) {
+                continue;
+            }
+
+            $newsByTitle[$article['title']] = $article;
+        }
+
+        $enriched = [];
+        foreach ($articleScores as $articleScore) {
+            if (!is_array($articleScore)) {
+                continue;
+            }
+
+            $title = $articleScore['title'] ?? null;
+            if (is_string($title) && isset($newsByTitle[$title])) {
+                $articleScore = array_replace($newsByTitle[$title], $articleScore);
+            }
+
+            $enriched[] = $articleScore;
+        }
+
+        return $enriched;
     }
 
     /**
