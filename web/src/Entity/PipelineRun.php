@@ -27,6 +27,9 @@ class PipelineRun
     #[ORM\Column(length: 32)]
     private string $status = 'queued';
 
+    #[ORM\Column(length: 32)]
+    private string $runScope = 'portfolio';
+
     #[ORM\Column(length: 1024)]
     private string $runPath = '';
 
@@ -105,6 +108,8 @@ class PipelineRun
     public function setRunKey(string $runKey): self { $this->runKey = $runKey; $this->runId = $this->runId ?: $runKey; return $this; }
     public function getStatus(): string { return $this->status; }
     public function setStatus(string $status): self { $this->status = $status; return $this; }
+    public function getRunScope(): string { return $this->runScope; }
+    public function setRunScope(string $runScope): self { $this->runScope = $runScope; return $this; }
     public function getRunPath(): string { return $this->runPath; }
     public function setRunPath(string $runPath): self { $this->runPath = $runPath; return $this; }
     public function getStartedAt(): ?\DateTimeImmutable { return $this->startedAt; }

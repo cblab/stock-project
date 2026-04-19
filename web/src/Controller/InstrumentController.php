@@ -23,8 +23,10 @@ class InstrumentController extends AbstractController
             'pageTitle' => 'Portfolio',
             'pageEyebrow' => 'Aktive Auswahl',
             'emptyMessage' => 'Noch keine Portfolio-Instrumente vorhanden.',
-            'showPortfolioColumn' => false,
+            'showPortfolioColumn' => true,
+            'showActiveColumn' => true,
             'showCreateButton' => true,
+            'returnRoute' => 'app_portfolio_index',
         ]);
     }
 
@@ -36,8 +38,25 @@ class InstrumentController extends AbstractController
             'pageTitle' => 'Watchlist',
             'pageEyebrow' => 'Beobachtungsliste',
             'emptyMessage' => 'Noch keine Watchlist-Instrumente vorhanden.',
-            'showPortfolioColumn' => false,
+            'showPortfolioColumn' => true,
+            'showActiveColumn' => true,
             'showCreateButton' => true,
+            'returnRoute' => 'app_watchlist_index',
+        ]);
+    }
+
+    #[Route('/instruments/inactive', name: 'app_instruments_inactive')]
+    public function inactive(InstrumentRepository $instrumentRepository): Response
+    {
+        return $this->render('instrument/index.html.twig', [
+            'instruments' => $instrumentRepository->findInactiveInstruments(),
+            'pageTitle' => 'Inaktive Instrumente',
+            'pageEyebrow' => 'Aus dem aktiven Universum entfernt',
+            'emptyMessage' => 'Keine inaktiven Instrumente vorhanden.',
+            'showPortfolioColumn' => true,
+            'showActiveColumn' => true,
+            'showCreateButton' => false,
+            'returnRoute' => 'app_instruments_inactive',
         ]);
     }
 
@@ -90,5 +109,31 @@ class InstrumentController extends AbstractController
             'form' => $form,
             'title' => 'Instrument bearbeiten',
         ]);
+    }
+
+    #[Route('/instrument/{id}/toggle-portfolio', name: 'app_instrument_toggle_portfolio', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function togglePortfolio(Instrument $instrument, Request $request, EntityManagerInterface $entityManager): Response
+    {
+        $instrument->setIsPortfolio(!$instrument->isPortfolio())->touch();
+        $entityManager->flush();
+
+        return $this->redirectToRoute($this->returnRoute($request));
+    }
+
+    #[Route('/instrument/{id}/toggle-active', name: 'app_instrument_toggle_active', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function toggleActive(Instrument $instrument, Request $request, EntityManagerInterface $entityManager): Response
+    {
+        $instrument->setActive(!$instrument->isActive())->touch();
+        $entityManager->flush();
+
+        return $this->redirectToRoute($this->returnRoute($request));
+    }
+
+    private function returnRoute(Request $request): string
+    {
+        $route = (string) $request->request->get('return_route', 'app_portfolio_index');
+        return in_array($route, ['app_portfolio_index', 'app_watchlist_index', 'app_instruments_inactive'], true)
+            ? $route
+            : 'app_portfolio_index';
     }
 }

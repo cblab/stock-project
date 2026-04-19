@@ -83,7 +83,7 @@ def run_db_mode(args: argparse.Namespace) -> dict:
         mappings = DBInputAdapter(connection).load_instruments(args.source)
         if not mappings:
             raise RuntimeError(f"No active instruments found for DB source '{args.source}'.")
-        output = DBOutputAdapter(connection, run_id=args.run_id, forecast=core.forecast_payload())
+        output = DBOutputAdapter(connection, run_id=args.run_id, forecast={**core.forecast_payload(), "source": args.source})
         return core.run(mappings, write_files=False, output_adapter=output)
     finally:
         connection.close()

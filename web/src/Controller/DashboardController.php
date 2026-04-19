@@ -7,6 +7,7 @@ use App\Entity\PipelineRunItem;
 use App\Repository\PipelineRunRepository;
 use App\Repository\PipelineRunItemRepository;
 use App\Service\PipelineRunLauncher;
+use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -23,13 +24,24 @@ class DashboardController extends AbstractController
         ]);
     }
 
-    #[Route('/runs/start', name: 'app_runs_start', methods: ['POST'])]
-    public function start(PipelineRunLauncher $launcher): Response
+    #[Route('/runs/start/{source}', name: 'app_runs_start', methods: ['POST'], requirements: ['source' => 'portfolio|watchlist'])]
+    public function start(string $source, PipelineRunLauncher $launcher): Response
     {
         $projectRoot = dirname($this->getParameter('kernel.project_dir'));
-        $run = $launcher->queuePortfolioRun($projectRoot);
+        $run = $launcher->queueRun($projectRoot, $source);
 
         return $this->redirectToRoute('app_run_show', ['id' => $run->getId()]);
+    }
+
+    #[Route('/run/{id}/delete', name: 'app_run_delete', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function delete(
+        PipelineRun $run,
+        EntityManagerInterface $entityManager,
+    ): Response {
+        $entityManager->remove($run);
+        $entityManager->flush();
+
+        return $this->redirectToRoute('app_runs_index');
     }
 
     #[Route('/run/{id}', name: 'app_run_show', requirements: ['id' => '\d+'])]

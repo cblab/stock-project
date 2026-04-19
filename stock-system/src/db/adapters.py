@@ -15,6 +15,10 @@ class DBInputAdapter:
         where = "active = 1"
         if source == "portfolio":
             where += " AND is_portfolio = 1"
+        elif source == "watchlist":
+            where += " AND is_portfolio = 0"
+        elif source != "all":
+            raise ValueError("DB source must be one of: portfolio, watchlist, all.")
         with self.connection.cursor() as cursor:
             cursor.execute(f"SELECT * FROM instrument WHERE {where} ORDER BY input_ticker ASC")
             rows = cursor.fetchall()
@@ -58,12 +62,13 @@ class DBOutputAdapter:
                 cursor.execute(
                     """
                     INSERT INTO pipeline_run
-                    (run_id, run_key, status, run_path, started_at, created_at, data_frequency, horizon_steps, horizon_label, score_validity_hours, summary_generated, decision_entry_count, decision_watch_count, decision_hold_count, decision_no_trade_count)
-                    VALUES (%s, %s, 'running', '', %s, %s, %s, %s, %s, %s, 0, 0, 0, 0, 0)
+                    (run_id, run_key, run_scope, status, run_path, started_at, created_at, data_frequency, horizon_steps, horizon_label, score_validity_hours, summary_generated, decision_entry_count, decision_watch_count, decision_hold_count, decision_no_trade_count)
+                    VALUES (%s, %s, %s, 'running', '', %s, %s, %s, %s, %s, %s, 0, 0, 0, 0, 0)
                     """,
                     (
                         run_key,
                         run_key,
+                        self.forecast.get("source", "portfolio"),
                         now,
                         now,
                         forecast.get("data_frequency"),

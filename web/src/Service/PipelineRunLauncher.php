@@ -11,10 +11,11 @@ class PipelineRunLauncher
     {
     }
 
-    public function queuePortfolioRun(string $projectRoot): PipelineRun
+    public function queueRun(string $projectRoot, string $source = 'portfolio'): PipelineRun
     {
+        $source = $source === 'watchlist' ? 'watchlist' : 'portfolio';
         $now = new \DateTimeImmutable();
-        $runKey = $now->format('Y-m-d_H-i-s');
+        $runKey = $now->format('Y-m-d_H-i-s').'-'.$source;
         $projectRoot = rtrim(str_replace('\\', DIRECTORY_SEPARATOR, $projectRoot), DIRECTORY_SEPARATOR);
         $logDir = $projectRoot.DIRECTORY_SEPARATOR.'web'.DIRECTORY_SEPARATOR.'var'.DIRECTORY_SEPARATOR.'log';
         if (!is_dir($logDir)) {
@@ -24,6 +25,7 @@ class PipelineRunLauncher
         $run = (new PipelineRun())
             ->setRunId($runKey)
             ->setRunKey($runKey)
+            ->setRunScope($source)
             ->setStatus('queued')
             ->setRunPath('')
             ->setCreatedAt($now)
@@ -56,9 +58,10 @@ class PipelineRunLauncher
         $previousCwd = getcwd();
         chdir($projectRoot);
         $command = sprintf(
-            'start "" /B %s %s --mode=db --source=portfolio --run-id=%d --quiet 1>%s 2>%s',
+            'start "" /B %s %s --mode=db --source=%s --run-id=%d --quiet 1>%s 2>%s',
             escapeshellarg($python),
             escapeshellarg($script),
+            escapeshellarg($source),
             $run->getId(),
             escapeshellarg($stdout),
             escapeshellarg($stderr),
@@ -81,6 +84,11 @@ class PipelineRunLauncher
         $this->entityManager->flush();
 
         return $run;
+    }
+
+    public function queuePortfolioRun(string $projectRoot): PipelineRun
+    {
+        return $this->queueRun($projectRoot, 'portfolio');
     }
 
     private function pythonBinary(): string
