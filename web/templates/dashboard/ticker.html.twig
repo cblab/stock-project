@@ -47,6 +47,15 @@
         </div>
     </div>
 
+    <div class="mb-6">
+        {% include '_last_run_snapshot.html.twig' with {
+            lastRunItem: lastRunItem,
+            currentRunItem: ticker,
+            showTickerLink: false,
+            showInstrumentLink: true
+        } only %}
+    </div>
+
     <div class="grid gap-4 lg:grid-cols-3">
         <section class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
             <h2 class="text-sm font-semibold uppercase text-slate-500" title="Kronos liefert Preis-/OHLCV-basiertes Richtungssignal.">Kronos</h2>

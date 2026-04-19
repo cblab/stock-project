@@ -1,5 +1,33 @@
 {% extends 'base.html.twig' %}
 
+{% macro field(field, wide) %}
+    <div class="{{ wide ? 'md:col-span-2' : '' }}">
+        {{ form_label(field, null, {label_attr: {class: 'instrument-label'}}) }}
+        {{ form_widget(field, {attr: {class: 'instrument-input'}}) }}
+        {{ form_errors(field) }}
+        {% if field.vars.help %}
+            <p class="form-help">{{ field.vars.help }}</p>
+        {% endif %}
+    </div>
+{% endmacro %}
+
+{% macro checkbox(field) %}
+    <div class="rounded-md border border-slate-200 bg-slate-50 px-3 py-3">
+        <label class="flex items-start gap-3">
+            {{ form_widget(field, {attr: {class: 'instrument-checkbox'}}) }}
+            <span>
+                <span class="block text-sm font-medium text-slate-800">{{ field.vars.label }}</span>
+                {% if field.vars.help %}
+                    <span class="mt-1 block text-xs text-slate-500">{{ field.vars.help }}</span>
+                {% endif %}
+                {{ form_errors(field) }}
+            </span>
+        </label>
+    </div>
+{% endmacro %}
+
+{% import _self as formui %}
+
 {% block title %}{{ title }}{% endblock %}
 
 {% block body %}
@@ -8,47 +36,64 @@
         <h1 class="mt-1 text-2xl font-semibold text-slate-950">{{ title }}</h1>
     </div>
 
-    <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        {{ form_start(form, {attr: {class: 'instrument-form space-y-6'}}) }}
-            <div>
-                <h2 class="text-sm font-semibold uppercase text-slate-500">Stammdaten</h2>
-                <p class="mt-1 text-sm text-slate-600">Ticker, Provider-Symbol und optionale Identifikatoren.</p>
+    <section class="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+        {{ form_start(form, {attr: {class: 'instrument-form'}}) }}
+            <div class="space-y-8">
+                <div>
+                    <h2 class="text-sm font-semibold uppercase text-slate-500">Stammdaten</h2>
+                    <p class="mt-1 text-sm text-slate-600">Ticker, Provider-Symbol, Name und Identifikatoren.</p>
+                    <div class="mt-4 grid gap-5 md:grid-cols-3">
+                        {{ formui.field(form.inputTicker, false) }}
+                        {{ formui.field(form.providerTicker, false) }}
+                        {{ formui.field(form.displayTicker, false) }}
+                        {{ formui.field(form.name, true) }}
+                        {{ formui.field(form.wkn, false) }}
+                        {{ formui.field(form.isin, false) }}
+                        {{ formui.field(form.assetClass, false) }}
+                        {{ formui.field(form.region, false) }}
+                        {{ formui.field(form.benchmark, false) }}
+                    </div>
+                </div>
+
+                <div>
+                    <h2 class="text-sm font-semibold uppercase text-slate-500">Gewichtung / Mapping</h2>
+                    <p class="mt-1 text-sm text-slate-600">Kontexttyp, Sentiment-Gewichte und Mapping-Hinweise.</p>
+                    <div class="mt-4 grid gap-5 md:grid-cols-2">
+                        {{ formui.field(form.contextType, false) }}
+                        <div></div>
+                        {{ formui.field(form.directNewsWeight, false) }}
+                        {{ formui.field(form.contextNewsWeight, false) }}
+                        {{ formui.field(form.mappingNote, true) }}
+                    </div>
+                </div>
+
+                <div>
+                    <h2 class="text-sm font-semibold uppercase text-slate-500">ETF-Kontext</h2>
+                    <p class="mt-1 text-sm text-slate-600">Ein Wert pro Zeile oder kommagetrennt; relevant fuer ETF-Kontextsentiment.</p>
+                    <div class="mt-4 grid gap-5 md:grid-cols-2">
+                        {{ formui.field(form.regionExposure, false) }}
+                        {{ formui.field(form.sectorProfile, false) }}
+                        {{ formui.field(form.topHoldingsProfile, false) }}
+                        {{ formui.field(form.macroProfile, false) }}
+                    </div>
+                </div>
+
+                <div>
+                    <h2 class="text-sm font-semibold uppercase text-slate-500">Status</h2>
+                    <p class="mt-1 text-sm text-slate-600">Aktive Instrumente koennen in Portfolio- oder Watchlist-Runs verwendet werden.</p>
+                    <div class="mt-4 grid gap-4 md:grid-cols-2">
+                        {{ formui.checkbox(form.active) }}
+                        {{ formui.checkbox(form.isPortfolio) }}
+                    </div>
+                </div>
             </div>
-            <div class="grid gap-4 md:grid-cols-3">
-                {{ form_row(form.inputTicker) }}
-                {{ form_row(form.providerTicker) }}
-                {{ form_row(form.displayTicker) }}
-                {{ form_row(form.name) }}
-                {{ form_row(form.wkn) }}
-                {{ form_row(form.isin) }}
-                {{ form_row(form.assetClass) }}
-                {{ form_row(form.region) }}
-                {{ form_row(form.benchmark) }}
-                {{ form_row(form.contextType) }}
+
+            {{ form_rest(form) }}
+
+            <div class="mt-8 flex items-center gap-3 border-t border-slate-200 pt-5">
+                <button class="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2" type="submit">Speichern</button>
+                <a class="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50" href="{{ path('app_portfolio_index') }}">Abbrechen</a>
             </div>
-            <div>
-                <h2 class="text-sm font-semibold uppercase text-slate-500">Gewichtung</h2>
-            </div>
-            <div class="grid gap-4 md:grid-cols-2">
-                {{ form_row(form.directNewsWeight) }}
-                {{ form_row(form.contextNewsWeight) }}
-            </div>
-            {{ form_row(form.mappingNote) }}
-            <div>
-                <h2 class="text-sm font-semibold uppercase text-slate-500">ETF-Kontext</h2>
-                <p class="mt-1 text-sm text-slate-600">Ein Wert pro Zeile oder kommagetrennt.</p>
-            </div>
-            <div class="grid gap-4 md:grid-cols-2">
-                {{ form_row(form.regionExposure) }}
-                {{ form_row(form.sectorProfile) }}
-                {{ form_row(form.topHoldingsProfile) }}
-                {{ form_row(form.macroProfile) }}
-            </div>
-            <div class="flex gap-6">
-                {{ form_row(form.active) }}
-                {{ form_row(form.isPortfolio) }}
-            </div>
-            <button class="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800" type="submit">Speichern</button>
-        {{ form_end(form) }}
+        {{ form_end(form, {render_rest: false}) }}
     </section>
 {% endblock %}
