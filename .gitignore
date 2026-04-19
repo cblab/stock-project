@@ -12,11 +12,17 @@
 /.deps/
 /.cache/
 /.hf-cache/
+/.tools/
 
 # Environment files and secrets.
 .env
 .env.*
 *.env
+!/web/.env
+!/web/.env.dev
+!/web/.env.test
+/web/.env.local
+/web/.env.*.local
 
 # Python caches, virtualenvs, and build outputs.
 __pycache__/
