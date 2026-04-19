@@ -54,6 +54,8 @@ class PipelineRunItemRepository extends ServiceEntityRepository
         return $this->createQueryBuilder('item')
             ->join('item.pipelineRun', 'run')
             ->addSelect('run')
+            ->join('item.instrument', 'instrument')
+            ->addSelect('instrument')
             ->addSelect('COALESCE(run.startedAt, run.createdAt) AS HIDDEN runSortAt')
             ->andWhere('item.instrument = :instrument')
             ->setParameter('instrument', $instrument)

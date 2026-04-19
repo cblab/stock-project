@@ -76,12 +76,14 @@ class DashboardController extends AbstractController
             throw $this->createNotFoundException('Pipeline run item not found.');
         }
 
+        $lastRunItem = $pipelineRunItemRepository->findLatestForInstrument($ticker->getInstrument());
+
         return $this->render('dashboard/ticker.html.twig', [
             'ticker' => $ticker,
             'run' => $ticker->getPipelineRun(),
+            'lastRunItem' => $lastRunItem,
             'explain' => $ticker->getExplainJson(),
             'view' => $this->buildTickerView($ticker),
-            'lastRunItem' => $pipelineRunItemRepository->findLatestForInstrument($ticker->getInstrument()),
         ]);
     }
 
