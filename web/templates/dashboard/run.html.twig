@@ -1,0 +1,70 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Run {{ run.runId }}{% endblock %}
+
+{% block body %}
+    <div class="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+            <a class="text-sm text-slate-500 hover:text-slate-950" href="{{ path('app_runs_index') }}">Zurueck zu Runs</a>
+            <h1 class="mt-1 text-2xl font-semibold text-slate-950">Run {{ run.runId }}</h1>
+            <p class="mt-1 text-sm text-slate-500">{{ run.runPath }}</p>
+        </div>
+        <div class="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm">
+            <span class="font-medium text-slate-950">Kronos:</span>
+            {{ run.dataFrequency ?: '-' }} Candles,
+            {{ run.horizonSteps ?: '-' }} Schritte,
+            {{ run.horizonLabel ?: '-' }},
+            {{ run.scoreValidityHours ?: '-' }}h Gueltigkeit
+        </div>
+    </div>
+
+    <div class="grid gap-4 md:grid-cols-4">
+        <div class="metric-card"><p class="text-xs font-semibold uppercase text-slate-500">ENTRY</p><p class="mt-2 text-xl font-semibold">{{ run.decisionEntryCount }}</p></div>
+        <div class="metric-card"><p class="text-xs font-semibold uppercase text-slate-500">WATCH</p><p class="mt-2 text-xl font-semibold">{{ run.decisionWatchCount }}</p></div>
+        <div class="metric-card"><p class="text-xs font-semibold uppercase text-slate-500">HOLD</p><p class="mt-2 text-xl font-semibold">{{ run.decisionHoldCount }}</p></div>
+        <div class="metric-card"><p class="text-xs font-semibold uppercase text-slate-500">NO TRADE</p><p class="mt-2 text-xl font-semibold">{{ run.decisionNoTradeCount }}</p></div>
+    </div>
+
+    <section class="mt-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <h2 class="text-sm font-semibold uppercase text-slate-500">Score-Modell</h2>
+        <p class="mt-2 text-sm text-slate-700">Scores liegen in <span class="font-medium">[-1, 1]</span>. Merged = 60% Kronos Normalized + 40% Sentiment Normalized. Thresholds: ENTRY ab 0.35, WATCH ab 0.15, HOLD zwischen -0.15 und 0.15, NO TRADE bis -0.15.</p>
+    </section>
+
+    <section class="mt-6 overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Ticker</th>
+                    <th>Provider</th>
+                    <th>Asset</th>
+                    <th>Region</th>
+                    <th>Sentiment Mode</th>
+                    <th>K Norm</th>
+                    <th>S Norm</th>
+                    <th>Merged</th>
+                    <th>Decision</th>
+                    <th>Daten</th>
+                    <th>News</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                {% for ticker in tickers %}
+                    {% set decisionClass = ticker.decision == 'ENTRY' ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : (ticker.decision == 'WATCH' ? 'bg-blue-50 text-blue-700 ring-blue-200' : (ticker.decision == 'NO TRADE' ? 'bg-rose-50 text-rose-700 ring-rose-200' : 'bg-slate-100 text-slate-700 ring-slate-200')) %}
+                    <tr class="hover:bg-slate-50">
+                        <td class="font-medium text-slate-950"><a class="underline decoration-slate-300 underline-offset-4 hover:decoration-slate-900" href="{{ path('app_ticker_show', {id: ticker.id}) }}">{{ ticker.displayTicker }}</a></td>
+                        <td>{{ ticker.providerTicker }}</td>
+                        <td><span class="rounded-full px-2 py-1 text-xs font-medium ring-1 {{ ticker.assetClass == 'ETF' ? 'bg-violet-50 text-violet-700 ring-violet-200' : 'bg-slate-100 text-slate-700 ring-slate-200' }}">{{ ticker.assetClass }}</span></td>
+                        <td>{{ ticker.region ?: '-' }}</td>
+                        <td>{{ ticker.sentimentMode ?: '-' }}</td>
+                        <td>{{ ticker.kronosNormalizedScore is not null ? ticker.kronosNormalizedScore|number_format(3) : '-' }}</td>
+                        <td>{{ ticker.sentimentNormalizedScore is not null ? ticker.sentimentNormalizedScore|number_format(3) : '-' }}</td>
+                        <td class="font-medium">{{ ticker.mergedScore is not null ? ticker.mergedScore|number_format(3) : '-' }}</td>
+                        <td><span class="rounded-full px-2 py-1 text-xs font-semibold ring-1 {{ decisionClass }}">{{ ticker.decision }}</span></td>
+                        <td>{{ ticker.marketDataStatus ?: '-' }}</td>
+                        <td>{{ ticker.newsStatus ?: '-' }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+{% endblock %}

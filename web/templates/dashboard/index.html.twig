@@ -1,0 +1,72 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Pipeline Runs{% endblock %}
+
+{% block body %}
+    <div class="mb-6">
+        <p class="text-sm font-medium uppercase text-slate-500">Persistierte Analyse-Runs</p>
+        <h1 class="mt-1 text-2xl font-semibold text-slate-950">Stock Pipeline Dashboard</h1>
+    </div>
+
+    {% if runs is empty %}
+        <section class="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 class="text-base font-semibold text-slate-950">Noch keine Runs importiert</h2>
+            <p class="mt-2 text-sm text-slate-600">Importiere einen bestehenden Pipeline-Run mit <code class="rounded bg-slate-100 px-1 py-0.5">php bin/console app:import-run --path="E:/stock-project/runs/YYYY-MM-DD_HH-MM"</code>.</p>
+        </section>
+    {% else %}
+        {% set newest = runs|first %}
+        <div class="grid gap-4 md:grid-cols-4">
+            <div class="metric-card">
+                <p class="text-xs font-semibold uppercase text-slate-500">Neuester Run</p>
+                <p class="mt-2 text-xl font-semibold text-slate-950">{{ newest.runId }}</p>
+            </div>
+            <div class="metric-card">
+                <p class="text-xs font-semibold uppercase text-slate-500">Ticker</p>
+                <p class="mt-2 text-xl font-semibold text-slate-950">{{ newest.tickers|length }}</p>
+            </div>
+            <div class="metric-card">
+                <p class="text-xs font-semibold uppercase text-slate-500">ENTRY / WATCH</p>
+                <p class="mt-2 text-xl font-semibold text-slate-950">{{ newest.decisionEntryCount }} / {{ newest.decisionWatchCount }}</p>
+            </div>
+            <div class="metric-card">
+                <p class="text-xs font-semibold uppercase text-slate-500">Score-Spanne</p>
+                <p class="mt-2 text-xl font-semibold text-slate-950">{{ newest.scoreMin|number_format(3) }} bis {{ newest.scoreMax|number_format(3) }}</p>
+            </div>
+        </div>
+
+        <section class="mt-6 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Run</th>
+                        <th>Start</th>
+                        <th>Ticker</th>
+                        <th>ENTRY</th>
+                        <th>WATCH</th>
+                        <th>HOLD</th>
+                        <th>NO TRADE</th>
+                        <th>Score Mean</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for run in runs %}
+                        <tr class="hover:bg-slate-50">
+                            <td class="font-medium text-slate-950">{{ run.runId }}</td>
+                            <td>{{ run.startedAt ? run.startedAt|date('d.m.Y H:i') : '-' }}</td>
+                            <td>{{ run.tickers|length }}</td>
+                            <td>{{ run.decisionEntryCount }}</td>
+                            <td>{{ run.decisionWatchCount }}</td>
+                            <td>{{ run.decisionHoldCount }}</td>
+                            <td>{{ run.decisionNoTradeCount }}</td>
+                            <td>{{ run.scoreMean is not null ? run.scoreMean|number_format(3) : '-' }}</td>
+                            <td class="text-right">
+                                <a class="font-medium text-slate-950 underline decoration-slate-300 underline-offset-4 hover:decoration-slate-900" href="{{ path('app_run_show', {id: run.id}) }}">Details</a>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+    {% endif %}
+{% endblock %}
