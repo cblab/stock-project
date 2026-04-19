@@ -68,23 +68,34 @@ class DashboardController extends AbstractController
     private function buildTickerView(PipelineTicker $ticker): array
     {
         $explain = $ticker->getExplainJson();
-        $articles = $this->extractArticles($explain);
+        $articles = $this->extractArticles($explain, $ticker);
+        $mergeWeights = $this->mergeWeights($explain);
+        $distribution = $this->sentimentDistribution($explain, $articles);
 
         return [
             'articles' => $articles,
             'articleGroups' => $this->groupArticles($articles, $ticker),
+            'sentimentDistribution' => $distribution,
+            'kronosRawPercent' => $this->percent($ticker->getKronosRawScore()),
+            'kronosClamp' => $this->clampInfo($ticker->getKronosNormalizedScore()),
+            'generatedAt' => $this->formatDateTime($explain['kronos_generated_at'] ?? null),
+            'validUntil' => $this->formatDateTime($explain['kronos_valid_until'] ?? null),
             'thresholds' => [
                 'no_trade' => -0.15,
                 'hold_low' => -0.15,
                 'watch' => 0.15,
                 'entry' => 0.35,
             ],
+            'mergeWeights' => $mergeWeights,
             'scorePositions' => [
                 'kronos' => $this->scorePosition($ticker->getKronosNormalizedScore()),
                 'sentiment' => $this->scorePosition($ticker->getSentimentNormalizedScore()),
                 'merged' => $this->scorePosition($ticker->getMergedScore()),
             ],
             'decisionReason' => $this->decisionReason($ticker, $explain),
+            'decisionMath' => $this->decisionMath($ticker, $mergeWeights),
+            'decisionThreshold' => $this->decisionThresholdSentence($ticker),
+            'signalSummary' => $this->signalSummary($ticker),
         ];
     }
 
@@ -92,16 +103,60 @@ class DashboardController extends AbstractController
      * @param array<string, mixed> $explain
      * @return array<int, array<string, mixed>>
      */
-    private function extractArticles(array $explain): array
+    private function extractArticles(array $explain, PipelineTicker $ticker): array
     {
         $articles = [];
         foreach (($explain['article_scores'] ?? []) as $article) {
             if (is_array($article)) {
+                $article['formatted_published_at'] = $this->formatDateTime($article['published_at'] ?? null);
+                $article['relevance'] = $this->articleRelevance($article, $ticker, $explain);
                 $articles[] = $article;
             }
         }
 
         return $articles;
+    }
+
+    /**
+     * @param array<string, mixed> $explain
+     * @return array{kronos: float, sentiment: float}
+     */
+    private function mergeWeights(array $explain): array
+    {
+        $weights = $explain['merge_weights'] ?? [];
+
+        return [
+            'kronos' => isset($weights['kronos']) && is_numeric($weights['kronos']) ? (float) $weights['kronos'] : 0.6,
+            'sentiment' => isset($weights['sentiment']) && is_numeric($weights['sentiment']) ? (float) $weights['sentiment'] : 0.4,
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $explain
+     * @param array<int, array<string, mixed>> $articles
+     * @return array{positive: int, neutral: int, negative: int, total: int}
+     */
+    private function sentimentDistribution(array $explain, array $articles): array
+    {
+        $summary = $explain['sentiment_article_score_summary'] ?? [];
+        if (is_array($summary)) {
+            return [
+                'positive' => (int) ($summary['positive'] ?? 0),
+                'neutral' => (int) ($summary['neutral'] ?? 0),
+                'negative' => (int) ($summary['negative'] ?? 0),
+                'total' => (int) ($summary['total'] ?? count($articles)),
+            ];
+        }
+
+        $distribution = ['positive' => 0, 'neutral' => 0, 'negative' => 0, 'total' => count($articles)];
+        foreach ($articles as $article) {
+            $label = strtolower((string) ($article['label'] ?? $article['raw_label'] ?? 'neutral'));
+            if (isset($distribution[$label])) {
+                ++$distribution[$label];
+            }
+        }
+
+        return $distribution;
     }
 
     /**
@@ -128,6 +183,131 @@ class DashboardController extends AbstractController
         $clamped = max(-1.0, min(1.0, $score));
 
         return ($clamped + 1.0) * 50.0;
+    }
+
+    private function percent(?float $value): ?float
+    {
+        return $value === null ? null : $value * 100.0;
+    }
+
+    /**
+     * @return array{label: string, tone: string}|null
+     */
+    private function clampInfo(?float $score): ?array
+    {
+        if ($score === null) {
+            return null;
+        }
+
+        if ($score >= 0.9995) {
+            return ['label' => 'Score clipped at upper bound', 'tone' => 'upper'];
+        }
+
+        if ($score <= -0.9995) {
+            return ['label' => 'Score clipped at lower bound', 'tone' => 'lower'];
+        }
+
+        return null;
+    }
+
+    private function formatDateTime(mixed $value): ?string
+    {
+        if (!is_string($value) || $value === '') {
+            return null;
+        }
+
+        try {
+            return (new \DateTimeImmutable($value))
+                ->setTimezone(new \DateTimeZone('Europe/Berlin'))
+                ->format('d.m.Y H:i');
+        } catch (\Throwable) {
+            return $value;
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $article
+     * @param array<string, mixed> $explain
+     */
+    private function articleRelevance(array $article, PipelineTicker $ticker, array $explain): string
+    {
+        $haystack = strtolower(trim(
+            (string) ($article['title'] ?? '').' '.
+            (string) ($article['summary'] ?? '').' '.
+            (string) ($article['snippet'] ?? '')
+        ));
+        $symbols = array_filter([
+            strtolower($ticker->getInputTicker()),
+            strtolower($ticker->getProviderTicker()),
+            strtolower(str_replace(['.DE', '.AS', '.ST'], '', $ticker->getProviderTicker())),
+        ]);
+
+        foreach ($symbols as $symbol) {
+            if ($symbol !== '' && str_contains($haystack, $symbol)) {
+                return 'direct';
+            }
+        }
+
+        foreach (($explain['top_holdings_profile'] ?? []) as $holding) {
+            if (is_string($holding) && $holding !== '' && str_contains($haystack, strtolower(str_replace(['.DE', '.AS', '.ST'], '', $holding)))) {
+                return 'related';
+            }
+        }
+
+        if (isset($article['sentiment_source']) && $article['sentiment_source'] === 'holdings_lookthrough') {
+            return 'related';
+        }
+
+        return $ticker->getAssetClass() === 'ETF' ? 'related' : 'weak';
+    }
+
+    /**
+     * @param array{kronos: float, sentiment: float} $weights
+     */
+    private function decisionMath(PipelineTicker $ticker, array $weights): string
+    {
+        $kronos = $ticker->getKronosNormalizedScore() ?? 0.0;
+        $sentiment = $ticker->getSentimentNormalizedScore() ?? 0.0;
+        $merged = $ticker->getMergedScore() ?? (($weights['kronos'] * $kronos) + ($weights['sentiment'] * $sentiment));
+
+        return sprintf(
+            '%.1f x %.4f + %.1f x %.4f = %.4f',
+            $weights['kronos'],
+            $kronos,
+            $weights['sentiment'],
+            $sentiment,
+            $merged
+        );
+    }
+
+    private function decisionThresholdSentence(PipelineTicker $ticker): string
+    {
+        $score = $ticker->getMergedScore() ?? 0.0;
+
+        return match ($ticker->getDecision()) {
+            'ENTRY' => sprintf('This is above the ENTRY threshold of 0.35 by %.4f.', $score - 0.35),
+            'WATCH' => sprintf('This is above WATCH 0.15 but below ENTRY 0.35; distance to ENTRY is %.4f.', 0.35 - $score),
+            'NO TRADE' => sprintf('This is at or below the NO TRADE threshold of -0.15 by %.4f.', -0.15 - $score),
+            default => 'This sits inside the HOLD band between -0.15 and 0.15.',
+        };
+    }
+
+    private function signalSummary(PipelineTicker $ticker): string
+    {
+        $kronos = $this->signalStrength($ticker->getKronosNormalizedScore(), 'Kronos');
+        $sentiment = $this->signalStrength($ticker->getSentimentNormalizedScore(), 'sentiment');
+
+        return $kronos.' and '.$sentiment.'.';
+    }
+
+    private function signalStrength(?float $score, string $label): string
+    {
+        $score ??= 0.0;
+        $abs = abs($score);
+        $direction = $score > 0.05 ? 'positive' : ($score < -0.05 ? 'negative' : 'neutral');
+        $strength = $abs >= 0.75 ? 'strongly' : ($abs >= 0.35 ? 'clearly' : ($abs >= 0.15 ? 'mildly' : 'weakly'));
+
+        return sprintf('%s is %s %s', $label, $strength, $direction);
     }
 
     /**
