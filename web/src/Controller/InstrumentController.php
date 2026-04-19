@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Entity\Instrument;
 use App\Form\InstrumentType;
 use App\Repository\InstrumentRepository;
+use App\Repository\InstrumentSepaSnapshotRepository;
 use App\Repository\PipelineRunItemRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -83,11 +84,16 @@ class InstrumentController extends AbstractController
     }
 
     #[Route('/instrument/{id}', name: 'app_instrument_show', requirements: ['id' => '\d+'])]
-    public function show(Instrument $instrument, PipelineRunItemRepository $pipelineRunItemRepository): Response
+    public function show(
+        Instrument $instrument,
+        PipelineRunItemRepository $pipelineRunItemRepository,
+        InstrumentSepaSnapshotRepository $sepaSnapshotRepository,
+    ): Response
     {
         return $this->render('instrument/show.html.twig', [
             'instrument' => $instrument,
             'lastRunItem' => $pipelineRunItemRepository->findLatestForInstrument($instrument),
+            'sepaSnapshot' => $sepaSnapshotRepository->findLatestForInstrument($instrument),
         ]);
     }
 
