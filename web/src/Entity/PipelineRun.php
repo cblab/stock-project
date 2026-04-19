@@ -10,6 +10,7 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: PipelineRunRepository::class)]
 #[ORM\UniqueConstraint(name: 'uniq_pipeline_run_run_id', columns: ['run_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_pipeline_run_run_key', columns: ['run_key'])]
 class PipelineRun
 {
     #[ORM\Id]
@@ -20,11 +21,20 @@ class PipelineRun
     #[ORM\Column(length: 64)]
     private string $runId = '';
 
+    #[ORM\Column(length: 64)]
+    private string $runKey = '';
+
+    #[ORM\Column(length: 32)]
+    private string $status = 'queued';
+
     #[ORM\Column(length: 1024)]
     private string $runPath = '';
 
     #[ORM\Column(nullable: true)]
     private ?\DateTimeImmutable $startedAt = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?\DateTimeImmutable $finishedAt = null;
 
     #[ORM\Column]
     private \DateTimeImmutable $createdAt;
@@ -76,19 +86,31 @@ class PipelineRun
     #[ORM\OrderBy(['mergedScore' => 'DESC'])]
     private Collection $tickers;
 
+    /** @var Collection<int, PipelineRunItem> */
+    #[ORM\OneToMany(mappedBy: 'pipelineRun', targetEntity: PipelineRunItem::class, cascade: ['persist'], orphanRemoval: true)]
+    #[ORM\OrderBy(['mergedScore' => 'DESC'])]
+    private Collection $runItems;
+
     public function __construct()
     {
         $this->createdAt = new \DateTimeImmutable();
         $this->tickers = new ArrayCollection();
+        $this->runItems = new ArrayCollection();
     }
 
     public function getId(): ?int { return $this->id; }
     public function getRunId(): string { return $this->runId; }
-    public function setRunId(string $runId): self { $this->runId = $runId; return $this; }
+    public function setRunId(string $runId): self { $this->runId = $runId; $this->runKey = $this->runKey ?: $runId; return $this; }
+    public function getRunKey(): string { return $this->runKey ?: $this->runId; }
+    public function setRunKey(string $runKey): self { $this->runKey = $runKey; $this->runId = $this->runId ?: $runKey; return $this; }
+    public function getStatus(): string { return $this->status; }
+    public function setStatus(string $status): self { $this->status = $status; return $this; }
     public function getRunPath(): string { return $this->runPath; }
     public function setRunPath(string $runPath): self { $this->runPath = $runPath; return $this; }
     public function getStartedAt(): ?\DateTimeImmutable { return $this->startedAt; }
     public function setStartedAt(?\DateTimeImmutable $startedAt): self { $this->startedAt = $startedAt; return $this; }
+    public function getFinishedAt(): ?\DateTimeImmutable { return $this->finishedAt; }
+    public function setFinishedAt(?\DateTimeImmutable $finishedAt): self { $this->finishedAt = $finishedAt; return $this; }
     public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
     public function setCreatedAt(\DateTimeImmutable $createdAt): self { $this->createdAt = $createdAt; return $this; }
     public function getDataFrequency(): ?string { return $this->dataFrequency; }
@@ -123,6 +145,12 @@ class PipelineRun
     /** @return Collection<int, PipelineTicker> */
     public function getTickers(): Collection { return $this->tickers; }
 
+    /** @return Collection<int, PipelineRunItem> */
+    public function getRunItems(): Collection { return $this->runItems; }
+
+    /** @return Collection<int, PipelineRunItem> */
+    public function getDisplayItems(): Collection { return $this->runItems->isEmpty() ? $this->tickers : $this->runItems; }
+
     public function addTicker(PipelineTicker $ticker): self
     {
         if (!$this->tickers->contains($ticker)) {
@@ -136,6 +164,16 @@ class PipelineRun
     public function removeTicker(PipelineTicker $ticker): self
     {
         $this->tickers->removeElement($ticker);
+        return $this;
+    }
+
+    public function addRunItem(PipelineRunItem $item): self
+    {
+        if (!$this->runItems->contains($item)) {
+            $this->runItems->add($item);
+            $item->setPipelineRun($this);
+        }
+
         return $this;
     }
 }

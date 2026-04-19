@@ -1,0 +1,41 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block body %}
+    <div class="mb-6">
+        <a class="text-sm text-slate-500 hover:text-slate-950" href="{{ path('app_portfolio_index') }}">Zurueck zu Portfolio</a>
+        <h1 class="mt-1 text-2xl font-semibold text-slate-950">{{ title }}</h1>
+    </div>
+
+    <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        {{ form_start(form, {attr: {class: 'space-y-5'}}) }}
+            <div class="grid gap-4 md:grid-cols-3">
+                {{ form_row(form.inputTicker) }}
+                {{ form_row(form.providerTicker) }}
+                {{ form_row(form.displayTicker) }}
+                {{ form_row(form.name) }}
+                {{ form_row(form.wkn) }}
+                {{ form_row(form.isin) }}
+                {{ form_row(form.assetClass) }}
+                {{ form_row(form.region) }}
+                {{ form_row(form.benchmark) }}
+                {{ form_row(form.contextType) }}
+                {{ form_row(form.directNewsWeight) }}
+                {{ form_row(form.contextNewsWeight) }}
+            </div>
+            {{ form_row(form.mappingNote) }}
+            <div class="grid gap-4 md:grid-cols-2">
+                {{ form_row(form.regionExposure) }}
+                {{ form_row(form.sectorProfile) }}
+                {{ form_row(form.topHoldingsProfile) }}
+                {{ form_row(form.macroProfile) }}
+            </div>
+            <div class="flex gap-6">
+                {{ form_row(form.active) }}
+                {{ form_row(form.isPortfolio) }}
+            </div>
+            <button class="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800" type="submit">Speichern</button>
+        {{ form_end(form) }}
+    </section>
+{% endblock %}

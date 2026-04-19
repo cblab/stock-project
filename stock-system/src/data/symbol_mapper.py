@@ -9,6 +9,7 @@ from common.config_loader import load_yaml
 
 @dataclass(frozen=True)
 class SymbolMapping:
+    instrument_id: int | None
     input_ticker: str
     provider_ticker: str
     display_ticker: str
@@ -49,6 +50,7 @@ def resolve_symbol(input_ticker: str, symbol_map: dict[str, dict]) -> SymbolMapp
         asset_class = str(item.get("asset_class") or "Equity").strip()
         note = str(item.get("note") or "Configured symbol mapping.").strip()
         return SymbolMapping(
+            instrument_id=item.get("instrument_id"),
             input_ticker=original,
             provider_ticker=provider,
             display_ticker=display,
@@ -69,6 +71,7 @@ def resolve_symbol(input_ticker: str, symbol_map: dict[str, dict]) -> SymbolMapp
 
     normalized = "BRK-B" if lookup == "BRK.B" else original
     return SymbolMapping(
+        instrument_id=None,
         input_ticker=original,
         provider_ticker=normalized,
         display_ticker=original,
