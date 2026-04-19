@@ -82,7 +82,6 @@ class DashboardController extends AbstractController
             'ticker' => $ticker,
             'run' => $ticker->getPipelineRun(),
             'lastRunItem' => $lastRunItem,
-            'isCurrentRunLatest' => $lastRunItem?->getId() === $ticker->getId(),
             'explain' => $ticker->getExplainJson(),
             'view' => $this->buildTickerView($ticker),
         ]);

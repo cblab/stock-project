@@ -2,9 +2,9 @@
 
 namespace App\Repository;
 
+use App\Entity\Instrument;
 use App\Entity\PipelineRun;
 use App\Entity\PipelineRunItem;
-use App\Entity\Instrument;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -56,9 +56,10 @@ class PipelineRunItemRepository extends ServiceEntityRepository
             ->addSelect('run')
             ->join('item.instrument', 'instrument')
             ->addSelect('instrument')
+            ->addSelect('COALESCE(run.startedAt, run.createdAt) AS HIDDEN runSortAt')
             ->andWhere('item.instrument = :instrument')
             ->setParameter('instrument', $instrument)
-            ->orderBy('COALESCE(run.startedAt, run.createdAt)', 'DESC')
+            ->orderBy('runSortAt', 'DESC')
             ->addOrderBy('run.id', 'DESC')
             ->addOrderBy('item.id', 'DESC')
             ->setMaxResults(1)

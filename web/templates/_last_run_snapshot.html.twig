@@ -1,0 +1,78 @@
+{% import 'dashboard/_ui.html.twig' as ui %}
+
+<section class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+            <h2 class="text-sm font-semibold uppercase text-slate-500">Letzter Lauf</h2>
+            <p class="mt-1 text-sm text-slate-600">Neuester gespeicherter Run fuer dieses Instrument.</p>
+        </div>
+        {% if lastRunItem is defined and lastRunItem %}
+            {% set lastRun = lastRunItem.pipelineRun %}
+            {% set scopeLabel = lastRun.runScope == 'watchlist' ? 'Watchlist' : 'Portfolio' %}
+            <span class="w-fit rounded-full px-2.5 py-1 text-xs font-semibold ring-1 {{ lastRun.runScope == 'watchlist' ? 'bg-blue-50 text-blue-700 ring-blue-200' : 'bg-emerald-50 text-emerald-700 ring-emerald-200' }}">
+                {{ scopeLabel }}
+            </span>
+        {% endif %}
+    </div>
+
+    {% if lastRunItem is defined and lastRunItem %}
+        {% set lastRun = lastRunItem.pipelineRun %}
+        {% set runDate = lastRun.startedAt ?: lastRun.createdAt %}
+        {% set isCurrentLatest = currentRunItem is defined and currentRunItem and currentRunItem.id == lastRunItem.id %}
+
+        {% if isCurrentLatest %}
+            <p class="mt-3 rounded-md bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800 ring-1 ring-emerald-200">
+                Dies ist zugleich der letzte Lauf dieses Instruments.
+            </p>
+        {% endif %}
+
+        <dl class="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+            <div class="rounded-md bg-slate-50 p-3">
+                <dt class="text-xs uppercase text-slate-500">Run-Zeit</dt>
+                <dd class="mt-1 font-semibold text-slate-950">{{ runDate ? runDate|date('d.m.Y H:i') : '-' }}</dd>
+            </div>
+            <div class="rounded-md bg-slate-50 p-3">
+                <dt class="text-xs uppercase text-slate-500">K Norm</dt>
+                <dd class="mt-1 font-semibold text-slate-950">{{ lastRunItem.kronosNormalizedScore is not null ? lastRunItem.kronosNormalizedScore|number_format(4) : '-' }}</dd>
+            </div>
+            <div class="rounded-md bg-slate-50 p-3">
+                <dt class="text-xs uppercase text-slate-500">S Norm</dt>
+                <dd class="mt-1 font-semibold text-slate-950">{{ lastRunItem.sentimentNormalizedScore is not null ? lastRunItem.sentimentNormalizedScore|number_format(4) : '-' }}</dd>
+            </div>
+            <div class="rounded-md bg-slate-50 p-3">
+                <dt class="text-xs uppercase text-slate-500">Merged</dt>
+                <dd class="mt-1 font-semibold text-slate-950">{{ lastRunItem.mergedScore is not null ? lastRunItem.mergedScore|number_format(4) : '-' }}</dd>
+            </div>
+            <div class="rounded-md bg-slate-50 p-3">
+                <dt class="text-xs uppercase text-slate-500">Decision</dt>
+                <dd class="mt-1">{{ ui.decision_badge(lastRunItem.decision) }}</dd>
+            </div>
+            <div class="rounded-md bg-slate-50 p-3">
+                <dt class="text-xs uppercase text-slate-500">Sentiment</dt>
+                <dd class="mt-1 font-semibold text-slate-950">{{ lastRunItem.sentimentLabel ?: '-' }}</dd>
+            </div>
+            <div class="rounded-md bg-slate-50 p-3">
+                <dt class="text-xs uppercase text-slate-500">Mode</dt>
+                <dd class="mt-1">{{ ui.mode_badge(lastRunItem.sentimentMode) }}</dd>
+            </div>
+            <div class="rounded-md bg-slate-50 p-3">
+                <dt class="text-xs uppercase text-slate-500">Data / News</dt>
+                <dd class="mt-1 flex flex-wrap gap-1">{{ ui.status_badge(lastRunItem.marketDataStatus) }} {{ ui.status_badge(lastRunItem.newsStatus) }}</dd>
+            </div>
+        </dl>
+
+        <div class="mt-4 flex flex-wrap gap-2 text-sm">
+            <a class="rounded-md border border-slate-300 px-3 py-2 font-medium text-slate-700 hover:bg-slate-50" href="{{ path('app_run_show', {id: lastRun.id}) }}">Run oeffnen</a>
+            {% if showTickerLink is not defined or showTickerLink %}
+                <a class="rounded-md border border-slate-300 px-3 py-2 font-medium text-slate-700 hover:bg-slate-50" href="{{ path('app_ticker_show', {id: lastRunItem.id}) }}">Run-Ticker oeffnen</a>
+            {% endif %}
+            {% if showInstrumentLink is defined and showInstrumentLink %}
+                <a class="rounded-md border border-slate-300 px-3 py-2 font-medium text-slate-700 hover:bg-slate-50" href="{{ path('app_instrument_show', {id: lastRunItem.instrument.id}) }}">Instrument oeffnen</a>
+            {% endif %}
+        </div>
+    {% else %}
+        <div class="mt-4 rounded-md border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">
+            Noch kein Lauf vorhanden.
+        </div>
+    {% endif %}
+</section>

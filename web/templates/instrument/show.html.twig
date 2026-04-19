@@ -13,6 +13,14 @@
         <a class="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800" href="{{ path('app_instrument_edit', {id: instrument.id}) }}">Bearbeiten</a>
     </div>
 
+    <div class="mb-6">
+        {% include '_last_run_snapshot.html.twig' with {
+            lastRunItem: lastRunItem,
+            showTickerLink: true,
+            showInstrumentLink: false
+        } only %}
+    </div>
+
     <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <dl class="grid gap-4 text-sm md:grid-cols-3">
             <div><dt class="text-slate-500">Input Ticker</dt><dd class="font-medium">{{ instrument.inputTicker }}</dd></div>
