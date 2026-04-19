@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
@@ -12,7 +13,7 @@ def _require_yfinance():
         import yfinance as yf
     except ImportError as exc:
         raise RuntimeError("Missing yfinance. Install stock-system/requirements.txt.") from exc
-    cache_dir = Path(__file__).resolve().parents[3] / ".cache" / "yfinance"
+    cache_dir = Path(os.environ.get("YFINANCE_CACHE_DIR") or Path(__file__).resolve().parents[3] / ".cache" / "yfinance")
     cache_dir.mkdir(parents=True, exist_ok=True)
     if hasattr(yf, "set_tz_cache_location"):
         yf.set_tz_cache_location(str(cache_dir))

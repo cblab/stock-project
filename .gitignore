@@ -10,6 +10,8 @@
 /runs/
 /runs/**
 /.deps/
+/.tmp/
+/.pip-cache/
 /.cache/
 /.hf-cache/
 /.tools/

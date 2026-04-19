@@ -1,0 +1,52 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ pageTitle }}{% endblock %}
+
+{% block body %}
+    <div class="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+            <p class="text-sm font-medium uppercase text-slate-500">{{ pageEyebrow }}</p>
+            <h1 class="mt-1 text-2xl font-semibold text-slate-950">{{ pageTitle }}</h1>
+        </div>
+        {% if showCreateButton %}
+            <a class="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm ring-1 ring-emerald-700/20 hover:bg-emerald-500" href="{{ path('app_instrument_new') }}">Instrument anlegen</a>
+        {% endif %}
+    </div>
+
+    <section class="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Ticker</th>
+                    <th>Provider</th>
+                    <th>Name</th>
+                    <th>WKN</th>
+                    <th>Asset</th>
+                    <th>Region</th>
+                    {% if showPortfolioColumn %}<th>Portfolio</th>{% endif %}
+                    <th>Aktiv</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                {% for instrument in instruments %}
+                    <tr class="hover:bg-slate-50">
+                        <td class="font-medium text-slate-950">{{ instrument.inputTicker }}</td>
+                        <td>{{ instrument.providerTicker }}</td>
+                        <td>{{ instrument.name ?: '-' }}</td>
+                        <td>{{ instrument.wkn ?: '-' }}</td>
+                        <td>{{ instrument.assetClass }}</td>
+                        <td>{{ instrument.region ?: '-' }}</td>
+                        {% if showPortfolioColumn %}<td>{{ instrument.portfolio ? 'Ja' : 'Nein' }}</td>{% endif %}
+                        <td>{{ instrument.active ? 'Ja' : 'Nein' }}</td>
+                        <td class="text-right">
+                            <a class="font-medium text-slate-950 underline decoration-slate-300 underline-offset-4 hover:decoration-slate-900" href="{{ path('app_instrument_show', {id: instrument.id}) }}">Details</a>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr><td class="px-4 py-6 text-center text-slate-500" colspan="{{ showPortfolioColumn ? 9 : 8 }}">{{ emptyMessage }}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+{% endblock %}

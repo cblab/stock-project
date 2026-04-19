@@ -3,9 +3,10 @@
 namespace App\Controller;
 
 use App\Entity\PipelineRun;
-use App\Entity\PipelineTicker;
+use App\Entity\PipelineRunItem;
 use App\Repository\PipelineRunRepository;
-use App\Repository\PipelineTickerRepository;
+use App\Repository\PipelineRunItemRepository;
+use App\Service\PipelineRunLauncher;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -22,12 +23,21 @@ class DashboardController extends AbstractController
         ]);
     }
 
+    #[Route('/runs/start', name: 'app_runs_start', methods: ['POST'])]
+    public function start(PipelineRunLauncher $launcher): Response
+    {
+        $projectRoot = dirname($this->getParameter('kernel.project_dir'));
+        $run = $launcher->queuePortfolioRun($projectRoot);
+
+        return $this->redirectToRoute('app_run_show', ['id' => $run->getId()]);
+    }
+
     #[Route('/run/{id}', name: 'app_run_show', requirements: ['id' => '\d+'])]
     public function run(
         int $id,
         Request $request,
         PipelineRunRepository $pipelineRunRepository,
-        PipelineTickerRepository $pipelineTickerRepository,
+        PipelineRunItemRepository $pipelineRunItemRepository,
     ): Response
     {
         $run = $pipelineRunRepository->find($id);
@@ -35,23 +45,23 @@ class DashboardController extends AbstractController
             throw $this->createNotFoundException('Pipeline run not found.');
         }
 
-        $sort = PipelineTickerRepository::normalizeSort((string) $request->query->get('sort', 'mergedScore'));
-        $direction = PipelineTickerRepository::normalizeDirection((string) $request->query->get('dir', 'desc'));
+        $sort = PipelineRunItemRepository::normalizeSort((string) $request->query->get('sort', 'mergedScore'));
+        $direction = PipelineRunItemRepository::normalizeDirection((string) $request->query->get('dir', 'desc'));
 
         return $this->render('dashboard/run.html.twig', [
             'run' => $run,
-            'tickers' => $pipelineTickerRepository->findForRunSorted($run, $sort, $direction),
+            'tickers' => $pipelineRunItemRepository->findForRunSorted($run, $sort, $direction),
             'currentSort' => $sort,
             'currentDir' => $direction,
         ]);
     }
 
     #[Route('/ticker/{id}', name: 'app_ticker_show', requirements: ['id' => '\d+'])]
-    public function ticker(int $id, PipelineTickerRepository $pipelineTickerRepository): Response
+    public function ticker(int $id, PipelineRunItemRepository $pipelineRunItemRepository): Response
     {
-        $ticker = $pipelineTickerRepository->find($id);
-        if (!$ticker instanceof PipelineTicker) {
-            throw $this->createNotFoundException('Pipeline ticker not found.');
+        $ticker = $pipelineRunItemRepository->find($id);
+        if (!$ticker instanceof PipelineRunItem) {
+            throw $this->createNotFoundException('Pipeline run item not found.');
         }
 
         return $this->render('dashboard/ticker.html.twig', [
@@ -65,7 +75,7 @@ class DashboardController extends AbstractController
     /**
      * @return array<string, mixed>
      */
-    private function buildTickerView(PipelineTicker $ticker): array
+    private function buildTickerView(PipelineRunItem $ticker): array
     {
         $explain = $ticker->getExplainJson();
         $articles = $this->extractArticles($explain, $ticker);
@@ -103,7 +113,7 @@ class DashboardController extends AbstractController
      * @param array<string, mixed> $explain
      * @return array<int, array<string, mixed>>
      */
-    private function extractArticles(array $explain, PipelineTicker $ticker): array
+    private function extractArticles(array $explain, PipelineRunItem $ticker): array
     {
         $articles = [];
         foreach (($explain['article_scores'] ?? []) as $article) {
@@ -163,7 +173,7 @@ class DashboardController extends AbstractController
      * @param array<int, array<string, mixed>> $articles
      * @return array<string, array<int, array<string, mixed>>>
      */
-    private function groupArticles(array $articles, PipelineTicker $ticker): array
+    private function groupArticles(array $articles, PipelineRunItem $ticker): array
     {
         $groups = [];
         foreach ($articles as $article) {
@@ -229,7 +239,7 @@ class DashboardController extends AbstractController
      * @param array<string, mixed> $article
      * @param array<string, mixed> $explain
      */
-    private function articleRelevance(array $article, PipelineTicker $ticker, array $explain): string
+    private function articleRelevance(array $article, PipelineRunItem $ticker, array $explain): string
     {
         $haystack = strtolower(trim(
             (string) ($article['title'] ?? '').' '.
@@ -264,7 +274,7 @@ class DashboardController extends AbstractController
     /**
      * @param array{kronos: float, sentiment: float} $weights
      */
-    private function decisionMath(PipelineTicker $ticker, array $weights): string
+    private function decisionMath(PipelineRunItem $ticker, array $weights): string
     {
         $kronos = $ticker->getKronosNormalizedScore() ?? 0.0;
         $sentiment = $ticker->getSentimentNormalizedScore() ?? 0.0;
@@ -280,7 +290,7 @@ class DashboardController extends AbstractController
         );
     }
 
-    private function decisionThresholdSentence(PipelineTicker $ticker): string
+    private function decisionThresholdSentence(PipelineRunItem $ticker): string
     {
         $score = $ticker->getMergedScore() ?? 0.0;
 
@@ -292,7 +302,7 @@ class DashboardController extends AbstractController
         };
     }
 
-    private function signalSummary(PipelineTicker $ticker): string
+    private function signalSummary(PipelineRunItem $ticker): string
     {
         $kronos = $this->signalStrength($ticker->getKronosNormalizedScore(), 'Kronos');
         $sentiment = $this->signalStrength($ticker->getSentimentNormalizedScore(), 'sentiment');
@@ -313,7 +323,7 @@ class DashboardController extends AbstractController
     /**
      * @param array<string, mixed> $explain
      */
-    private function decisionReason(PipelineTicker $ticker, array $explain): string
+    private function decisionReason(PipelineRunItem $ticker, array $explain): string
     {
         if (isset($explain['decision_reason']) && is_string($explain['decision_reason'])) {
             return $explain['decision_reason'];

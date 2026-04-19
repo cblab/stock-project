@@ -1,0 +1,39 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ instrument.inputTicker }}{% endblock %}
+
+{% block body %}
+    <div class="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+            <a class="text-sm text-slate-500 hover:text-slate-950" href="{{ path(instrument.portfolio ? 'app_portfolio_index' : 'app_watchlist_index') }}">Zurueck zu {{ instrument.portfolio ? 'Portfolio' : 'Watchlist' }}</a>
+            <h1 class="mt-1 text-2xl font-semibold text-slate-950">{{ instrument.displayTicker }}</h1>
+            <p class="mt-1 text-sm text-slate-600">{{ instrument.name ?: 'Kein Name gepflegt' }}{% if instrument.wkn %} | WKN {{ instrument.wkn }}{% endif %}</p>
+        </div>
+        <a class="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800" href="{{ path('app_instrument_edit', {id: instrument.id}) }}">Bearbeiten</a>
+    </div>
+
+    <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <dl class="grid gap-4 text-sm md:grid-cols-3">
+            <div><dt class="text-slate-500">Input Ticker</dt><dd class="font-medium">{{ instrument.inputTicker }}</dd></div>
+            <div><dt class="text-slate-500">Provider Ticker</dt><dd class="font-medium">{{ instrument.providerTicker }}</dd></div>
+            <div><dt class="text-slate-500">Display Ticker</dt><dd class="font-medium">{{ instrument.displayTicker }}</dd></div>
+            <div><dt class="text-slate-500">Asset Class</dt><dd class="font-medium">{{ instrument.assetClass }}</dd></div>
+            <div><dt class="text-slate-500">Region</dt><dd class="font-medium">{{ instrument.region ?: '-' }}</dd></div>
+            <div><dt class="text-slate-500">Benchmark</dt><dd class="font-medium">{{ instrument.benchmark ?: '-' }}</dd></div>
+            <div><dt class="text-slate-500">Portfolio</dt><dd class="font-medium">{{ instrument.portfolio ? 'Ja' : 'Nein' }}</dd></div>
+            <div><dt class="text-slate-500">Aktiv</dt><dd class="font-medium">{{ instrument.active ? 'Ja' : 'Nein' }}</dd></div>
+            <div><dt class="text-slate-500">Mapping Status</dt><dd class="font-medium">{{ instrument.mappingStatus ?: '-' }}</dd></div>
+        </dl>
+        {% if instrument.assetClass == 'ETF' %}
+            <div class="mt-6 grid gap-4 text-sm md:grid-cols-2">
+                <div><p class="text-slate-500">Region Exposure</p><p class="font-medium">{{ instrument.regionExposure|join(', ') ?: '-' }}</p></div>
+                <div><p class="text-slate-500">Sector Profile</p><p class="font-medium">{{ instrument.sectorProfile|join(', ') ?: '-' }}</p></div>
+                <div><p class="text-slate-500">Top Holdings</p><p class="font-medium">{{ instrument.topHoldingsProfile|join(', ') ?: '-' }}</p></div>
+                <div><p class="text-slate-500">Macro Profile</p><p class="font-medium">{{ instrument.macroProfile|join(', ') ?: '-' }}</p></div>
+            </div>
+        {% endif %}
+        {% if instrument.mappingNote %}
+            <p class="mt-6 rounded-md bg-slate-50 p-3 text-sm text-slate-700">{{ instrument.mappingNote }}</p>
+        {% endif %}
+    </section>
+{% endblock %}

@@ -22,7 +22,7 @@ class PipelineRunRepository extends ServiceEntityRepository
     public function findLatest(int $limit = 50): array
     {
         return $this->createQueryBuilder('run')
-            ->orderBy('run.startedAt', 'DESC')
+            ->orderBy('run.createdAt', 'DESC')
             ->addOrderBy('run.id', 'DESC')
             ->setMaxResults($limit)
             ->getQuery()
