@@ -1,4 +1,5 @@
 {% extends 'base.html.twig' %}
+{% import 'dashboard/_ui.html.twig' as ui %}
 
 {% block title %}{{ instrument.inputTicker }}{% endblock %}
 
@@ -34,6 +35,72 @@
         {% endif %}
         {% if instrument.mappingNote %}
             <p class="mt-6 rounded-md bg-slate-50 p-3 text-sm text-slate-700">{{ instrument.mappingNote }}</p>
+        {% endif %}
+    </section>
+
+    <section class="mt-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <div class="flex items-center justify-between gap-3">
+            <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Letzter Lauf</h2>
+            {% if lastRunItem %}
+                <a class="text-sm font-medium text-slate-700 underline decoration-slate-300 underline-offset-4 hover:text-slate-950 hover:decoration-slate-900" href="{{ path('app_run_show', {id: lastRunItem.pipelineRun.id}) }}">Run oeffnen</a>
+            {% endif %}
+        </div>
+
+        {% if lastRunItem %}
+            {% set runScope = lastRunItem.instrument.portfolio ? 'Portfolio' : 'Watchlist' %}
+            <div class="mt-3 flex flex-wrap gap-2">
+                {{ ui.decision_badge(lastRunItem.decision) }}
+                <span class="rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200">{{ runScope }}</span>
+                <span class="rounded-full bg-white px-2 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200">{{ lastRunItem.sentimentLabel ?: 'sentiment n/a' }}</span>
+                {{ ui.status_badge(lastRunItem.marketDataStatus) }}
+                {{ ui.status_badge(lastRunItem.newsStatus) }}
+            </div>
+
+            <dl class="mt-4 grid gap-3 text-sm md:grid-cols-2 lg:grid-cols-3">
+                <div>
+                    <dt class="text-slate-500">Run-Zeit</dt>
+                    <dd class="font-medium text-slate-900">{{ (lastRunItem.pipelineRun.startedAt ?: lastRunItem.pipelineRun.createdAt)|date('d.m.Y H:i') }}</dd>
+                </div>
+                <div>
+                    <dt class="text-slate-500">Run-ID</dt>
+                    <dd class="font-medium text-slate-900">{{ lastRunItem.pipelineRun.runId }}</dd>
+                </div>
+                <div>
+                    <dt class="text-slate-500">Sentiment Mode</dt>
+                    <dd class="font-medium text-slate-900">{{ lastRunItem.sentimentMode ?: '-' }}</dd>
+                </div>
+                <div>
+                    <dt class="text-slate-500">K Norm</dt>
+                    <dd class="font-medium text-slate-900">{{ lastRunItem.kronosNormalizedScore is not null ? lastRunItem.kronosNormalizedScore|number_format(2) : '-' }}</dd>
+                </div>
+                <div>
+                    <dt class="text-slate-500">S Norm</dt>
+                    <dd class="font-medium text-slate-900">{{ lastRunItem.sentimentNormalizedScore is not null ? lastRunItem.sentimentNormalizedScore|number_format(2) : '-' }}</dd>
+                </div>
+                <div>
+                    <dt class="text-slate-500">Merged</dt>
+                    <dd class="font-medium text-slate-900">{{ lastRunItem.mergedScore is not null ? lastRunItem.mergedScore|number_format(2) : '-' }}</dd>
+                </div>
+                <div>
+                    <dt class="text-slate-500">Decision</dt>
+                    <dd class="font-medium text-slate-900">{{ lastRunItem.decision }}</dd>
+                </div>
+                <div>
+                    <dt class="text-slate-500">Sentiment Label</dt>
+                    <dd class="font-medium text-slate-900">{{ lastRunItem.sentimentLabel ?: '-' }}</dd>
+                </div>
+                <div>
+                    <dt class="text-slate-500">Data / News</dt>
+                    <dd class="font-medium text-slate-900">{{ lastRunItem.marketDataStatus ?: '-' }} / {{ lastRunItem.newsStatus ?: '-' }}</dd>
+                </div>
+            </dl>
+
+            <div class="mt-4 flex flex-wrap gap-4 text-sm">
+                <a class="font-medium text-slate-700 underline decoration-slate-300 underline-offset-4 hover:text-slate-950 hover:decoration-slate-900" href="{{ path('app_run_show', {id: lastRunItem.pipelineRun.id}) }}">Run oeffnen</a>
+                <a class="font-medium text-slate-700 underline decoration-slate-300 underline-offset-4 hover:text-slate-950 hover:decoration-slate-900" href="{{ path('app_ticker_show', {id: lastRunItem.id}) }}">Ticker im Run oeffnen</a>
+            </div>
+        {% else %}
+            <p class="mt-3 text-sm text-slate-600">Noch kein Lauf vorhanden.</p>
         {% endif %}
     </section>
 {% endblock %}

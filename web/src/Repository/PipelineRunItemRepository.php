@@ -4,6 +4,7 @@ namespace App\Repository;
 
 use App\Entity\PipelineRun;
 use App\Entity\PipelineRunItem;
+use App\Entity\Instrument;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -46,6 +47,23 @@ class PipelineRunItemRepository extends ServiceEntityRepository
             ->addOrderBy('instrument.inputTicker', 'ASC')
             ->getQuery()
             ->getResult();
+    }
+
+    public function findLatestForInstrument(Instrument $instrument): ?PipelineRunItem
+    {
+        return $this->createQueryBuilder('item')
+            ->join('item.pipelineRun', 'run')
+            ->addSelect('run')
+            ->join('item.instrument', 'instrument')
+            ->addSelect('instrument')
+            ->andWhere('item.instrument = :instrument')
+            ->setParameter('instrument', $instrument)
+            ->orderBy('COALESCE(run.startedAt, run.createdAt)', 'DESC')
+            ->addOrderBy('run.id', 'DESC')
+            ->addOrderBy('item.id', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
     }
 
     public static function normalizeSort(string $sort): string

@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Entity\Instrument;
 use App\Form\InstrumentType;
 use App\Repository\InstrumentRepository;
+use App\Repository\PipelineRunItemRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -63,9 +64,12 @@ class InstrumentController extends AbstractController
     }
 
     #[Route('/instrument/{id}', name: 'app_instrument_show', requirements: ['id' => '\d+'])]
-    public function show(Instrument $instrument): Response
+    public function show(Instrument $instrument, PipelineRunItemRepository $pipelineRunItemRepository): Response
     {
-        return $this->render('instrument/show.html.twig', ['instrument' => $instrument]);
+        return $this->render('instrument/show.html.twig', [
+            'instrument' => $instrument,
+            'lastRunItem' => $pipelineRunItemRepository->findLatestForInstrument($instrument),
+        ]);
     }
 
     #[Route('/instrument/{id}/edit', name: 'app_instrument_edit', requirements: ['id' => '\d+'])]
