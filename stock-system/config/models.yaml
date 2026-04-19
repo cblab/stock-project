@@ -1,0 +1,7 @@
+kronos_model_path: "E:/stock-project/models/kronos/models/Kronos-small"
+kronos_tokenizer_path: "E:/stock-project/models/kronos/tokenizers/Kronos-Tokenizer-base"
+sentiment_model_path: "E:/stock-project/models/sentiment/models/finbert"
+fingpt_repo_path: "E:/stock-project/repos/FinGPT"
+fingpt_base_model_path:
+fingpt_lora_model_path:
+prefer_fingpt: true

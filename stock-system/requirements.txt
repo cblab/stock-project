@@ -1,0 +1,10 @@
+pandas
+PyYAML
+yfinance
+numpy
+torch
+transformers
+peft
+safetensors
+accelerate
+einops

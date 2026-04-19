@@ -1,0 +1,86 @@
+IWDA:
+  provider_symbol: "IWDA.AS"
+  display_ticker: "IWDA"
+  region: "EU"
+  asset_class: "ETF"
+  context_type: "global_equity"
+  benchmark: "MSCI World"
+  region_exposure: ["US", "Europe", "Japan"]
+  sector_profile: ["Technology", "Financials", "Healthcare"]
+  top_holdings_profile: ["MSFT", "AAPL", "NVDA"]
+  macro_profile: ["global_growth", "usd", "rates"]
+  direct_news_weight: 0.1
+  context_news_weight: 0.9
+  note: "iShares Core MSCI World UCITS ETF on Euronext Amsterdam; bare IWDA is not provider-safe."
+VHYL:
+  provider_symbol: "VHYL.AS"
+  display_ticker: "VHYL"
+  region: "EU"
+  asset_class: "ETF"
+  context_type: "global_high_dividend_equity"
+  benchmark: "FTSE All-World High Dividend Yield"
+  region_exposure: ["US", "Europe", "Asia Pacific"]
+  sector_profile: ["Financials", "Healthcare", "Consumer Staples", "Energy"]
+  top_holdings_profile: ["JNJ", "PG", "PEP", "ENB"]
+  macro_profile: ["dividend_yield", "rates", "global_growth", "usd"]
+  direct_news_weight: 0.1
+  context_news_weight: 0.9
+  note: "Vanguard FTSE All-World High Dividend Yield UCITS ETF on Euronext Amsterdam."
+TDIV:
+  provider_symbol: "TDIV.AS"
+  display_ticker: "TDIV"
+  region: "EU"
+  asset_class: "ETF"
+  context_type: "europe_dividend_equity"
+  benchmark: "European dividend equity basket"
+  region_exposure: ["Europe"]
+  sector_profile: ["Financials", "Industrials", "Healthcare", "Utilities"]
+  top_holdings_profile: ["ALV.DE", "MUV2.DE", "ENR.DE"]
+  macro_profile: ["eurozone_growth", "ecb_rates", "eur"]
+  direct_news_weight: 0.1
+  context_news_weight: 0.9
+  note: "VanEck dividend ETF on Euronext Amsterdam; TDIV.DE did not return Yahoo data in validation."
+FGEQ:
+  provider_symbol: "FGEQ.DE"
+  display_ticker: "FGEQ"
+  region: "EU"
+  asset_class: "ETF"
+  context_type: "global_quality_income_equity"
+  benchmark: "Fidelity Global Quality Income strategy"
+  region_exposure: ["US", "Europe", "Developed Markets"]
+  sector_profile: ["Technology", "Healthcare", "Consumer Staples", "Industrials"]
+  top_holdings_profile: ["MSFT", "AAPL", "JNJ", "PG"]
+  macro_profile: ["quality_factor", "rates", "global_growth", "usd"]
+  direct_news_weight: 0.1
+  context_news_weight: 0.9
+  note: "Fidelity Global Quality Income UCITS ETF on Xetra; validated with Yahoo daily data."
+MUV2:
+  provider_symbol: "MUV2.DE"
+  display_ticker: "MUV2"
+  region: "EU"
+  note: "Munich Re on Xetra."
+ALV:
+  provider_symbol: "ALV.DE"
+  display_ticker: "ALV"
+  region: "EU"
+  note: "Allianz on Xetra."
+AIXA:
+  provider_symbol: "AIXA.DE"
+  display_ticker: "AIXA"
+  region: "EU"
+  note: "AIXTRON on Xetra."
+SIVE:
+  provider_symbol: "SIVE.ST"
+  display_ticker: "SIVE"
+  region: "EU"
+  note: "Sivers Semiconductors on Nasdaq Stockholm; SIVE.DE did not return Yahoo data in validation."
+ENR:
+  provider_symbol: "ENR.DE"
+  display_ticker: "ENR"
+  region: "EU"
+  note: "Siemens Energy on Xetra. This intentionally maps ENR to Europe, not US Energizer Holdings."
+BRK.B:
+  provider_symbol: "BRK-B"
+  display_ticker: "BRK.B"
+  region: "US"
+  note: "Yahoo uses BRK-B for Berkshire Hathaway class B."
