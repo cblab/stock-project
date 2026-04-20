@@ -1,4 +1,4 @@
-kronos_model_path: "E:/stock-project/models/kronos/models/Kronos-small"
+kronos_model_path: "E:/stock-project/models/kronos/models/Kronos-base"
 kronos_tokenizer_path: "E:/stock-project/models/kronos/tokenizers/Kronos-Tokenizer-base"
 sentiment_model_path: "E:/stock-project/models/sentiment/models/finbert"
 fingpt_repo_path: "E:/stock-project/repos/FinGPT"

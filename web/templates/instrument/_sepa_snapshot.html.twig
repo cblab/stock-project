@@ -66,13 +66,23 @@
 
         <div class="mt-5 grid gap-4 lg:grid-cols-2">
             <div class="rounded-md bg-slate-50 p-4">
-                <h3 class="text-sm font-semibold text-slate-950">Kill Trigger</h3>
-                {% if sepaSnapshot.killTriggersJson is empty %}
-                    <p class="mt-2 text-sm text-emerald-800">Keine Kill Trigger aktiv.</p>
+                {% set hardTriggers = detail.hard_triggers ?? sepaSnapshot.killTriggersJson %}
+                {% set softWarnings = detail.soft_warnings ?? [] %}
+                <h3 class="text-sm font-semibold text-slate-950">Trigger & Warnungen</h3>
+                {% if hardTriggers is empty %}
+                    <p class="mt-2 text-sm text-emerald-800">Keine harten Kill Trigger aktiv.</p>
                 {% else %}
                     <ul class="mt-2 space-y-1 text-sm text-rose-800">
-                        {% for trigger in sepaSnapshot.killTriggersJson %}
+                        {% for trigger in hardTriggers %}
                             <li class="rounded-md bg-white px-2 py-1 ring-1 ring-rose-100">{{ trigger|replace({'_': ' '}) }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+                {% if softWarnings is not empty %}
+                    <p class="mt-3 text-xs font-semibold uppercase text-amber-700">Weiche Warnungen</p>
+                    <ul class="mt-2 space-y-1 text-sm text-amber-800">
+                        {% for warning in softWarnings %}
+                            <li class="rounded-md bg-white px-2 py-1 ring-1 ring-amber-100">{{ warning|replace({'_': ' '}) }}</li>
                         {% endfor %}
                     </ul>
                 {% endif %}
@@ -81,8 +91,11 @@
                 <h3 class="text-sm font-semibold text-slate-950">Einordnung</h3>
                 <p class="mt-2 text-sm text-slate-700">
                     SEPA Phase 1 bewertet die strukturelle Setup-Qualitaet getrennt vom kurzfristigen Kronos-/Sentiment-Lauf.
-                    Die Ampel kombiniert den Total Score mit Kill Triggern, damit strukturelle Defekte nicht durch einen hohen Score verdeckt werden.
+                    Die Ampel kombiniert den Total Score mit harten Strukturfehlern und weichen Entry-/Risiko-Warnungen.
                 </p>
+                {% if detail.traffic_light_reason is defined %}
+                    <p class="mt-2 text-xs text-slate-500">Ampelgrund: {{ detail.traffic_light_reason|replace({'_': ' '}) }}.</p>
+                {% endif %}
                 {% if detail.phase1_model.not_included_yet is defined %}
                     <p class="mt-2 text-xs text-slate-500">Noch nicht enthalten: {{ detail.phase1_model.not_included_yet|join(', ') }}.</p>
                 {% endif %}

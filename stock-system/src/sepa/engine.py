@@ -8,7 +8,7 @@ from sepa.market import load_market_benchmark, load_price_history, score_market_
 from sepa.momentum import score_momentum
 from sepa.relative_strength import score_relative_strength
 from sepa.risk import score_risk_asymmetry
-from sepa.scoring import WEIGHTS, score_superperformance, total_score, traffic_light
+from sepa.scoring import HARD_KILL_TRIGGERS, SOFT_WARNING_TRIGGERS, WEIGHTS, classify_triggers, score_superperformance, total_score, traffic_light
 from sepa.signals import SepaSnapshot
 from sepa.stage import score_stage_structure
 from sepa.volume import score_volume_quality
@@ -31,6 +31,9 @@ class SepaEngine:
                 "status": "market_data_failed",
                 "market_data_error": market_payload.get("market_data_error"),
                 "phase1_model": _model_description(),
+                "hard_triggers": ["market_data_failed"],
+                "soft_warnings": [],
+                "traffic_light_reason": "market_data_failed",
             }
             return SepaSnapshot(
                 instrument_id=mapping.instrument_id,
@@ -49,6 +52,8 @@ class SepaEngine:
                 traffic_light="Rot",
                 kill_triggers=["market_data_failed"],
                 detail=detail,
+                hard_triggers=["market_data_failed"],
+                soft_warnings=[],
             )
 
         benchmark_payload = load_market_benchmark(self.period, self.interval)
@@ -75,8 +80,9 @@ class SepaEngine:
         kills = []
         for result in results.values():
             kills.extend(result.kill_triggers)
+        hard_triggers, soft_warnings = classify_triggers(kills)
         total = total_score(results)
-        light = traffic_light(total, kills)
+        light, light_reason = traffic_light(total, hard_triggers, soft_warnings)
         as_of = df.index[-1].date().isoformat()
 
         return SepaSnapshot(
@@ -94,14 +100,20 @@ class SepaEngine:
             superperformance_score=superperformance.score,
             total_score=total,
             traffic_light=light,
-            kill_triggers=sorted(set(kills)),
+            kill_triggers=hard_triggers,
             detail={
                 "phase1_model": _model_description(),
                 "market_data_status": market_payload.get("market_data_status"),
                 "market_data_rows": market_payload.get("market_data_rows"),
                 "benchmark_status": benchmark_payload.get("market_data_status"),
+                "all_triggers": sorted(set(kills)),
+                "hard_triggers": hard_triggers,
+                "soft_warnings": soft_warnings,
+                "traffic_light_reason": light_reason,
                 "scores": {key: result.details for key, result in results.items()},
             },
+            hard_triggers=hard_triggers,
+            soft_warnings=soft_warnings,
         )
 
 
@@ -110,7 +122,22 @@ def _model_description() -> dict:
         "name": "SEPA / Minervi Phase-1 Initialmodell",
         "score_range": "0-100",
         "weights": WEIGHTS,
-        "note": "Initial deterministic weighting chosen for Phase 1; intended for later calibration.",
+        "hard_kill_triggers": sorted(HARD_KILL_TRIGGERS),
+        "soft_warning_triggers": sorted(SOFT_WARNING_TRIGGERS),
+        "traffic_light_rules": {
+            "red": [
+                "multiple hard structure failures",
+                "one hard structure failure with total score below 65",
+                "total score below 40",
+            ],
+            "yellow": [
+                "one hard trigger offset by high total score",
+                "total score below 70",
+                "soft entry or risk warnings",
+            ],
+            "green": ["total score at least 70 with no hard triggers or soft warnings"],
+        },
+        "note": "Phase-1 calibration separates structural kill triggers from entry and risk warnings.",
         "not_included_yet": [
             "full VCP contraction sequence scoring",
             "post-buy microstructure",
@@ -118,4 +145,3 @@ def _model_description() -> dict:
             "institutional ownership model",
         ],
     }
-

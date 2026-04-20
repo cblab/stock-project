@@ -29,6 +29,8 @@ class SepaSnapshot:
     traffic_light: str
     kill_triggers: list[str]
     detail: dict[str, Any]
+    hard_triggers: list[str] = field(default_factory=list)
+    soft_warnings: list[str] = field(default_factory=list)
 
 
 def clamp(value: float, low: float = 0.0, high: float = 100.0) -> float:
@@ -37,4 +39,3 @@ def clamp(value: float, low: float = 0.0, high: float = 100.0) -> float:
 
 def round_score(value: float) -> float:
     return round(clamp(value), 2)
-

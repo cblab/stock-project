@@ -17,10 +17,10 @@ def score_momentum(df) -> ScoreResult:
     max_drawdown_21 = _max_drawdown(close.tail(21))
 
     score = 0.0
-    score += 30.0 if ret_21 > 0.03 else (18.0 if ret_21 > 0 else 5.0)
-    score += 35.0 if ret_63 > 0.10 else (24.0 if ret_63 > 0.03 else (12.0 if ret_63 > 0 else 0.0))
-    score += 20.0 if ret_126 > 0.15 else (13.0 if ret_126 > 0.05 else (6.0 if ret_126 > 0 else 0.0))
-    score += 15.0 if -0.05 <= extension <= 0.20 else (7.0 if extension <= 0.30 else 0.0)
+    score += _tier(ret_21, [(0.12, 27), (0.06, 24), (0.03, 20), (0.0, 10)], 3)
+    score += _tier(ret_63, [(0.35, 32), (0.20, 28), (0.10, 22), (0.03, 14), (0.0, 6)], 0)
+    score += _tier(ret_126, [(0.55, 22), (0.30, 19), (0.15, 15), (0.05, 9), (0.0, 4)], 0)
+    score += 19.0 if -0.03 <= extension <= 0.12 else (14.0 if extension <= 0.20 else (7.0 if extension <= 0.30 else 1.0))
 
     triggers = []
     if ret_63 < -0.08:
@@ -51,3 +51,9 @@ def _max_drawdown(series) -> float:
     drawdowns = (series / running_high) - 1.0
     return float(drawdowns.min())
 
+
+def _tier(value: float, tiers: list[tuple[float, float]], default: float) -> float:
+    for threshold, score in tiers:
+        if value >= threshold:
+            return score
+    return default
