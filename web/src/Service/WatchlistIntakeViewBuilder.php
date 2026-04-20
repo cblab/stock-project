@@ -10,17 +10,31 @@ class WatchlistIntakeViewBuilder
     {
     }
 
-    /** @return array{run: ?array<string, mixed>, sectors: array<int, array<string, mixed>>, candidates: array<int, array<string, mixed>>, pagination: array<string, int>, metrics: array<string, int>} */
-    public function latest(int $page = 1, int $perPage = 10): array
+    private const SORT_COLUMNS = [
+        'priority' => 'registry_priority',
+        'ticker' => 'ticker',
+        'sector' => 'sector_label',
+        'status' => 'registry_status',
+        'sepa' => 'sepa_total',
+        'merged' => 'merged_score',
+        'prüfung' => 'last_seen_at',
+        'pruefung' => 'last_seen_at',
+        'seen' => 'seen_count',
+    ];
+
+    /** @return array{run: ?array<string, mixed>, sectors: array<int, array<string, mixed>>, candidates: array<int, array<string, mixed>>, pagination: array<string, int>, metrics: array<string, int>, sort: array{key: string, dir: string}} */
+    public function latest(int $page = 1, int $perPage = 10, string $sort = 'priority', string $dir = 'desc'): array
     {
         $page = max(1, $page);
         $perPage = max(5, min(100, $perPage));
+        $sort = array_key_exists($sort, self::SORT_COLUMNS) ? $sort : 'priority';
+        $dir = strtolower($dir) === 'asc' ? 'asc' : 'desc';
         $run = $this->connection->fetchAssociative(
             'SELECT * FROM sector_intake_run ORDER BY created_at DESC, id DESC LIMIT 1'
         ) ?: null;
 
         if ($run === null) {
-            return ['run' => null, 'sectors' => [], 'candidates' => [], 'pagination' => $this->pagination(1, $perPage, 0), 'metrics' => $this->emptyMetrics()];
+            return ['run' => null, 'sectors' => [], 'candidates' => [], 'pagination' => $this->pagination(1, $perPage, 0), 'metrics' => $this->emptyMetrics(), 'sort' => ['key' => $sort, 'dir' => $dir]];
         }
 
         $sectors = $this->connection->fetchAllAssociative(
@@ -32,8 +46,10 @@ class WatchlistIntakeViewBuilder
         $pages = max(1, (int) ceil($totalCandidates / $perPage));
         $page = min($page, $pages);
         $offset = ($page - 1) * $perPage;
+        $orderExpression = self::SORT_COLUMNS[$sort];
+        $orderSql = $orderExpression.' '.$dir.', registry_priority DESC, latest_intake_score DESC, last_seen_at DESC, ticker ASC';
         $candidates = $this->connection->fetchAllAssociative(
-            'SELECT * FROM watchlist_candidate_registry ORDER BY active_candidate DESC, COALESCE(manual_state, latest_status) ASC, latest_intake_score DESC, last_seen_at DESC LIMIT '.$perPage.' OFFSET '.$offset
+            $this->registrySelectSql().' ORDER BY '.$orderSql.' LIMIT '.$perPage.' OFFSET '.$offset
         );
 
         return [
@@ -42,7 +58,48 @@ class WatchlistIntakeViewBuilder
             'candidates' => array_map(fn (array $row) => $this->normalizeRegistryRow($row), $candidates),
             'pagination' => $this->pagination($page, $perPage, $totalCandidates),
             'metrics' => $metrics,
+            'sort' => ['key' => $sort, 'dir' => $dir],
         ];
+    }
+
+    private function registrySelectSql(): string
+    {
+        return "
+            SELECT
+                r.*,
+                COALESCE(r.manual_state, r.latest_status) AS registry_status,
+                CAST(JSON_UNQUOTE(JSON_EXTRACT(r.latest_sepa_json, '$.total')) AS DECIMAL(10,4)) AS sepa_total,
+                CAST(JSON_UNQUOTE(JSON_EXTRACT(r.latest_buy_signals_json, '$.merged_score')) AS DECIMAL(10,4)) AS merged_score,
+                (
+                    r.latest_intake_score * 0.35
+                    + r.best_intake_score * 0.25
+                    + LEAST(r.seen_count, 5) * 4
+                    + CASE
+                        WHEN r.last_seen_at >= DATE_SUB(NOW(), INTERVAL 3 DAY) THEN 10
+                        WHEN r.last_seen_at >= DATE_SUB(NOW(), INTERVAL 14 DAY) THEN 6
+                        WHEN r.last_seen_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) THEN 3
+                        ELSE 0
+                      END
+                    + CASE COALESCE(r.manual_state, r.latest_status)
+                        WHEN 'TOP_CANDIDATE' THEN 15
+                        WHEN 'STRONG_CANDIDATE' THEN 9
+                        WHEN 'RESEARCH_ONLY' THEN 2
+                        WHEN 'RECHECK_LATER' THEN 1
+                        WHEN 'ADDED_TO_WATCHLIST' THEN -20
+                        WHEN 'DISMISSED' THEN -25
+                        ELSE 0
+                      END
+                    + COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(r.latest_sepa_json, '$.total')) AS DECIMAL(10,4)), 0) * 0.15
+                    + CASE
+                        WHEN CAST(JSON_UNQUOTE(JSON_EXTRACT(r.latest_buy_signals_json, '$.merged_score')) AS DECIMAL(10,4)) IS NULL THEN 0
+                        WHEN ABS(CAST(JSON_UNQUOTE(JSON_EXTRACT(r.latest_buy_signals_json, '$.merged_score')) AS DECIMAL(10,4))) <= 1
+                            THEN ((CAST(JSON_UNQUOTE(JSON_EXTRACT(r.latest_buy_signals_json, '$.merged_score')) AS DECIMAL(10,4)) + 1) * 50) * 0.05
+                        ELSE CAST(JSON_UNQUOTE(JSON_EXTRACT(r.latest_buy_signals_json, '$.merged_score')) AS DECIMAL(10,4)) * 0.05
+                      END
+                    + CASE WHEN r.active_candidate = 1 THEN 5 ELSE -20 END
+                ) AS registry_priority
+            FROM watchlist_candidate_registry r
+        ";
     }
 
     /** @return array<string, int> */
