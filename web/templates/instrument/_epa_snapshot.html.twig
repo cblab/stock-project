@@ -3,7 +3,7 @@
 <section class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
     <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-            <h2 class="text-sm font-semibold uppercase text-slate-500">EPA / Exit & Risk Snapshot</h2>
+            <h2 class="text-sm font-semibold uppercase text-slate-500">Exit Point Analysis / Exit & Risk Snapshot</h2>
             <p class="mt-1 text-sm text-slate-600">Exit Point Analysis: Failure, Trend Exit, Climax/Overextension und Risk Management.</p>
         </div>
         {% if epaSnapshot %}
@@ -15,10 +15,10 @@
         {% set detail = epaSnapshot.detailJson %}
         {% set weights = detail.model.weights ?? {} %}
         {% set scoreItems = [
-            ['Failure', epaSnapshot.failureScore, weights.failure ?? null],
-            ['Trend Exit', epaSnapshot.trendExitScore, weights.trend_exit ?? null],
-            ['Climax', epaSnapshot.climaxScore, weights.climax ?? null],
-            ['Risk', epaSnapshot.riskScore, weights.risk ?? null]
+            ['Failure', epaSnapshot.failureScore, weights.failure ?? null, 'Bewertet, wie stark das aktuelle Verhalten nach einem gescheiterten Setup oder Breakout aussieht.'],
+            ['Trend Exit', epaSnapshot.trendExitScore, weights.trend_exit ?? null, 'Bewertet, ob sich Hinweise auf einen echten Trendbruch oder strukturellen Ausstieg mehren.'],
+            ['Climax', epaSnapshot.climaxScore, weights.climax ?? null, 'Misst Ueberdehnung, Blowoff-Charakter und moeglichen Gewinnsicherungsdruck.'],
+            ['Risk', epaSnapshot.riskScore, weights.risk ?? null, 'Bewertet den aktuellen Druck, Risiko zu reduzieren oder enger zu managen.']
         ] %}
 
         <div class="mt-4 grid gap-3 md:grid-cols-5">
@@ -37,7 +37,7 @@
                 <p class="mt-1 font-semibold text-slate-950">{{ epaSnapshot.asOfDate|date('d.m.Y') }}</p>
             </div>
             <div class="rounded-md bg-slate-50 p-3">
-                <p class="text-xs uppercase text-slate-500">SEPA Kontext</p>
+                <p class="text-xs uppercase text-slate-500">Buy-Kontext</p>
                 <p class="mt-1 font-semibold text-slate-950">{{ detail.sepa_context.traffic_light ?? '-' }}{% if detail.sepa_context.total_score is defined and detail.sepa_context.total_score is not null %} / {{ detail.sepa_context.total_score|number_format(1) }}{% endif %}</p>
             </div>
             <div class="rounded-md bg-slate-50 p-3">
@@ -50,7 +50,7 @@
             {% for item in scoreItems %}
                 <div class="rounded-md border border-slate-200 p-3">
                     <div class="flex items-center justify-between gap-3">
-                        <p class="text-sm font-medium text-slate-700">{{ item[0] }}</p>
+                        <p class="text-sm font-medium text-slate-700 underline decoration-dotted underline-offset-4" title="{{ item[3] }}">{{ item[0] }}</p>
                         <p class="text-sm font-semibold text-slate-950">{{ item[1]|number_format(1) }}</p>
                     </div>
                     <div class="mt-2 h-2 rounded-full bg-slate-100">
@@ -89,11 +89,9 @@
             <div class="rounded-md bg-slate-50 p-4">
                 <h3 class="text-sm font-semibold text-slate-950">Einordnung</h3>
                 <p class="mt-2 text-sm text-slate-700">
-                    EPA bewertet die Verkaufsperspektive getrennt von SEPA. Ein hoher EPA-Score bedeutet nicht automatisch ein schlechtes Buy-Setup, sondern erhoehten Exit-, Trim- oder Risk-Management-Druck.
+                    Exit Point Analysis bewertet die Verkaufsperspektive getrennt von der Specific Entry Point Analysis.
+                    Ein hoher EPA-Score bedeutet nicht automatisch ein schlechtes Buy-Setup, sondern erhoehten Exit-, Trim- oder Risk-Management-Druck.
                 </p>
-                {% if detail.model.not_included_yet is defined %}
-                    <p class="mt-2 text-xs text-slate-500">Bewusst noch nicht enthalten: {{ detail.model.not_included_yet|join(', ') }}.</p>
-                {% endif %}
             </div>
         </div>
     {% else %}
