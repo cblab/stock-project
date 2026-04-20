@@ -49,6 +49,21 @@ class InstrumentSepaSnapshot
     private float $superperformanceScore = 0.0;
 
     #[ORM\Column]
+    private float $vcpScore = 0.0;
+
+    #[ORM\Column]
+    private float $microstructureScore = 0.0;
+
+    #[ORM\Column]
+    private float $breakoutReadinessScore = 0.0;
+
+    #[ORM\Column]
+    private float $structureScore = 0.0;
+
+    #[ORM\Column]
+    private float $executionScore = 0.0;
+
+    #[ORM\Column]
     private float $totalScore = 0.0;
 
     #[ORM\Column(length: 16)]
@@ -94,6 +109,16 @@ class InstrumentSepaSnapshot
     public function setRiskScore(float $value): self { $this->riskScore = $value; return $this; }
     public function getSuperperformanceScore(): float { return $this->superperformanceScore; }
     public function setSuperperformanceScore(float $value): self { $this->superperformanceScore = $value; return $this; }
+    public function getVcpScore(): float { return $this->vcpScore; }
+    public function setVcpScore(float $value): self { $this->vcpScore = $value; return $this; }
+    public function getMicrostructureScore(): float { return $this->microstructureScore; }
+    public function setMicrostructureScore(float $value): self { $this->microstructureScore = $value; return $this; }
+    public function getBreakoutReadinessScore(): float { return $this->breakoutReadinessScore; }
+    public function setBreakoutReadinessScore(float $value): self { $this->breakoutReadinessScore = $value; return $this; }
+    public function getStructureScore(): float { return $this->structureScore; }
+    public function setStructureScore(float $value): self { $this->structureScore = $value; return $this; }
+    public function getExecutionScore(): float { return $this->executionScore; }
+    public function setExecutionScore(float $value): self { $this->executionScore = $value; return $this; }
     public function getTotalScore(): float { return $this->totalScore; }
     public function setTotalScore(float $value): self { $this->totalScore = $value; return $this; }
     public function getTrafficLight(): string { return $this->trafficLight; }

@@ -25,6 +25,11 @@ class SepaSnapshot:
     momentum_score: float
     risk_score: float
     superperformance_score: float
+    vcp_score: float
+    microstructure_score: float
+    breakout_readiness_score: float
+    structure_score: float
+    execution_score: float
     total_score: float
     traffic_light: str
     kill_triggers: list[str]

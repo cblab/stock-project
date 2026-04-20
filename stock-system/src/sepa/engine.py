@@ -4,13 +4,16 @@ from datetime import datetime, timezone
 
 from data.symbol_mapper import SymbolMapping
 from sepa.base_quality import score_base_quality
+from sepa.execution import EXECUTION_WEIGHTS, TOTAL_EXECUTION_WEIGHT, TOTAL_STRUCTURE_WEIGHT, blended_total_score, execution_score
 from sepa.market import load_market_benchmark, load_price_history, score_market_regime
+from sepa.microstructure import score_breakout_readiness, score_microstructure
 from sepa.momentum import score_momentum
 from sepa.relative_strength import score_relative_strength
 from sepa.risk import score_risk_asymmetry
 from sepa.scoring import HARD_KILL_TRIGGERS, SOFT_WARNING_TRIGGERS, WEIGHTS, classify_triggers, score_superperformance, total_score, traffic_light
 from sepa.signals import SepaSnapshot
 from sepa.stage import score_stage_structure
+from sepa.vcp import score_vcp_quality
 from sepa.volume import score_volume_quality
 
 
@@ -48,6 +51,11 @@ class SepaEngine:
                 momentum_score=0.0,
                 risk_score=0.0,
                 superperformance_score=0.0,
+                vcp_score=0.0,
+                microstructure_score=0.0,
+                breakout_readiness_score=0.0,
+                structure_score=0.0,
+                execution_score=0.0,
                 total_score=0.0,
                 traffic_light="Rot",
                 kill_triggers=["market_data_failed"],
@@ -67,7 +75,10 @@ class SepaEngine:
         momentum = score_momentum(df)
         risk = score_risk_asymmetry(df)
         superperformance = score_superperformance(relative_strength, momentum, volume)
-        results = {
+        vcp = score_vcp_quality(df)
+        microstructure = score_microstructure(df)
+        breakout_readiness = score_breakout_readiness(df)
+        structure_results = {
             "market": market,
             "stage": stage,
             "relative_strength": relative_strength,
@@ -77,11 +88,19 @@ class SepaEngine:
             "risk": risk,
             "superperformance": superperformance,
         }
+        execution_results = {
+            "vcp": vcp,
+            "microstructure": microstructure,
+            "breakout_readiness": breakout_readiness,
+        }
+        results = {**structure_results, **execution_results}
         kills = []
         for result in results.values():
             kills.extend(result.kill_triggers)
         hard_triggers, soft_warnings = classify_triggers(kills)
-        total = total_score(results)
+        structure_total = total_score(structure_results)
+        execution_total = execution_score(execution_results)
+        total = blended_total_score(structure_total, execution_total)
         light, light_reason = traffic_light(total, hard_triggers, soft_warnings)
         as_of = df.index[-1].date().isoformat()
 
@@ -98,6 +117,11 @@ class SepaEngine:
             momentum_score=momentum.score,
             risk_score=risk.score,
             superperformance_score=superperformance.score,
+            vcp_score=vcp.score,
+            microstructure_score=microstructure.score,
+            breakout_readiness_score=breakout_readiness.score,
+            structure_score=structure_total,
+            execution_score=execution_total,
             total_score=total,
             traffic_light=light,
             kill_triggers=hard_triggers,
@@ -110,6 +134,17 @@ class SepaEngine:
                 "hard_triggers": hard_triggers,
                 "soft_warnings": soft_warnings,
                 "traffic_light_reason": light_reason,
+                "structure_layer": {
+                    "score": structure_total,
+                    "weights": WEIGHTS,
+                    "scores": {key: result.details for key, result in structure_results.items()},
+                },
+                "execution_layer": {
+                    "name": "SEPA / Minervini Execution Layer",
+                    "score": execution_total,
+                    "weights": EXECUTION_WEIGHTS,
+                    "scores": {key: result.details for key, result in execution_results.items()},
+                },
                 "scores": {key: result.details for key, result in results.items()},
             },
             hard_triggers=hard_triggers,
@@ -122,6 +157,15 @@ def _model_description() -> dict:
         "name": "SEPA / Minervi Phase-1 Initialmodell",
         "score_range": "0-100",
         "weights": WEIGHTS,
+        "structure_execution_blend": {
+            "structure": TOTAL_STRUCTURE_WEIGHT,
+            "execution": TOTAL_EXECUTION_WEIGHT,
+        },
+        "execution_layer": {
+            "name": "SEPA / Minervini Execution Layer",
+            "weights": EXECUTION_WEIGHTS,
+            "included_scores": ["vcp", "microstructure", "breakout_readiness"],
+        },
         "hard_kill_triggers": sorted(HARD_KILL_TRIGGERS),
         "soft_warning_triggers": sorted(SOFT_WARNING_TRIGGERS),
         "traffic_light_rules": {
@@ -135,13 +179,13 @@ def _model_description() -> dict:
                 "total score below 70",
                 "soft entry or risk warnings",
             ],
-            "green": ["total score at least 70 with no hard triggers or soft warnings"],
+            "green": ["blended total score at least 70 with no hard triggers or soft warnings"],
         },
         "note": "Phase-1 calibration separates structural kill triggers from entry and risk warnings.",
         "not_included_yet": [
-            "full VCP contraction sequence scoring",
-            "post-buy microstructure",
             "fundamental earnings/sales acceleration",
             "institutional ownership model",
+            "external sponsorship and ownership quality",
+            "full historical backtest calibration",
         ],
     }
