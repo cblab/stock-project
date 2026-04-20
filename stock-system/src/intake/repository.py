@@ -125,10 +125,27 @@ class IntakeRepository:
             row = cursor.fetchone()
         return dict(row) if row else None
 
+    def registry_candidate(self, ticker: str) -> dict | None:
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT *
+                FROM watchlist_candidate_registry
+                WHERE UPPER(ticker) = UPPER(%s)
+                LIMIT 1
+                """,
+                (ticker,),
+            )
+            row = cursor.fetchone()
+        return dict(row) if row else None
+
     def is_in_cooldown(self, ticker: str, cooldown_days: int) -> tuple[bool, dict | None]:
         state = self.latest_candidate_state(ticker)
         if not state:
             return False, None
+        manual_state = str(state.get("manual_state") or "")
+        if manual_state == "REJECTED":
+            return False, state
         status = str(state.get("status") or "")
         if status in {"TOP_CANDIDATE", "STRONG_CANDIDATE"}:
             return False, state
@@ -246,6 +263,72 @@ class IntakeRepository:
             "climax": candidate.hard_checks.get("epa_climax"),
             "action": candidate.hard_checks.get("epa_action"),
         }
+        existing = self.registry_candidate(candidate.ticker)
+        if existing is None:
+            self._insert_registry(
+                run_id=run_id,
+                candidate_id=candidate_id,
+                candidate=candidate,
+                latest_buy_signals=latest_buy_signals,
+                latest_sepa=latest_sepa,
+                latest_epa=latest_epa,
+                now=now,
+            )
+            return
+
+        manual_state = existing.get("manual_state")
+        reason = candidate.reason
+        if manual_state == "REJECTED" and self._should_reactivate_rejected(existing, candidate, latest_sepa):
+            manual_state = None
+            reason = "reactivated_quality_improved"
+        active_candidate = 0 if manual_state in {"ADDED_TO_WATCHLIST", "REJECTED"} else 1
+        best_score = max(float(existing.get("best_intake_score") or 0.0), float(candidate.intake_score))
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE watchlist_candidate_registry
+                SET sector_key = %s,
+                    sector_label = %s,
+                    last_seen_at = %s,
+                    seen_count = seen_count + 1,
+                    latest_intake_score = %s,
+                    best_intake_score = %s,
+                    latest_status = %s,
+                    manual_state = %s,
+                    active_candidate = %s,
+                    latest_reason = %s,
+                    latest_buy_signals_json = %s,
+                    latest_sepa_json = %s,
+                    latest_epa_json = %s,
+                    latest_detail_json = %s,
+                    latest_run_id = %s,
+                    latest_candidate_id = %s,
+                    updated_at = %s
+                WHERE id = %s
+                """,
+                (
+                    candidate.sector_key,
+                    candidate.sector_label,
+                    now,
+                    candidate.intake_score,
+                    best_score,
+                    candidate.status,
+                    manual_state,
+                    active_candidate,
+                    reason,
+                    json.dumps(latest_buy_signals, ensure_ascii=False, default=str),
+                    json.dumps(latest_sepa, ensure_ascii=False, default=str),
+                    json.dumps(latest_epa, ensure_ascii=False, default=str),
+                    json.dumps(candidate.detail, ensure_ascii=False, default=str),
+                    run_id,
+                    candidate_id,
+                    now,
+                    existing["id"],
+                ),
+            )
+        self.connection.commit()
+
+    def _insert_registry(self, *, run_id: int, candidate_id: int, candidate, latest_buy_signals: dict, latest_sepa: dict, latest_epa: dict, now: str) -> None:
         with self.connection.cursor() as cursor:
             cursor.execute(
                 """
@@ -255,23 +338,6 @@ class IntakeRepository:
                  latest_reason, latest_buy_signals_json, latest_sepa_json, latest_epa_json, latest_detail_json,
                  latest_run_id, latest_candidate_id, created_at, updated_at)
                 VALUES (%s, NULL, %s, %s, %s, %s, 1, %s, %s, %s, NULL, 1, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ON DUPLICATE KEY UPDATE
-                    sector_key = VALUES(sector_key),
-                    sector_label = VALUES(sector_label),
-                    last_seen_at = VALUES(last_seen_at),
-                    seen_count = seen_count + 1,
-                    latest_intake_score = VALUES(latest_intake_score),
-                    best_intake_score = GREATEST(best_intake_score, VALUES(latest_intake_score)),
-                    latest_status = IF(manual_state IS NULL, VALUES(latest_status), latest_status),
-                    active_candidate = IF(manual_state IN ('ADDED_TO_WATCHLIST', 'DISMISSED'), 0, 1),
-                    latest_reason = VALUES(latest_reason),
-                    latest_buy_signals_json = VALUES(latest_buy_signals_json),
-                    latest_sepa_json = VALUES(latest_sepa_json),
-                    latest_epa_json = VALUES(latest_epa_json),
-                    latest_detail_json = VALUES(latest_detail_json),
-                    latest_run_id = VALUES(latest_run_id),
-                    latest_candidate_id = VALUES(latest_candidate_id),
-                    updated_at = VALUES(updated_at)
                 """,
                 (
                     candidate.ticker,
@@ -295,6 +361,31 @@ class IntakeRepository:
             )
         self.connection.commit()
 
+    def _should_reactivate_rejected(self, existing: dict, candidate, latest_sepa: dict) -> bool:
+        previous_score = float(existing.get("latest_intake_score") or 0.0)
+        previous_best = float(existing.get("best_intake_score") or 0.0)
+        previous_sepa = self._json_number(existing.get("latest_sepa_json"), "total")
+        new_sepa = float(latest_sepa.get("total") or 0.0)
+        strong_status = candidate.status in {"TOP_CANDIDATE", "STRONG_CANDIDATE"}
+        if candidate.status == "TOP_CANDIDATE" and candidate.intake_score >= previous_score + 5.0:
+            return True
+        if strong_status and candidate.intake_score >= previous_score + 8.0:
+            return True
+        if strong_status and new_sepa >= previous_sepa + 8.0:
+            return True
+        if strong_status and int(existing.get("seen_count") or 0) >= 2 and candidate.intake_score >= previous_best + 3.0:
+            return True
+        return False
+
+    def _json_number(self, value, key: str) -> float:
+        if not value:
+            return 0.0
+        try:
+            decoded = json.loads(value) if isinstance(value, str) else value
+            return float(decoded.get(key) or 0.0)
+        except Exception:
+            return 0.0
+
     def manual_action(self, candidate_id: int, action: str) -> dict:
         with self.connection.cursor() as cursor:
             cursor.execute("SELECT * FROM sector_intake_candidate WHERE id = %s", (candidate_id,))
@@ -304,16 +395,14 @@ class IntakeRepository:
         ticker = str(candidate["ticker"])
         status_by_action = {
             "add": "ADDED_TO_WATCHLIST",
-            "dismiss": "DISMISSED",
-            "recheck": "RECHECK_LATER",
+            "dismiss": "REJECTED",
         }
         reason_by_action = {
             "add": "manual_add",
             "dismiss": "manual_dismiss",
-            "recheck": "manual_recheck_later",
         }
         if action not in status_by_action:
-            raise ValueError("Manual action must be one of: add, dismiss, recheck.")
+            raise ValueError("Manual action must be one of: add, dismiss.")
         added = False
         if action == "add":
             signals = self.latest_signals(ticker)

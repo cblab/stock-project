@@ -64,7 +64,15 @@
                             </td>
                         {% endif %}
                         <td class="text-right">
-                            <a class="font-medium text-slate-950 underline decoration-slate-300 underline-offset-4 hover:decoration-slate-900" href="{{ path('app_instrument_show', {id: instrument.id}) }}">Details</a>
+                            <div class="flex items-center justify-end gap-2">
+                                <a class="font-medium text-slate-950 underline decoration-slate-300 underline-offset-4 hover:decoration-slate-900" href="{{ path('app_instrument_show', {id: instrument.id}) }}">Details</a>
+                                {% if returnRoute in ['app_portfolio_index', 'app_watchlist_index'] %}
+                                    <form method="post" action="{{ path('app_instrument_delete', {id: instrument.id}) }}" onsubmit="return confirm('Instrument {{ instrument.inputTicker }} endgueltig loeschen?');">
+                                        <input type="hidden" name="return_route" value="{{ returnRoute }}">
+                                        <button class="rounded-md border border-rose-200 px-2 py-1 text-[11px] font-medium text-rose-700 hover:bg-rose-50" title="Instrument endgueltig loeschen. Abhaengige Runs und Snapshots werden per Cascade entfernt.">Loeschen</button>
+                                    </form>
+                                {% endif %}
+                            </div>
                         </td>
                     </tr>
                 {% else %}

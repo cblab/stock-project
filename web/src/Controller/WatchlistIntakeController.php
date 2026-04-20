@@ -19,10 +19,11 @@ class WatchlistIntakeController extends AbstractController
             max(5, min(100, $request->query->getInt('perPage', 10))),
             (string) $request->query->get('sort', 'priority'),
             strtolower((string) $request->query->get('dir', 'desc')),
+            $request->query->getBoolean('showRejected', false),
         ));
     }
 
-    #[Route('/watchlist-intake/candidate/{id}/{action}', name: 'app_watchlist_intake_action', methods: ['POST'], requirements: ['id' => '\d+', 'action' => 'add|dismiss|recheck'])]
+    #[Route('/watchlist-intake/candidate/{id}/{action}', name: 'app_watchlist_intake_action', methods: ['POST'], requirements: ['id' => '\d+', 'action' => 'add|dismiss'])]
     public function action(int $id, string $action, WatchlistIntakeActionService $actionService): Response
     {
         $actionService->apply($id, $action);
