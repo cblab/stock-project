@@ -12,9 +12,9 @@ class WatchlistIntakeActionService
 
     public function apply(int $candidateId, string $action): void
     {
-        $candidate = $this->connection->fetchAssociative('SELECT * FROM sector_intake_candidate WHERE id = ?', [$candidateId]);
+        $candidate = $this->connection->fetchAssociative('SELECT * FROM watchlist_candidate_registry WHERE id = ?', [$candidateId]);
         if (!$candidate) {
-            throw new \InvalidArgumentException('Unknown intake candidate.');
+            throw new \InvalidArgumentException('Unknown watchlist candidate.');
         }
 
         $status = match ($action) {
@@ -40,16 +40,29 @@ class WatchlistIntakeActionService
         }
 
         $this->connection->update(
-            'sector_intake_candidate',
+            'watchlist_candidate_registry',
             [
-                'status' => $status,
-                'manual_action' => $action,
-                'added_to_watchlist' => $added ? 1 : 0,
-                'reason' => $reason,
+                'manual_state' => $status,
+                'active_candidate' => in_array($status, ['ADDED_TO_WATCHLIST', 'DISMISSED'], true) ? 0 : 1,
+                'latest_reason' => $reason,
                 'updated_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
             ],
             ['id' => $candidateId],
         );
+
+        if ($candidate['latest_candidate_id'] !== null) {
+            $this->connection->update(
+                'sector_intake_candidate',
+                [
+                    'status' => $status,
+                    'manual_action' => $action,
+                    'added_to_watchlist' => $added ? 1 : 0,
+                    'reason' => $reason,
+                    'updated_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
+                ],
+                ['id' => $candidate['latest_candidate_id']],
+            );
+        }
     }
 
     private function addTickerToWatchlist(string $ticker, string $sectorLabel): bool

@@ -111,10 +111,13 @@ class IntakeRepository:
         with self.connection.cursor() as cursor:
             cursor.execute(
                 """
-                SELECT *
-                FROM sector_intake_candidate
+                SELECT
+                    ticker,
+                    latest_status AS status,
+                    last_seen_at AS created_at,
+                    manual_state
+                FROM watchlist_candidate_registry
                 WHERE UPPER(ticker) = UPPER(%s)
-                ORDER BY created_at DESC, id DESC
                 LIMIT 1
                 """,
                 (ticker,),
@@ -191,7 +194,7 @@ class IntakeRepository:
             )
         self.connection.commit()
 
-    def write_candidate(self, run_id: int, candidate) -> None:
+    def write_candidate(self, run_id: int, candidate) -> int:
         now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
         with self.connection.cursor() as cursor:
             cursor.execute(
@@ -215,6 +218,78 @@ class IntakeRepository:
                     candidate.reason,
                     json.dumps(candidate.hard_checks, ensure_ascii=False, default=str),
                     json.dumps(candidate.detail, ensure_ascii=False, default=str),
+                    now,
+                ),
+            )
+            candidate_id = int(cursor.lastrowid)
+        self.connection.commit()
+        return candidate_id
+
+    def upsert_registry(self, *, run_id: int, candidate_id: int, candidate) -> None:
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        latest_buy_signals = {
+            "decision": candidate.hard_checks.get("decision"),
+            "kronos_score": candidate.hard_checks.get("kronos_score"),
+            "sentiment_score": candidate.hard_checks.get("sentiment_score"),
+            "merged_score": candidate.hard_checks.get("merged_score"),
+            "sentiment_label": candidate.hard_checks.get("sentiment_label"),
+        }
+        latest_sepa = {
+            "structure": candidate.hard_checks.get("sepa_structure"),
+            "execution": candidate.hard_checks.get("sepa_execution"),
+            "total": candidate.hard_checks.get("sepa_total"),
+            "traffic_light": candidate.hard_checks.get("traffic_light"),
+            "source": candidate.hard_checks.get("signal_source"),
+        }
+        latest_epa = {
+            "total": candidate.hard_checks.get("epa_total"),
+            "climax": candidate.hard_checks.get("epa_climax"),
+            "action": candidate.hard_checks.get("epa_action"),
+        }
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO watchlist_candidate_registry
+                (ticker, name, sector_key, sector_label, first_seen_at, last_seen_at, seen_count,
+                 latest_intake_score, best_intake_score, latest_status, manual_state, active_candidate,
+                 latest_reason, latest_buy_signals_json, latest_sepa_json, latest_epa_json, latest_detail_json,
+                 latest_run_id, latest_candidate_id, created_at, updated_at)
+                VALUES (%s, NULL, %s, %s, %s, %s, 1, %s, %s, %s, NULL, 1, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE
+                    sector_key = VALUES(sector_key),
+                    sector_label = VALUES(sector_label),
+                    last_seen_at = VALUES(last_seen_at),
+                    seen_count = seen_count + 1,
+                    latest_intake_score = VALUES(latest_intake_score),
+                    best_intake_score = GREATEST(best_intake_score, VALUES(latest_intake_score)),
+                    latest_status = IF(manual_state IS NULL, VALUES(latest_status), latest_status),
+                    active_candidate = IF(manual_state IN ('ADDED_TO_WATCHLIST', 'DISMISSED'), 0, 1),
+                    latest_reason = VALUES(latest_reason),
+                    latest_buy_signals_json = VALUES(latest_buy_signals_json),
+                    latest_sepa_json = VALUES(latest_sepa_json),
+                    latest_epa_json = VALUES(latest_epa_json),
+                    latest_detail_json = VALUES(latest_detail_json),
+                    latest_run_id = VALUES(latest_run_id),
+                    latest_candidate_id = VALUES(latest_candidate_id),
+                    updated_at = VALUES(updated_at)
+                """,
+                (
+                    candidate.ticker,
+                    candidate.sector_key,
+                    candidate.sector_label,
+                    now,
+                    now,
+                    candidate.intake_score,
+                    candidate.intake_score,
+                    candidate.status,
+                    candidate.reason,
+                    json.dumps(latest_buy_signals, ensure_ascii=False, default=str),
+                    json.dumps(latest_sepa, ensure_ascii=False, default=str),
+                    json.dumps(latest_epa, ensure_ascii=False, default=str),
+                    json.dumps(candidate.detail, ensure_ascii=False, default=str),
+                    run_id,
+                    candidate_id,
+                    now,
                     now,
                 ),
             )
