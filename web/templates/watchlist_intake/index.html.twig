@@ -1,0 +1,173 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Watchlist Intake{% endblock %}
+
+{% block body %}
+    <div class="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+            <p class="text-sm font-medium uppercase text-slate-500">Sector Discovery & Watchlist Proposal System</p>
+            <h1 class="mt-1 text-2xl font-semibold text-slate-950">Watchlist Intake</h1>
+            <p class="mt-1 max-w-4xl text-sm text-slate-600">
+                Das Modul identifiziert starke Sektoren und priorisiert Kandidaten fuer die Watchlist. Die Aufnahme erfolgt bewusst manuell.
+                Specific Entry Point Analysis ist die primaere Bewertungslogik; Kronos und Sentiment ergaenzen nur als Kontext. Exit Point Analysis ist hier kein Intake-Gate.
+            </p>
+        </div>
+        {% if run %}
+            <div class="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm">
+                <span class="font-medium text-slate-950">{{ run.status }}</span>
+                <span class="text-slate-500"> / Proposal Only</span>
+            </div>
+        {% endif %}
+    </div>
+
+    {% if run is null %}
+        <section class="rounded-lg border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-600">
+            Noch kein Watchlist-Intake-Lauf vorhanden. Starte `python stock-system/scripts/run_watchlist_intake.py --mode=db`.
+        </section>
+    {% else %}
+        <section class="mb-5 grid gap-3 md:grid-cols-4">
+            <div class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                <p class="text-xs uppercase text-slate-500">Run</p>
+                <p class="mt-1 font-semibold text-slate-950">{{ run.run_key }}</p>
+                <p class="text-xs text-slate-500">{{ run.created_at|date('d.m.Y H:i') }}</p>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                <p class="text-xs uppercase text-slate-500" title="Nur die staerksten Sektoren werden weiter untersucht. Der Score kombiniert Sektor-Performance und relative Staerke gegen SPY.">Top-Sektoren</p>
+                <p class="mt-1 text-2xl font-semibold text-slate-950">{{ sectors|length }}</p>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                <p class="text-xs uppercase text-slate-500" title="Rotierende Kandidaten aus den ausgewaehlten Top-Sektoren. Frisch gepruefte Titel werden per Cooldown geschont.">Kandidaten</p>
+                <p class="mt-1 text-2xl font-semibold text-slate-950">{{ candidates|length }}</p>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                <p class="text-xs uppercase text-slate-500" title="Watchlist-Aufnahmen entstehen nur durch Nutzeraktion, nie durch den Python-Job.">Manuell aufgenommen</p>
+                <p class="mt-1 text-2xl font-semibold text-slate-950">{{ candidates|filter(c => c.status == 'ADDED_TO_WATCHLIST')|length }}</p>
+            </div>
+        </section>
+
+        <section class="mb-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <h2 class="text-sm font-semibold uppercase text-slate-500">Top-Sektoren</h2>
+            <div class="mt-3 grid gap-3 md:grid-cols-3">
+                {% for sector in sectors %}
+                    <div class="rounded-md border border-slate-200 p-3">
+                        <div class="flex items-start justify-between gap-3">
+                            <div>
+                                <p class="font-semibold text-slate-950" title="Sector Rank: Rang innerhalb dieses Intake-Laufs nach Sektor-Score.">#{{ sector.sector_rank }} {{ sector.sector_label }}</p>
+                                <p class="text-xs text-slate-500">{{ sector.proxy_ticker }}</p>
+                            </div>
+                            <span class="compact-badge bg-emerald-50 text-emerald-700 ring-emerald-200" title="Sector Score: 1M/3M Performance plus relative Staerke gegen SPY.">{{ sector.sector_score|number_format(1) }}</span>
+                        </div>
+                        <dl class="signal-stack mt-3">
+                            <dt title="Performance des Sektor-Proxys ueber ca. einen Monat.">1M</dt><dt title="Performance des Sektor-Proxys ueber ca. drei Monate.">3M</dt><dt title="Relative 1M-Performance gegen SPY.">Rel 1M</dt><dt title="Relative 3M-Performance gegen SPY.">Rel 3M</dt>
+                            <dd>{{ sector.return_1m_pct|number_format(1) }}%</dd>
+                            <dd>{{ sector.return_3m_pct|number_format(1) }}%</dd>
+                            <dd>{{ sector.relative_1m_pct|number_format(1) }}%</dd>
+                            <dd>{{ sector.relative_3m_pct|number_format(1) }}%</dd>
+                        </dl>
+                    </div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="rounded-lg border border-slate-200 bg-white shadow-sm">
+            <table class="data-table">
+                <colgroup>
+                    <col class="w-[9%]">
+                    <col class="w-[14%]">
+                    <col class="w-[13%]">
+                    <col class="w-[22%]">
+                    <col class="w-[18%]">
+                    <col class="w-[14%]">
+                    <col class="w-[10%]">
+                </colgroup>
+                <thead>
+                    <tr>
+                        <th title="Ticker aus dem kuratierten Kandidatenpool des Top-Sektors.">Ticker</th>
+                        <th title="Sektor, aus dem der Kandidat vorgeschlagen wurde.">Sektor</th>
+                        <th title="Proposal Status: TOP, STRONG, Research, Rejected oder manuelle Entscheidung.">Status</th>
+                        <th title="SEPA ist die primaere Intake-Logik: Structure, Execution, Total und Ampel.">SEPA</th>
+                        <th title="Kurzfristige Kronos-/Sentiment-Signale dienen nur als Kontext und Tiebreaker.">K/S/M Kontext</th>
+                        <th title="Letzte Pruefung und Grund der Proposal-Klasse.">Pruefung</th>
+                        <th title="Manuelle Aktion: aufnehmen, verwerfen oder spaeter erneut pruefen.">Aktionen</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for candidate in candidates %}
+                        {% set checks = candidate.hard_checks %}
+                        {% set price = candidate.detail.price_strength ?? {} %}
+                        {% set statusTone =
+                            candidate.status == 'TOP_CANDIDATE' ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' :
+                            (candidate.status == 'STRONG_CANDIDATE' ? 'bg-sky-50 text-sky-700 ring-sky-200' :
+                            (candidate.status == 'ADDED_TO_WATCHLIST' ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' :
+                            (candidate.status == 'DISMISSED' ? 'bg-slate-100 text-slate-600 ring-slate-200' :
+                            (candidate.status == 'RECHECK_LATER' ? 'bg-amber-50 text-amber-700 ring-amber-200' :
+                            (candidate.status == 'REJECTED' ? 'bg-rose-50 text-rose-700 ring-rose-200' : 'bg-amber-50 text-amber-700 ring-amber-200'))))) %}
+                        <tr>
+                            <td>
+                                <div class="font-semibold text-slate-950">{{ candidate.ticker }}</div>
+                                <div class="text-[11px] text-slate-500">Rank {{ candidate.candidate_rank }}</div>
+                            </td>
+                            <td>
+                                <div class="font-medium text-slate-800">{{ candidate.sector_label }}</div>
+                                <div class="text-[11px] text-slate-500" title="Sektor-Prioritaet im aktuellen Lauf.">Sektor #{{ candidate.sector_rank }}</div>
+                            </td>
+                            <td>
+                                <span class="compact-badge {{ statusTone }}" title="Proposal Status: Systemvorschlag oder manuelle Nutzerentscheidung.">{{ candidate.status }}</span>
+                                <div class="mt-1 text-[11px] text-slate-500">Score {{ candidate.intake_score|number_format(1) }}</div>
+                                {% if checks.signal_source is defined %}
+                                    <div class="mt-1 text-[11px] text-slate-500" title="Neuer Titel ohne DB-Snapshots: SEPA wird hier als leichter OHLCV-Proxy berechnet.">OHLCV-Proxy</div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <dl class="signal-stack max-w-[18rem]">
+                                    <dt title="SEPA Structure: Trend, Stage, relative Staerke, Base, Volumen und Momentum.">Str</dt>
+                                    <dt title="SEPA Execution: VCP, Mikrostruktur und Breakout Readiness.">Exe</dt>
+                                    <dt title="SEPA Total: kombinierte Struktur- und Execution-Qualitaet.">Tot</dt>
+                                    <dt title="Ampel: verdichtet SEPA-Qualitaet und Warnsignale.">Ampel</dt>
+                                    <dd>{{ checks.sepa_structure is defined and checks.sepa_structure is not null ? checks.sepa_structure|number_format(1) : '-' }}</dd>
+                                    <dd>{{ checks.sepa_execution is defined and checks.sepa_execution is not null ? checks.sepa_execution|number_format(1) : '-' }}</dd>
+                                    <dd>{{ checks.sepa_total is defined and checks.sepa_total is not null ? checks.sepa_total|number_format(1) : '-' }}</dd>
+                                    <dd>{{ checks.traffic_light ?? '-' }}</dd>
+                                </dl>
+                                {% if checks.epa_action is defined %}
+                                    <div class="mt-1 text-[11px] text-slate-500" title="EPA wird hier nur angezeigt, aber nicht als Intake-Gate verwendet.">EPA Kontext: {{ checks.epa_action ?: '-' }}</div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <dl class="signal-stack max-w-[16rem]">
+                                    <dt title="Kronos: kurzfristiger Prognose-/Preiskontext, nur Zusatzsignal.">K</dt>
+                                    <dt title="Sentiment: Nachrichten-/Textsignal, nur Zusatzkontext.">S</dt>
+                                    <dt title="Merged: Kombination aus Kronos und Sentiment, hier nur Tiebreaker.">M</dt>
+                                    <dt title="Preisfilter: 1M/3M Momentum und Naehe zum Hoch aus sparsam gecachten OHLCV-Daten.">Px</dt>
+                                    <dd>{{ checks.kronos_score is defined and checks.kronos_score is not null ? checks.kronos_score|number_format(3) : '-' }}</dd>
+                                    <dd>{{ checks.sentiment_score is defined and checks.sentiment_score is not null ? checks.sentiment_score|number_format(3) : '-' }}</dd>
+                                    <dd>{{ checks.merged_score is defined and checks.merged_score is not null ? checks.merged_score|number_format(3) : '-' }}</dd>
+                                    <dd>{{ price.price_score is defined ? price.price_score|number_format(1) : '-' }}</dd>
+                                </dl>
+                            </td>
+                            <td class="text-xs text-slate-600">
+                                <div title="Letzte Pruefung dieses Kandidaten im Intake-Lauf.">{{ candidate.created_at|date('d.m. H:i') }}</div>
+                                <div class="mt-1">{{ candidate.reason|replace({'_': ' '}) }}</div>
+                            </td>
+                            <td>
+                                <div class="flex flex-col gap-1">
+                                    <form method="post" action="{{ path('app_watchlist_intake_action', {id: candidate.id, action: 'add'}) }}">
+                                        <button class="w-full rounded-md bg-slate-950 px-2 py-1 text-[11px] font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300" title="Diesen Kandidaten manuell in die Watchlist aufnehmen." {{ candidate.status == 'ADDED_TO_WATCHLIST' ? 'disabled' : '' }}>Aufnehmen</button>
+                                    </form>
+                                    <form method="post" action="{{ path('app_watchlist_intake_action', {id: candidate.id, action: 'dismiss'}) }}">
+                                        <button class="w-full rounded-md border border-slate-200 px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50" title="Diesen Vorschlag verwerfen und im Status DISMISSED markieren.">Verwerfen</button>
+                                    </form>
+                                    <form method="post" action="{{ path('app_watchlist_intake_action', {id: candidate.id, action: 'recheck'}) }}">
+                                        <button class="w-full rounded-md border border-amber-200 px-2 py-1 text-[11px] font-medium text-amber-800 hover:bg-amber-50" title="Diesen Vorschlag fuer eine spaetere erneute Pruefung markieren.">Spaeter pruefen</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="7" class="py-6 text-center text-slate-500">Keine Kandidaten im letzten Lauf.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+    {% endif %}
+{% endblock %}

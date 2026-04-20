@@ -141,6 +141,44 @@ separate:
 - Buy Signal Matrix: Kronos, Sentiment, Merged Score, SEPA Structure/Execution.
 - Sell Signal Matrix: EPA Exit & Risk only.
 
+## Sector Discovery & Watchlist Intake
+
+The Watchlist Intake module is not a universal screener. It intentionally keeps
+the search space small:
+
+1. rank configured sector proxies by 1-month and 3-month performance plus
+   relative strength versus SPY
+2. continue only with the top configured sectors, usually 2-3
+3. inspect only a small candidate list per selected sector
+4. reuse existing DB signals and snapshots for the proposal score
+5. leave the final watchlist decision to the user
+
+Run it first as a dry-run:
+
+```powershell
+python stock-system\scripts\run_watchlist_intake.py --mode=db
+```
+
+The old `--apply` flag is deprecated and ignored. Watchlist additions happen
+only through the web UI.
+
+Configuration lives in `stock-system/config/sector_intake.yaml`. The proposal
+score is SEPA-centered: Structure, Execution, Total score, traffic light, and
+sector strength dominate. Kronos, Sentiment, and Merged are retained as compact
+context and tiebreakers. EPA is shown only as context and is not an intake gate.
+
+Rate-limit controls are built in: sector/candidate lists are deliberately small,
+candidate pools rotate per run, active portfolio/watchlist instruments are
+excluded from proposals, Yahoo/yfinance requests are paused between downloads,
+and OHLCV responses are cached under `.cache/sector_intake` for the configured
+TTL. Candidates are also cooled down in the DB for about 14 days unless they
+were strong/top candidates. New candidates without verified DB snapshots get a
+lightweight OHLCV-based SEPA proxy so the proposal row is still interpretable.
+
+The latest run is visible in the web UI at `/watchlist-intake` with selected
+sectors, proposal classes, reasons, and manual actions. Available user actions
+are `In Watchlist aufnehmen`, `Verwerfen`, and `Spaeter pruefen`.
+
 ## Start
 
 ```powershell
