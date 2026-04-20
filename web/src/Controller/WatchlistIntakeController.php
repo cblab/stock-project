@@ -17,6 +17,8 @@ class WatchlistIntakeController extends AbstractController
         return $this->render('watchlist_intake/index.html.twig', $viewBuilder->latest(
             max(1, $request->query->getInt('page', 1)),
             max(5, min(100, $request->query->getInt('perPage', 10))),
+            (string) $request->query->get('sort', 'priority'),
+            strtolower((string) $request->query->get('dir', 'desc')),
         ));
     }
 
