@@ -149,9 +149,11 @@ the search space small:
 1. rank configured sector proxies by 1-month and 3-month performance plus
    relative strength versus SPY
 2. continue only with the top configured sectors, usually 2-3
-3. inspect only a small candidate list per selected sector
-4. reuse existing DB signals and snapshots for the proposal score
-5. leave the final watchlist decision to the user
+3. discover candidates dynamically from Yahoo sector screeners, with ETF
+   holdings only as a fallback
+4. deeply inspect only a small rotating subset per selected sector
+5. upsert unique tickers into the cumulative `watchlist_candidate_registry`
+6. leave the final watchlist decision to the user
 
 Run it first as a dry-run:
 
@@ -167,18 +169,19 @@ score is SEPA-centered: Structure, Execution, Total score, traffic light, and
 sector strength dominate. Kronos, Sentiment, and Merged are retained as compact
 context and tiebreakers. EPA is shown only as context and is not an intake gate.
 
-Rate-limit controls are built in: sector/candidate lists are deliberately small,
-candidate pools rotate per run, active portfolio/watchlist instruments are
-excluded from proposals, Yahoo/yfinance requests are paused between downloads,
-and OHLCV responses are cached under `.cache/sector_intake` for the configured
-TTL. Individual ticker candidates are cooled down in the DB for about 14 days
-unless they were strong/top candidates. New candidates without verified DB
-snapshots get a lightweight OHLCV-based SEPA proxy so the proposal row is still
-interpretable.
+Rate-limit controls are built in: sector universes and OHLCV responses are
+cached under `.cache/sector_intake`, Yahoo/yfinance requests are paused between
+downloads, active portfolio/watchlist instruments are excluded, candidate pools
+rotate per run, and individual ticker candidates are cooled down in the DB for
+about 14 days unless they were strong/top candidates. Cooldown skips do not
+consume the deep-check budget, so later tickers can still move into view.
 
-The latest run is visible in the web UI at `/watchlist-intake` with selected
-sectors, proposal classes, reasons, and manual actions. Available user actions
-are `In Watchlist aufnehmen`, `Verwerfen`, and `Spaeter pruefen`.
+Intake runs remain historical diagnostics in `sector_intake_run` and
+`sector_intake_candidate`. The primary UI at `/watchlist-intake` reads the
+deduplicated `watchlist_candidate_registry`, so the page grows cumulatively over
+multiple runs. Global KPIs are computed from the registry, independent of
+pagination. Available user actions are `In Watchlist aufnehmen`, `Verwerfen`,
+and `Spaeter pruefen`.
 
 ## Start
 

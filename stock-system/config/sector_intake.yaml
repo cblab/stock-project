@@ -2,55 +2,60 @@ sector_proxies:
   - key: technology
     label: Technology
     proxy: XLK
-    candidates: [NVDA, AVGO, ASML, TSM, AMD, AMAT, LRCX, KLAC, NOW, CRM, ANET, PANW, SNPS, CDNS, ORCL, MSFT]
+    yahoo_sector: Technology
   - key: semiconductors
     label: Semiconductors
     proxy: SMH
-    candidates: [NVDA, AVGO, ASML, TSM, AMD, AMAT, LRCX, KLAC, MU, COHR, LITE, AEHR, AAOI, "ON", MRVL, MCHP, ACLS, TER]
+    yahoo_sector: Technology
+    yahoo_industries: [Semiconductors, Semiconductor Equipment & Materials]
   - key: communication
     label: Communication Services
     proxy: XLC
-    candidates: [META, GOOGL, NFLX, TMUS, SPOT, DIS, UBER, DASH, TTD]
+    yahoo_sector: Communication Services
   - key: consumer_discretionary
     label: Consumer Discretionary
     proxy: XLY
-    candidates: [AMZN, TSLA, HD, ROST, TJX, BKNG, CMG, MELI, ORLY, AZO, LULU, DECK]
+    yahoo_sector: Consumer Cyclical
   - key: industrials
     label: Industrials
     proxy: XLI
-    candidates: [GE, ETN, PH, CAT, URI, CARR, FIX, PWR, VRT, HON, TDG, AXON]
+    yahoo_sector: Industrials
   - key: financials
     label: Financials
     proxy: XLF
-    candidates: [JPM, V, MA, GS, MS, BX, KKR, AXP, COF, BLK, IBKR]
+    yahoo_sector: Financial Services
   - key: healthcare
     label: Healthcare
     proxy: XLV
-    candidates: [LLY, NVO, ISRG, TMO, BSX, REGN, VRTX, MCK, COR, DXCM, RMD]
+    yahoo_sector: Healthcare
   - key: energy
     label: Energy
     proxy: XLE
-    candidates: [XOM, CVX, COP, SLB, LNG, FANG, EOG, WMB, HAL, VLO, MPC]
+    yahoo_sector: Energy
   - key: materials
     label: Materials
     proxy: XLB
-    candidates: [LIN, FCX, NUE, NEM, APD, SCCO, STLD, VMC, MLM, ECL]
+    yahoo_sector: Basic Materials
   - key: utilities
     label: Utilities
     proxy: XLU
-    candidates: [SO, NEE, DUK, CEG, VST, GEV, TLN, AEP, EXC, SRE]
+    yahoo_sector: Utilities
   - key: real_estate
     label: Real Estate
     proxy: XLRE
-    candidates: [PLD, AMT, EQIX, WELL, VICI, CCI, DLR, SPG, O, IRM]
+    yahoo_sector: Real Estate
 
 intake:
   top_sectors: 3
-  candidates_per_sector: 8
+  candidates_per_sector: 12
   cooldown_days: 14
   request_pause_seconds: 0.75
   cache_ttl_hours: 12
   min_sector_score: 50
+  candidate_discovery:
+    universe_source: yahoo_screener
+    max_universe_per_sector: 80
+    max_deep_checks_per_sector: 12
   thresholds:
     top_candidate_min_score: 82
     strong_candidate_min_score: 70

@@ -36,7 +36,8 @@ class SectorWatchlistIntakeEngine:
                 dry_run=True,
             )
             for candidate in candidates:
-                self.repository.write_candidate(run_id, candidate)
+                candidate_id = self.repository.write_candidate(run_id, candidate)
+                self.repository.upsert_registry(run_id=run_id, candidate_id=candidate_id, candidate=candidate)
             summary = {
                 "run_id": run_id,
                 "proposal_only": True,

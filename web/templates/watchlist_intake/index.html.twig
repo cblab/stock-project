@@ -6,23 +6,23 @@
     <div class="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
             <p class="text-sm font-medium uppercase text-slate-500">Sector Discovery & Watchlist Proposal System</p>
-            <h1 class="mt-1 text-2xl font-semibold text-slate-950">Watchlist Intake</h1>
+            <h1 class="mt-1 text-2xl font-semibold text-slate-950">Watchlist Candidate Registry</h1>
             <p class="mt-1 max-w-4xl text-sm text-slate-600">
-                Das Modul identifiziert starke Sektoren und priorisiert Kandidaten fuer die Watchlist. Die Aufnahme erfolgt bewusst manuell.
-                Specific Entry Point Analysis ist die primaere Bewertungslogik; Kronos und Sentiment ergaenzen nur als Kontext. Exit Point Analysis ist hier kein Intake-Gate.
+                Das Modul identifiziert starke Sektoren, entdeckt Kandidaten dynamisch aus Sektor-ETF-Holdings und fuehrt sie kumulativ in einer deduplizierten Registry.
+                Die Aufnahme erfolgt bewusst manuell. Specific Entry Point Analysis ist die primaere Bewertungslogik; Kronos und Sentiment ergaenzen nur als Kontext.
             </p>
         </div>
         {% if run %}
             <div class="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm">
-                <span class="font-medium text-slate-950">{{ run.status }}</span>
-                <span class="text-slate-500"> / Proposal Only</span>
+                <span class="font-medium text-slate-950">Letzter Lauf: {{ run.status }}</span>
+                <span class="text-slate-500"> / Registry View</span>
             </div>
         {% endif %}
     </div>
 
     {% if run is null %}
         <section class="rounded-lg border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-600">
-            Noch kein Watchlist-Intake-Lauf vorhanden. Starte `python stock-system/scripts/run_watchlist_intake.py --mode=db`.
+            Noch kein Watchlist-Candidate-Registry-Lauf vorhanden. Starte `python stock-system/scripts/run_watchlist_intake.py --mode=db`.
         </section>
     {% else %}
         {% set diagnostics = run.summary.diagnostics ?? {} %}
@@ -37,21 +37,22 @@
                 <p class="mt-1 text-2xl font-semibold text-slate-950">{{ sectors|length }}</p>
             </div>
             <div class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-                <p class="text-xs uppercase text-slate-500" title="Rotierende Kandidaten aus den ausgewaehlten Top-Sektoren. Frisch gepruefte Titel werden per Cooldown geschont.">Kandidaten</p>
-                <p class="mt-1 text-2xl font-semibold text-slate-950">{{ pagination.total }}</p>
+                <p class="text-xs uppercase text-slate-500" title="Kumulativer deduplizierter Kandidatenbestand ueber alle Intake-Laeufe.">Registry-Kandidaten</p>
+                <p class="mt-1 text-2xl font-semibold text-slate-950">{{ metrics.total_candidates }}</p>
             </div>
             <div class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
                 <p class="text-xs uppercase text-slate-500" title="Watchlist-Aufnahmen entstehen nur durch Nutzeraktion, nie durch den Python-Job.">Manuell aufgenommen</p>
-                <p class="mt-1 text-2xl font-semibold text-slate-950">{{ candidates|filter(c => c.status == 'ADDED_TO_WATCHLIST')|length }}</p>
+                <p class="mt-1 text-2xl font-semibold text-slate-950">{{ metrics.manually_added }}</p>
             </div>
         </section>
 
         <section class="mb-5 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-            <span class="font-medium text-slate-950">Intake-Debug:</span>
+            <span class="font-medium text-slate-950">Letzter Lauf:</span>
             {{ diagnostics.excluded_active|default(0) }} wegen aktivem Portfolio-/Watchlist-Bestand ausgeschlossen,
             {{ diagnostics.cooldown_skipped|default(0) }} wegen Kandidaten-Cooldown pro Ticker uebersprungen,
             {{ diagnostics.eligible_after_exclusions|default(0) }} nach Ausschluessen im Kandidatenpool,
-            {{ diagnostics.written_candidates|default(pagination.total) }} Vorschlaege gespeichert.
+            {{ diagnostics.written_candidates|default(0) }} historische Lauf-Kandidaten gespeichert.
+            Registry: {{ metrics.active_candidates }} aktiv, {{ metrics.dismissed }} verworfen, {{ metrics.recheck_later }} spaeter pruefen.
             <span class="text-slate-500" title="Wenn hier 0 Vorschlaege stehen, sind meist viele einzelne Ticker im 14-Tage-Cooldown oder der konfigurierte Sektorpool ist nach aktiven Bestandsausschluessen leer. Der Cooldown gilt pro Kandidat/Ticker, nicht pro Sektor.">Warum 0?</span>
         </section>
 
@@ -103,9 +104,9 @@
                 </colgroup>
                 <thead>
                     <tr>
-                        <th title="Ticker aus dem kuratierten Kandidatenpool des Top-Sektors.">Ticker</th>
-                        <th title="Sektor, aus dem der Kandidat vorgeschlagen wurde.">Sektor</th>
-                        <th title="Proposal Status: TOP, STRONG, Research, Rejected oder manuelle Entscheidung.">Status</th>
+                        <th title="Ticker aus der kumulativen Candidate Registry.">Ticker</th>
+                        <th title="Aktueller Sektor-Kontext aus der letzten Sichtung.">Sektor</th>
+                        <th title="Registry Status: aktueller Vorschlagsstatus oder manuelle Nutzerentscheidung.">Status</th>
                         <th title="SEPA ist die primaere Intake-Logik: Structure, Execution, Total und Ampel.">SEPA</th>
                         <th title="Kurzfristige Kronos-/Sentiment-Signale dienen nur als Kontext und Tiebreaker.">K/S/M Kontext</th>
                         <th title="Letzte Pruefung und Grund der Proposal-Klasse.">Pruefung</th>
@@ -126,15 +127,16 @@
                         <tr>
                             <td>
                                 <div class="font-semibold text-slate-950">{{ candidate.ticker }}</div>
-                                <div class="text-[11px] text-slate-500">Rank {{ candidate.candidate_rank }}</div>
+                                <div class="text-[11px] text-slate-500">Seen {{ candidate.seen_count }}x</div>
                             </td>
                             <td>
                                 <div class="font-medium text-slate-800">{{ candidate.sector_label }}</div>
-                                <div class="text-[11px] text-slate-500" title="Sektor-Prioritaet im aktuellen Lauf.">Sektor #{{ candidate.sector_rank }}</div>
+                                <div class="text-[11px] text-slate-500" title="Erste und letzte Sichtung in der Registry.">{{ candidate.first_seen_at|date('d.m.') }} bis {{ candidate.last_seen_at|date('d.m.') }}</div>
                             </td>
                             <td>
                                 <span class="compact-badge {{ statusTone }}" title="Proposal Status: Systemvorschlag oder manuelle Nutzerentscheidung.">{{ candidate.status }}</span>
-                                <div class="mt-1 text-[11px] text-slate-500">Score {{ candidate.intake_score|number_format(1) }}</div>
+                                <div class="mt-1 text-[11px] text-slate-500">Latest {{ candidate.latest_intake_score|number_format(1) }}</div>
+                                <div class="text-[11px] text-slate-500">Best {{ candidate.best_intake_score|number_format(1) }}</div>
                                 {% if checks.signal_source is defined %}
                                     <div class="mt-1 text-[11px] text-slate-500" title="Neuer Titel ohne DB-Snapshots: SEPA wird hier als leichter OHLCV-Proxy berechnet.">OHLCV-Proxy</div>
                                 {% endif %}
@@ -167,7 +169,7 @@
                                 </dl>
                             </td>
                             <td class="text-xs text-slate-600">
-                                <div title="Letzte Pruefung dieses Kandidaten im Intake-Lauf.">{{ candidate.created_at|date('d.m. H:i') }}</div>
+                                <div title="Letzte Sichtung dieses Kandidaten in der Registry.">{{ candidate.last_seen_at|date('d.m. H:i') }}</div>
                                 <div class="mt-1">{{ candidate.reason|replace({'_': ' '}) }}</div>
                             </td>
                             <td>
@@ -185,7 +187,7 @@
                             </td>
                         </tr>
                     {% else %}
-                        <tr><td colspan="7" class="py-6 text-center text-slate-500">Keine Kandidaten im letzten Lauf.</td></tr>
+                        <tr><td colspan="7" class="py-6 text-center text-slate-500">Noch keine Kandidaten in der Registry.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
