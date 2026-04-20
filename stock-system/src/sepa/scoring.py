@@ -43,6 +43,23 @@ SOFT_WARNING_TRIGGERS = {
     "atr_risk_too_high",
     "overextended_from_50dma",
     "sharp_recent_momentum_drawdown",
+    "vcp_history_insufficient",
+    "vcp_contraction_sequence_missing",
+    "vcp_contractions_not_tightening",
+    "vcp_base_too_deep",
+    "vcp_volatility_expanding",
+    "vcp_too_loose_near_pivot",
+    "microstructure_history_insufficient",
+    "microstructure_lost_20dma",
+    "microstructure_deep_recent_pullback",
+    "microstructure_weak_up_down_volume",
+    "microstructure_heavy_down_days",
+    "microstructure_ranges_expanding",
+    "breakout_history_insufficient",
+    "breakout_not_near_pivot",
+    "breakout_entry_late_or_extended",
+    "breakout_setup_not_tight",
+    "breakout_no_volume_dry_up",
 }
 
 
@@ -101,6 +118,8 @@ def traffic_light(total: float, hard_triggers: list[str], soft_warnings: list[st
         return "Rot", "very_low_total_score"
     if hard_triggers:
         return "Gelb", "hard_warning_offset_by_high_structure_score"
+    if total < 62 and soft_warnings:
+        return "Gelb", "weak_total_with_execution_or_risk_warnings"
     if total < 70:
         return "Gelb", "score_below_green_threshold"
     if soft_warnings:

@@ -51,7 +51,18 @@ sentiment checkpoint. Direct FinGPT inference can be enabled by setting
 
 ## SEPA / Minervi Phase-1 calibration
 
-The SEPA traffic light separates structural failure from entry and risk
+The SEPA model has two deterministic OHLCV layers:
+
+- Structure Layer: market, stage, relative strength, base quality, volume,
+  momentum, risk, and superperformance potential.
+- SEPA / Minervini Execution Layer: VCP contraction quality, short-term
+  microstructure, and breakout readiness.
+
+The blended total score uses 72% Structure and 28% Execution. Execution is
+large enough to matter, but hard structural failures remain separated from
+late-entry or setup-quality warnings.
+
+The traffic light separates structural failure from entry and execution risk
 warnings:
 
 - Hard kill triggers: market or data failure, price below the 200-DMA, 50-DMA
@@ -61,12 +72,18 @@ warnings:
 - Soft warnings: unattractive stop distance, overextension from the 50-DMA,
   sharp recent momentum drawdown, deep or chaotic base, expanding base
   volatility, high ATR risk, distance from 52-week high, insufficient
-  category history, and low superperformance potential.
+  category history, low superperformance potential, weak/missing VCP
+  contraction sequence, sloppy microstructure, and late or loose breakout
+  readiness.
 
 Red is reserved for multiple hard structure failures, a hard failure with a
 weak total score, or a very low total score. Strong leaders with no hard
 failure but late-entry risk are Yellow instead of Red. Green requires a strong
 score and no active hard or soft warnings.
+
+Execution details are stored in `detail_json.execution_layer`; the main table
+also stores `vcp_score`, `microstructure_score`, `breakout_readiness_score`,
+`structure_score`, and `execution_score` for direct display and filtering.
 
 ## Start
 

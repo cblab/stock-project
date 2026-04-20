@@ -2,7 +2,7 @@
     <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
             <h2 class="text-sm font-semibold uppercase text-slate-500">SEPA / Minervi Snapshot</h2>
-            <p class="mt-1 text-sm text-slate-600">Strukturelle Phase-1-Bewertung: Trend, relative Staerke, Base, Volumen, Momentum und Risiko.</p>
+            <p class="mt-1 text-sm text-slate-600">Struktur- und Execution-Bewertung: Trend, relative Staerke, Base, VCP, Mikrostruktur und Setup-Timing.</p>
         </div>
         {% if sepaSnapshot %}
             {% set lightClasses = sepaSnapshot.trafficLight == 'Gruen'
@@ -25,12 +25,28 @@
             ['Risiko', sepaSnapshot.riskScore, weights.risk ?? null],
             ['Superperformance', sepaSnapshot.superperformanceScore, weights.superperformance ?? null]
         ] %}
+        {% set executionWeights = detail.execution_layer.weights ?? detail.phase1_model.execution_layer.weights ?? {} %}
+        {% set executionItems = [
+            ['VCP', sepaSnapshot.vcpScore, executionWeights.vcp ?? null, detail.execution_layer.scores.vcp ?? detail.scores.vcp ?? {}],
+            ['Mikrostruktur', sepaSnapshot.microstructureScore, executionWeights.microstructure ?? null, detail.execution_layer.scores.microstructure ?? detail.scores.microstructure ?? {}],
+            ['Breakout Readiness', sepaSnapshot.breakoutReadinessScore, executionWeights.breakout_readiness ?? null, detail.execution_layer.scores.breakout_readiness ?? detail.scores.breakout_readiness ?? {}]
+        ] %}
 
-        <div class="mt-4 grid gap-3 md:grid-cols-4">
+        <div class="mt-4 grid gap-3 md:grid-cols-5">
             <div class="rounded-md bg-slate-50 p-3">
                 <p class="text-xs uppercase text-slate-500">Total Score</p>
                 <p class="mt-1 text-2xl font-semibold text-slate-950">{{ sepaSnapshot.totalScore|number_format(1) }}</p>
                 <p class="text-xs text-slate-500">0-100</p>
+            </div>
+            <div class="rounded-md bg-slate-50 p-3">
+                <p class="text-xs uppercase text-slate-500">Structure</p>
+                <p class="mt-1 text-2xl font-semibold text-slate-950">{{ sepaSnapshot.structureScore|number_format(1) }}</p>
+                <p class="text-xs text-slate-500">Trendqualitaet</p>
+            </div>
+            <div class="rounded-md bg-slate-50 p-3">
+                <p class="text-xs uppercase text-slate-500">Execution</p>
+                <p class="mt-1 text-2xl font-semibold text-slate-950">{{ sepaSnapshot.executionScore|number_format(1) }}</p>
+                <p class="text-xs text-slate-500">Setup-Timing</p>
             </div>
             <div class="rounded-md bg-slate-50 p-3">
                 <p class="text-xs uppercase text-slate-500">As of</p>
@@ -42,11 +58,12 @@
             </div>
             <div class="rounded-md bg-slate-50 p-3">
                 <p class="text-xs uppercase text-slate-500">Modell</p>
-                <p class="mt-1 font-semibold text-slate-950">Phase 1</p>
-                <p class="text-xs text-slate-500">initial gewichtet</p>
+                <p class="mt-1 font-semibold text-slate-950">Structure + Execution</p>
+                <p class="text-xs text-slate-500">deterministisch</p>
             </div>
         </div>
 
+        <h3 class="mt-5 text-sm font-semibold text-slate-950">Structure Layer</h3>
         <div class="mt-5 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
             {% for item in scoreItems %}
                 <div class="rounded-md border border-slate-200 p-3">
@@ -59,6 +76,31 @@
                     </div>
                     {% if item[2] is not null %}
                         <p class="mt-1 text-xs text-slate-500">Gewicht {{ (item[2] * 100)|number_format(0) }}%</p>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+
+        <h3 class="mt-5 text-sm font-semibold text-slate-950">SEPA / Minervini Execution Layer</h3>
+        <div class="mt-3 grid gap-3 md:grid-cols-3">
+            {% for item in executionItems %}
+                <div class="rounded-md border border-slate-200 p-3">
+                    <div class="flex items-center justify-between gap-3">
+                        <p class="text-sm font-medium text-slate-700">{{ item[0] }}</p>
+                        <p class="text-sm font-semibold text-slate-950">{{ item[1]|number_format(1) }}</p>
+                    </div>
+                    <div class="mt-2 h-2 rounded-full bg-slate-100">
+                        <div class="h-2 rounded-full bg-sky-500" style="width: {{ item[1] }}%"></div>
+                    </div>
+                    {% if item[2] is not null %}
+                        <p class="mt-1 text-xs text-slate-500">Execution-Gewicht {{ (item[2] * 100)|number_format(0) }}%</p>
+                    {% endif %}
+                    {% if item[3].contraction_count is defined %}
+                        <p class="mt-2 text-xs text-slate-500">{{ item[3].contraction_count }} Kontraktionen / Volatilitaet {{ item[3].volatility_contraction_ratio ?? '-' }}</p>
+                    {% elseif item[3].green_days_25d is defined %}
+                        <p class="mt-2 text-xs text-slate-500">{{ item[3].green_days_25d }} gruen / {{ item[3].red_days_25d }} rot, U/D {{ item[3].up_down_volume_ratio_25d ?? '-' }}</p>
+                    {% elseif item[3].setup_phase is defined %}
+                        <p class="mt-2 text-xs text-slate-500">{{ item[3].setup_phase|replace({'_': ' '}) }} / Pivot {{ item[3].distance_to_pivot_pct ?? '-' }}%</p>
                     {% endif %}
                 </div>
             {% endfor %}
@@ -91,7 +133,7 @@
                 <h3 class="text-sm font-semibold text-slate-950">Einordnung</h3>
                 <p class="mt-2 text-sm text-slate-700">
                     SEPA Phase 1 bewertet die strukturelle Setup-Qualitaet getrennt vom kurzfristigen Kronos-/Sentiment-Lauf.
-                    Die Ampel kombiniert den Total Score mit harten Strukturfehlern und weichen Entry-/Risiko-Warnungen.
+                    Der Execution Layer ergaenzt VCP, Mikrostruktur und Breakout-Readiness. Die Ampel kombiniert den gemischten Total Score mit harten Strukturfehlern und weichen Execution-/Risiko-Warnungen.
                 </p>
                 {% if detail.traffic_light_reason is defined %}
                     <p class="mt-2 text-xs text-slate-500">Ampelgrund: {{ detail.traffic_light_reason|replace({'_': ' '}) }}.</p>
