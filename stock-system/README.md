@@ -65,25 +65,36 @@ late-entry or setup-quality warnings.
 The traffic light separates structural failure from entry and execution risk
 warnings:
 
-- Hard kill triggers: market or data failure, price below the 200-DMA, 50-DMA
+- Hard triggers: market or data failure, price below the 200-DMA, 50-DMA
   below 200-DMA, 50-DMA structure break, 63-day momentum breakdown, lost base
-  support, missing relative-strength leadership, negative up/down volume, and
-  strong distribution.
+  support, missing relative-strength leadership, and negative up/down volume.
 - Soft warnings: unattractive stop distance, overextension from the 50-DMA,
   sharp recent momentum drawdown, deep or chaotic base, expanding base
   volatility, high ATR risk, distance from 52-week high, insufficient
   category history, low superperformance potential, weak/missing VCP
   contraction sequence, sloppy microstructure, and late or loose breakout
-  readiness.
+  readiness. Distribution pressure is reported as a soft warning unless it is
+  accompanied by hard trend, support, momentum, or leadership failure.
 
 Red is reserved for multiple hard structure failures, a hard failure with a
 weak total score, or a very low total score. Strong leaders with no hard
 failure but late-entry risk are Yellow instead of Red. Green requires a strong
-score and no active hard or soft warnings.
+score and no active hard triggers. Elite scores can remain Green with at most
+minor, non-blocking execution notes; blocking setup, extension, volatility, or
+distribution warnings keep the result Yellow.
+
+Raw trigger ids remain in `detail_json`, but the UI displays deduplicated
+warning summaries such as `Base zu tief oder unruhig`, `Entry spaet oder
+ueberdehnt`, and `Setup nicht tight genug`.
 
 Execution details are stored in `detail_json.execution_layer`; the main table
 also stores `vcp_score`, `microstructure_score`, `breakout_readiness_score`,
 `structure_score`, and `execution_score` for direct display and filtering.
+
+The web UI includes `/signal-matrix`, a consolidated table that joins the
+latest Kronos/Sentiment run item with the latest SEPA snapshot per instrument.
+It defaults to sorting by merged Kronos/Sentiment score and then SEPA total
+score.
 
 ## Start
 

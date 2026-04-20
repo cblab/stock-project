@@ -1,0 +1,110 @@
+{% extends 'base.html.twig' %}
+{% import 'dashboard/_ui.html.twig' as ui %}
+
+{% block title %}Signal-Matrix{% endblock %}
+
+{% block body %}
+    {% set columns = {
+        ticker: ['Ticker', 'Instrument-Detailseite'],
+        name: ['Name', 'Name und WKN'],
+        asset: ['Asset', 'Asset Class'],
+        region: ['Region', 'Region'],
+        scope: ['Scope', 'Letzter Pipeline-Run Scope'],
+        kronos: ['K Norm', 'Normalisierter Kronos-Score [-1, 1]'],
+        sentiment: ['S Norm', 'Normalisierter Sentiment-Score [-1, 1]'],
+        merged: ['Merged', 'Kronos/Sentiment Gesamtscore'],
+        decision: ['Decision', 'Pipeline-Entscheidung'],
+        structure: ['Structure', 'SEPA Structure Score'],
+        execution: ['Execution', 'SEPA Execution Score'],
+        sepaTotal: ['SEPA Total', 'SEPA / Minervini Total Score'],
+        trafficLight: ['Ampel', 'SEPA Ampel'],
+        lastRun: ['Last Run', 'Letzter Kronos/Sentiment Run'],
+        lastSepa: ['Last SEPA', 'Letzter SEPA Snapshot']
+    } %}
+
+    <div class="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+            <p class="text-sm font-medium uppercase text-slate-500">Gesamtuebersicht</p>
+            <h1 class="mt-1 text-2xl font-semibold text-slate-950">Signal-Matrix</h1>
+            <p class="mt-1 text-sm text-slate-600">Gesamtuebersicht aus Kronos, Sentiment und SEPA / Minervini.</p>
+        </div>
+        <div class="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm">
+            <span class="font-medium text-slate-950">{{ items|length }}</span> Instrumente
+        </div>
+    </div>
+
+    <section class="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    {% for field, meta in columns %}
+                        {% set nextDir = currentSort == field and currentDir == 'asc' ? 'desc' : 'asc' %}
+                        {% set active = currentSort == field %}
+                        <th title="{{ meta[1] }}">
+                            <a class="inline-flex items-center gap-1 rounded px-1 py-0.5 {{ active ? 'text-slate-950' : 'text-slate-500 hover:text-slate-950' }}" href="{{ path('app_signal_matrix', {sort: field, dir: nextDir}) }}">
+                                <span>{{ meta[0] }}</span>
+                                <span class="text-[10px]">{{ active ? (currentDir == 'asc' ? 'ASC' : 'DESC') : 'SORT' }}</span>
+                            </a>
+                        </th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                {% for item in items %}
+                    {% set lightClasses = item.traffic_light == 'Gruen'
+                        ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+                        : (item.traffic_light == 'Gelb' ? 'bg-amber-50 text-amber-700 ring-amber-200' : (item.traffic_light == 'Rot' ? 'bg-rose-50 text-rose-700 ring-rose-200' : 'bg-slate-100 text-slate-700 ring-slate-200')) %}
+                    <tr class="hover:bg-slate-50">
+                        <td class="font-medium text-slate-950">
+                            <a class="underline decoration-slate-300 underline-offset-4 hover:decoration-slate-900" href="{{ path('app_instrument_show', {id: item.instrument_id}) }}">{{ item.display_ticker ?: item.input_ticker }}</a>
+                            <div class="mt-1 flex gap-1">
+                                <span class="rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 {{ item.is_portfolio ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : 'bg-sky-50 text-sky-700 ring-sky-200' }}">{{ item.is_portfolio ? 'Portfolio' : 'Watchlist' }}</span>
+                                <span class="rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 {{ item.active ? 'bg-slate-100 text-slate-700 ring-slate-200' : 'bg-rose-50 text-rose-700 ring-rose-200' }}">{{ item.active ? 'Aktiv' : 'Inaktiv' }}</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="max-w-[16rem] truncate font-medium text-slate-800">{{ item.name ?: '-' }}</div>
+                            {% if item.wkn %}<div class="text-xs text-slate-500">WKN {{ item.wkn }}</div>{% endif %}
+                        </td>
+                        <td>{{ ui.asset_badge(item.asset_class) }}</td>
+                        <td>{{ item.region ?: '-' }}</td>
+                        <td>
+                            {% if item.run_scope %}
+                                <span class="rounded-full px-2 py-1 text-xs font-medium ring-1 {{ item.run_scope == 'watchlist' ? 'bg-sky-50 text-sky-700 ring-sky-200' : 'bg-emerald-50 text-emerald-700 ring-emerald-200' }}">{{ item.run_scope }}</span>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>{{ item.kronos_normalized_score is not null ? item.kronos_normalized_score|number_format(3) : '-' }}</td>
+                        <td>{{ item.sentiment_normalized_score is not null ? item.sentiment_normalized_score|number_format(3) : '-' }}</td>
+                        <td class="font-semibold text-slate-950">{{ item.merged_score is not null ? item.merged_score|number_format(3) : '-' }}</td>
+                        <td>{{ item.decision ? ui.decision_badge(item.decision) : '-' }}</td>
+                        <td>{{ item.structure_score is not null ? item.structure_score|number_format(1) : '-' }}</td>
+                        <td>{{ item.execution_score is not null ? item.execution_score|number_format(1) : '-' }}</td>
+                        <td class="font-semibold">{{ item.sepa_total_score is not null ? item.sepa_total_score|number_format(1) : '-' }}</td>
+                        <td>
+                            {% if item.traffic_light %}
+                                <span class="rounded-full px-2 py-1 text-xs font-semibold ring-1 {{ lightClasses }}">{{ item.traffic_light }}</span>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if item.run_id %}
+                                <a class="underline decoration-slate-300 underline-offset-4 hover:decoration-slate-900" href="{{ path('app_run_show', {id: item.run_id}) }}">{{ item.last_run_at ? item.last_run_at|date('d.m. H:i') : 'Run' }}</a>
+                                {% if item.run_item_id %}
+                                    <div><a class="text-xs text-slate-500 underline decoration-slate-300 underline-offset-4 hover:text-slate-950" href="{{ path('app_ticker_show', {id: item.run_item_id}) }}">Ticker-Run</a></div>
+                                {% endif %}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>{{ item.last_sepa_date ? item.last_sepa_date|date('d.m.Y') : '-' }}</td>
+                    </tr>
+                {% else %}
+                    <tr><td class="px-4 py-6 text-center text-slate-500" colspan="{{ columns|length }}">Keine Signale vorhanden.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+{% endblock %}

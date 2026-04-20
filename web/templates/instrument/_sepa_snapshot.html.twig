@@ -108,23 +108,23 @@
 
         <div class="mt-5 grid gap-4 lg:grid-cols-2">
             <div class="rounded-md bg-slate-50 p-4">
-                {% set hardTriggers = detail.hard_triggers ?? sepaSnapshot.killTriggersJson %}
-                {% set softWarnings = detail.soft_warnings ?? [] %}
+                {% set hardTriggers = detail.hard_trigger_summaries is defined ? detail.hard_trigger_summaries : sepaSnapshot.killTriggersJson %}
+                {% set softWarnings = detail.soft_warning_summaries is defined ? detail.soft_warning_summaries : [] %}
                 <h3 class="text-sm font-semibold text-slate-950">Trigger & Warnungen</h3>
                 {% if hardTriggers is empty %}
                     <p class="mt-2 text-sm text-emerald-800">Keine harten Kill Trigger aktiv.</p>
                 {% else %}
                     <ul class="mt-2 space-y-1 text-sm text-rose-800">
                         {% for trigger in hardTriggers %}
-                            <li class="rounded-md bg-white px-2 py-1 ring-1 ring-rose-100">{{ trigger|replace({'_': ' '}) }}</li>
+                            <li class="rounded-md bg-white px-2 py-1 ring-1 ring-rose-100" title="{{ trigger.triggers is defined ? trigger.triggers|join(', ') : '' }}">{{ trigger.label ?? trigger|replace({'_': ' '}) }}</li>
                         {% endfor %}
                     </ul>
                 {% endif %}
                 {% if softWarnings is not empty %}
-                    <p class="mt-3 text-xs font-semibold uppercase text-amber-700">Weiche Warnungen</p>
+                    <p class="mt-3 text-xs font-semibold uppercase text-amber-700">Soft Warnings / Execution Flaws</p>
                     <ul class="mt-2 space-y-1 text-sm text-amber-800">
                         {% for warning in softWarnings %}
-                            <li class="rounded-md bg-white px-2 py-1 ring-1 ring-amber-100">{{ warning|replace({'_': ' '}) }}</li>
+                            <li class="rounded-md bg-white px-2 py-1 ring-1 ring-amber-100" title="{{ warning.triggers is defined ? warning.triggers|join(', ') : '' }}">{{ warning.label ?? warning|replace({'_': ' '}) }}</li>
                         {% endfor %}
                     </ul>
                 {% endif %}

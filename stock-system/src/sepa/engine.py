@@ -10,7 +10,7 @@ from sepa.microstructure import score_breakout_readiness, score_microstructure
 from sepa.momentum import score_momentum
 from sepa.relative_strength import score_relative_strength
 from sepa.risk import score_risk_asymmetry
-from sepa.scoring import HARD_KILL_TRIGGERS, SOFT_WARNING_TRIGGERS, WEIGHTS, classify_triggers, score_superperformance, total_score, traffic_light
+from sepa.scoring import HARD_KILL_TRIGGERS, SOFT_WARNING_TRIGGERS, WEIGHTS, classify_triggers, score_superperformance, total_score, traffic_light, trigger_summaries
 from sepa.signals import SepaSnapshot
 from sepa.stage import score_stage_structure
 from sepa.vcp import score_vcp_quality
@@ -36,6 +36,8 @@ class SepaEngine:
                 "phase1_model": _model_description(),
                 "hard_triggers": ["market_data_failed"],
                 "soft_warnings": [],
+                "hard_trigger_summaries": [{"key": "market_data_failed", "label": "Marktdaten fehlen", "severity": "hard", "triggers": ["market_data_failed"]}],
+                "soft_warning_summaries": [],
                 "traffic_light_reason": "market_data_failed",
             }
             return SepaSnapshot(
@@ -98,6 +100,7 @@ class SepaEngine:
         for result in results.values():
             kills.extend(result.kill_triggers)
         hard_triggers, soft_warnings = classify_triggers(kills)
+        hard_summaries, soft_summaries = trigger_summaries(hard_triggers, soft_warnings)
         structure_total = total_score(structure_results)
         execution_total = execution_score(execution_results)
         total = blended_total_score(structure_total, execution_total)
@@ -133,6 +136,8 @@ class SepaEngine:
                 "all_triggers": sorted(set(kills)),
                 "hard_triggers": hard_triggers,
                 "soft_warnings": soft_warnings,
+                "hard_trigger_summaries": hard_summaries,
+                "soft_warning_summaries": soft_summaries,
                 "traffic_light_reason": light_reason,
                 "structure_layer": {
                     "score": structure_total,
