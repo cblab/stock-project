@@ -1,7 +1,7 @@
 <section class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
     <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-            <h2 class="text-sm font-semibold uppercase text-slate-500">SEPA / Minervi Snapshot</h2>
+            <h2 class="text-sm font-semibold uppercase text-slate-500">Specific Entry Point Analysis / Minervini Snapshot</h2>
             <p class="mt-1 text-sm text-slate-600">Struktur- und Execution-Bewertung: Trend, relative Staerke, Base, VCP, Mikrostruktur und Setup-Timing.</p>
         </div>
         {% if sepaSnapshot %}
@@ -16,20 +16,20 @@
         {% set detail = sepaSnapshot.detailJson %}
         {% set weights = detail.phase1_model.weights ?? {} %}
         {% set scoreItems = [
-            ['Markt', sepaSnapshot.marketScore, weights.market ?? null],
-            ['Stage', sepaSnapshot.stageScore, weights.stage ?? null],
-            ['Relative Staerke', sepaSnapshot.relativeStrengthScore, weights.relative_strength ?? null],
-            ['Base', sepaSnapshot.baseQualityScore, weights.base_quality ?? null],
-            ['Volumen', sepaSnapshot.volumeScore, weights.volume ?? null],
-            ['Momentum', sepaSnapshot.momentumScore, weights.momentum ?? null],
-            ['Risiko', sepaSnapshot.riskScore, weights.risk ?? null],
-            ['Superperformance', sepaSnapshot.superperformanceScore, weights.superperformance ?? null]
+            ['Markt', sepaSnapshot.marketScore, weights.market ?? null, 'Bewertet, wie konstruktiv das uebergeordnete Marktumfeld fuer Long-Setups ist.'],
+            ['Stage', sepaSnapshot.stageScore, weights.stage ?? null, 'Bewertet die mittelfristige Trendstruktur, etwa Kurslage relativ zu 50- und 200-Tage-Linie.'],
+            ['Relative Staerke', sepaSnapshot.relativeStrengthScore, weights.relative_strength ?? null, 'Misst, wie stark sich die Aktie relativ zum Markt und anderen Titeln verhaelt.'],
+            ['Base', sepaSnapshot.baseQualityScore, weights.base_quality ?? null, 'Bewertet, ob die aktuelle Konsolidierung sauber, kontrolliert und konstruktiv wirkt.'],
+            ['Volumen', sepaSnapshot.volumeScore, weights.volume ?? null, 'Prueft, ob das Volumenverhalten eher Akkumulation oder Distribution signalisiert.'],
+            ['Momentum', sepaSnapshot.momentumScore, weights.momentum ?? null, 'Misst Staerke und Stabilitaet der juengsten Kursdynamik.'],
+            ['Risiko', sepaSnapshot.riskScore, weights.risk ?? null, 'Bewertet, wie attraktiv das aktuelle Chancen-/Risikoprofil des Setups ist.'],
+            ['Superperformance', sepaSnapshot.superperformanceScore, weights.superperformance ?? null, 'Schaetzt das Potenzial fuer Fuehrungsaktien-Qualitaet und klare Outperformance ein.']
         ] %}
         {% set executionWeights = detail.execution_layer.weights ?? detail.phase1_model.execution_layer.weights ?? {} %}
         {% set executionItems = [
-            ['VCP', sepaSnapshot.vcpScore, executionWeights.vcp ?? null, detail.execution_layer.scores.vcp ?? detail.scores.vcp ?? {}],
-            ['Mikrostruktur', sepaSnapshot.microstructureScore, executionWeights.microstructure ?? null, detail.execution_layer.scores.microstructure ?? detail.scores.microstructure ?? {}],
-            ['Breakout Readiness', sepaSnapshot.breakoutReadinessScore, executionWeights.breakout_readiness ?? null, detail.execution_layer.scores.breakout_readiness ?? detail.scores.breakout_readiness ?? {}]
+            ['VCP', sepaSnapshot.vcpScore, executionWeights.vcp ?? null, detail.execution_layer.scores.vcp ?? detail.scores.vcp ?? {}, 'Bewertet die Kontraktionsfolge der Base: Pullbacks und Volatilitaet sollten konstruktiv enger werden.'],
+            ['Mikrostruktur', sepaSnapshot.microstructureScore, executionWeights.microstructure ?? null, detail.execution_layer.scores.microstructure ?? detail.scores.microstructure ?? {}, 'Bewertet das kurzfristige Verhalten: gruen/rot-Tage, Pullbacks, Range-Struktur und Up/Down-Volumen.'],
+            ['Breakout Readiness', sepaSnapshot.breakoutReadinessScore, executionWeights.breakout_readiness ?? null, detail.execution_layer.scores.breakout_readiness ?? detail.scores.breakout_readiness ?? {}, 'Bewertet, ob das Setup nahe und sauber an einem Pivot/Trigger liegt oder bereits zu spaet und gestreckt ist.']
         ] %}
 
         <div class="mt-4 grid gap-3 md:grid-cols-5">
@@ -68,7 +68,7 @@
             {% for item in scoreItems %}
                 <div class="rounded-md border border-slate-200 p-3">
                     <div class="flex items-center justify-between gap-3">
-                        <p class="text-sm font-medium text-slate-700">{{ item[0] }}</p>
+                        <p class="text-sm font-medium text-slate-700 underline decoration-dotted underline-offset-4" title="{{ item[3] }}">{{ item[0] }}</p>
                         <p class="text-sm font-semibold text-slate-950">{{ item[1]|number_format(1) }}</p>
                     </div>
                     <div class="mt-2 h-2 rounded-full bg-slate-100">
@@ -81,12 +81,12 @@
             {% endfor %}
         </div>
 
-        <h3 class="mt-5 text-sm font-semibold text-slate-950">SEPA / Minervini Execution Layer</h3>
+        <h3 class="mt-5 text-sm font-semibold text-slate-950">Execution Layer</h3>
         <div class="mt-3 grid gap-3 md:grid-cols-3">
             {% for item in executionItems %}
                 <div class="rounded-md border border-slate-200 p-3">
                     <div class="flex items-center justify-between gap-3">
-                        <p class="text-sm font-medium text-slate-700">{{ item[0] }}</p>
+                        <p class="text-sm font-medium text-slate-700 underline decoration-dotted underline-offset-4" title="{{ item[4] }}">{{ item[0] }}</p>
                         <p class="text-sm font-semibold text-slate-950">{{ item[1]|number_format(1) }}</p>
                     </div>
                     <div class="mt-2 h-2 rounded-full bg-slate-100">
@@ -132,20 +132,17 @@
             <div class="rounded-md bg-slate-50 p-4">
                 <h3 class="text-sm font-semibold text-slate-950">Einordnung</h3>
                 <p class="mt-2 text-sm text-slate-700">
-                    SEPA Phase 1 bewertet die strukturelle Setup-Qualitaet getrennt vom kurzfristigen Kronos-/Sentiment-Lauf.
-                    Der Execution Layer ergaenzt VCP, Mikrostruktur und Breakout-Readiness. Die Ampel kombiniert den gemischten Total Score mit harten Strukturfehlern und weichen Execution-/Risiko-Warnungen.
+                    Specific Entry Point Analysis bewertet die strukturelle Setup-Qualitaet getrennt vom kurzfristigen Kronos-/Sentiment-Lauf.
+                    Der Execution Layer ergaenzt VCP, Mikrostruktur und Breakout-Readiness. Die Ampel kombiniert Strukturqualitaet, Setup-Timing und Warnsignale.
                 </p>
                 {% if detail.traffic_light_reason is defined %}
                     <p class="mt-2 text-xs text-slate-500">Ampelgrund: {{ detail.traffic_light_reason|replace({'_': ' '}) }}.</p>
-                {% endif %}
-                {% if detail.phase1_model.not_included_yet is defined %}
-                    <p class="mt-2 text-xs text-slate-500">Noch nicht enthalten: {{ detail.phase1_model.not_included_yet|join(', ') }}.</p>
                 {% endif %}
             </div>
         </div>
     {% else %}
         <div class="mt-4 rounded-md border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">
-            Noch kein SEPA / Minervi Snapshot vorhanden. Starte den Python-Job `python stock-system/scripts/run_sepa.py --mode=db --source=portfolio`.
+            Noch kein Specific Entry Point Analysis Snapshot vorhanden. Starte den Python-Job `python stock-system/scripts/run_sepa.py --mode=db --source=portfolio`.
         </div>
     {% endif %}
 </section>
