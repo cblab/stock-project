@@ -25,6 +25,7 @@
             Noch kein Watchlist-Intake-Lauf vorhanden. Starte `python stock-system/scripts/run_watchlist_intake.py --mode=db`.
         </section>
     {% else %}
+        {% set diagnostics = run.summary.diagnostics ?? {} %}
         <section class="mb-5 grid gap-3 md:grid-cols-4">
             <div class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
                 <p class="text-xs uppercase text-slate-500">Run</p>
@@ -37,12 +38,21 @@
             </div>
             <div class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
                 <p class="text-xs uppercase text-slate-500" title="Rotierende Kandidaten aus den ausgewaehlten Top-Sektoren. Frisch gepruefte Titel werden per Cooldown geschont.">Kandidaten</p>
-                <p class="mt-1 text-2xl font-semibold text-slate-950">{{ candidates|length }}</p>
+                <p class="mt-1 text-2xl font-semibold text-slate-950">{{ pagination.total }}</p>
             </div>
             <div class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
                 <p class="text-xs uppercase text-slate-500" title="Watchlist-Aufnahmen entstehen nur durch Nutzeraktion, nie durch den Python-Job.">Manuell aufgenommen</p>
                 <p class="mt-1 text-2xl font-semibold text-slate-950">{{ candidates|filter(c => c.status == 'ADDED_TO_WATCHLIST')|length }}</p>
             </div>
+        </section>
+
+        <section class="mb-5 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+            <span class="font-medium text-slate-950">Intake-Debug:</span>
+            {{ diagnostics.excluded_active|default(0) }} wegen aktivem Portfolio-/Watchlist-Bestand ausgeschlossen,
+            {{ diagnostics.cooldown_skipped|default(0) }} wegen Kandidaten-Cooldown pro Ticker uebersprungen,
+            {{ diagnostics.eligible_after_exclusions|default(0) }} nach Ausschluessen im Kandidatenpool,
+            {{ diagnostics.written_candidates|default(pagination.total) }} Vorschlaege gespeichert.
+            <span class="text-slate-500" title="Wenn hier 0 Vorschlaege stehen, sind meist viele einzelne Ticker im 14-Tage-Cooldown oder der konfigurierte Sektorpool ist nach aktiven Bestandsausschluessen leer. Der Cooldown gilt pro Kandidat/Ticker, nicht pro Sektor.">Warum 0?</span>
         </section>
 
         <section class="mb-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
@@ -70,6 +80,17 @@
         </section>
 
         <section class="rounded-lg border border-slate-200 bg-white shadow-sm">
+            {% if pagination.pages > 1 %}
+                <div class="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 text-sm">
+                    <span class="text-slate-600">
+                        Seite {{ pagination.page }} von {{ pagination.pages }} · {{ pagination.total }} Vorschlaege
+                    </span>
+                    <div class="flex gap-2">
+                        <a class="rounded-md border border-slate-200 px-3 py-1 text-slate-700 hover:bg-slate-50 {{ pagination.page <= 1 ? 'pointer-events-none opacity-40' : '' }}" href="{{ path('app_watchlist_intake', {page: pagination.page - 1, perPage: pagination.per_page}) }}">Zurueck</a>
+                        <a class="rounded-md border border-slate-200 px-3 py-1 text-slate-700 hover:bg-slate-50 {{ pagination.page >= pagination.pages ? 'pointer-events-none opacity-40' : '' }}" href="{{ path('app_watchlist_intake', {page: pagination.page + 1, perPage: pagination.per_page}) }}">Weiter</a>
+                    </div>
+                </div>
+            {% endif %}
             <table class="data-table">
                 <colgroup>
                     <col class="w-[9%]">
@@ -168,6 +189,17 @@
                     {% endfor %}
                 </tbody>
             </table>
+            {% if pagination.pages > 1 %}
+                <div class="flex items-center justify-between gap-3 border-t border-slate-100 px-4 py-3 text-sm">
+                    <span class="text-slate-600">
+                        Zeige {{ candidates|length }} von {{ pagination.total }} Vorschlaegen
+                    </span>
+                    <div class="flex gap-2">
+                        <a class="rounded-md border border-slate-200 px-3 py-1 text-slate-700 hover:bg-slate-50 {{ pagination.page <= 1 ? 'pointer-events-none opacity-40' : '' }}" href="{{ path('app_watchlist_intake', {page: pagination.page - 1, perPage: pagination.per_page}) }}">Zurueck</a>
+                        <a class="rounded-md border border-slate-200 px-3 py-1 text-slate-700 hover:bg-slate-50 {{ pagination.page >= pagination.pages ? 'pointer-events-none opacity-40' : '' }}" href="{{ path('app_watchlist_intake', {page: pagination.page + 1, perPage: pagination.per_page}) }}">Weiter</a>
+                    </div>
+                </div>
+            {% endif %}
         </section>
     {% endif %}
 {% endblock %}

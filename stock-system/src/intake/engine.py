@@ -28,7 +28,7 @@ class SectorWatchlistIntakeEngine:
             sectors = discover_top_sectors(self.config, self.market)
             for sector in sectors:
                 self.repository.write_sector(run_id, sector)
-            candidates = evaluate_candidates(
+            candidates, diagnostics = evaluate_candidates(
                 sectors=sectors,
                 config=self.config,
                 market=self.market,
@@ -45,6 +45,7 @@ class SectorWatchlistIntakeEngine:
                 "top_candidates": [candidate.__dict__ for candidate in candidates if candidate.status == "TOP_CANDIDATE"],
                 "strong_candidates": [candidate.__dict__ for candidate in candidates if candidate.status == "STRONG_CANDIDATE"],
                 "manual_action_required": True,
+                "diagnostics": diagnostics,
                 "rate_limit_strategy": {
                     "cache_ttl_hours": self.config.get("intake", {}).get("cache_ttl_hours", 12),
                     "request_pause_seconds": self.config.get("intake", {}).get("request_pause_seconds", 0.75),
