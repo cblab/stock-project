@@ -1,0 +1,104 @@
+{% import 'dashboard/_ui.html.twig' as ui %}
+
+<section class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+            <h2 class="text-sm font-semibold uppercase text-slate-500">EPA / Exit & Risk Snapshot</h2>
+            <p class="mt-1 text-sm text-slate-600">Exit Point Analysis: Failure, Trend Exit, Climax/Overextension und Risk Management.</p>
+        </div>
+        {% if epaSnapshot %}
+            {{ ui.epa_action_badge(epaSnapshot.action) }}
+        {% endif %}
+    </div>
+
+    {% if epaSnapshot %}
+        {% set detail = epaSnapshot.detailJson %}
+        {% set weights = detail.model.weights ?? {} %}
+        {% set scoreItems = [
+            ['Failure', epaSnapshot.failureScore, weights.failure ?? null],
+            ['Trend Exit', epaSnapshot.trendExitScore, weights.trend_exit ?? null],
+            ['Climax', epaSnapshot.climaxScore, weights.climax ?? null],
+            ['Risk', epaSnapshot.riskScore, weights.risk ?? null]
+        ] %}
+
+        <div class="mt-4 grid gap-3 md:grid-cols-5">
+            <div class="rounded-md bg-slate-50 p-3">
+                <p class="text-xs uppercase text-slate-500">EPA Risk Score</p>
+                <p class="mt-1 text-2xl font-semibold text-slate-950">{{ epaSnapshot.totalScore|number_format(1) }}</p>
+                <p class="text-xs text-slate-500">0-100, hoeher = kritischer</p>
+            </div>
+            <div class="rounded-md bg-slate-50 p-3">
+                <p class="text-xs uppercase text-slate-500">Action</p>
+                <p class="mt-1 font-semibold text-slate-950">{{ epaSnapshot.action }}</p>
+                <p class="text-xs text-slate-500">{{ (detail.action_reason ?? '-')|replace({'_': ' '}) }}</p>
+            </div>
+            <div class="rounded-md bg-slate-50 p-3">
+                <p class="text-xs uppercase text-slate-500">As of</p>
+                <p class="mt-1 font-semibold text-slate-950">{{ epaSnapshot.asOfDate|date('d.m.Y') }}</p>
+            </div>
+            <div class="rounded-md bg-slate-50 p-3">
+                <p class="text-xs uppercase text-slate-500">SEPA Kontext</p>
+                <p class="mt-1 font-semibold text-slate-950">{{ detail.sepa_context.traffic_light ?? '-' }}{% if detail.sepa_context.total_score is defined and detail.sepa_context.total_score is not null %} / {{ detail.sepa_context.total_score|number_format(1) }}{% endif %}</p>
+            </div>
+            <div class="rounded-md bg-slate-50 p-3">
+                <p class="text-xs uppercase text-slate-500">Marktdaten</p>
+                <p class="mt-1 font-semibold text-slate-950">{{ detail.market_data_status ?? '-' }}{% if detail.market_data_rows is defined %} / {{ detail.market_data_rows }} Zeilen{% endif %}</p>
+            </div>
+        </div>
+
+        <div class="mt-5 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+            {% for item in scoreItems %}
+                <div class="rounded-md border border-slate-200 p-3">
+                    <div class="flex items-center justify-between gap-3">
+                        <p class="text-sm font-medium text-slate-700">{{ item[0] }}</p>
+                        <p class="text-sm font-semibold text-slate-950">{{ item[1]|number_format(1) }}</p>
+                    </div>
+                    <div class="mt-2 h-2 rounded-full bg-slate-100">
+                        <div class="h-2 rounded-full bg-rose-500" style="width: {{ item[1] }}%"></div>
+                    </div>
+                    {% if item[2] is not null %}
+                        <p class="mt-1 text-xs text-slate-500">Gewicht {{ (item[2] * 100)|number_format(0) }}%</p>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+
+        <div class="mt-5 grid gap-4 lg:grid-cols-2">
+            <div class="rounded-md bg-slate-50 p-4">
+                {% set hardTriggers = detail.hard_trigger_summaries is defined ? detail.hard_trigger_summaries : epaSnapshot.hardTriggersJson %}
+                {% set softWarnings = detail.soft_warning_summaries is defined ? detail.soft_warning_summaries : epaSnapshot.softWarningsJson %}
+                <h3 class="text-sm font-semibold text-slate-950">Exit Trigger & Warnings</h3>
+                {% if hardTriggers is empty %}
+                    <p class="mt-2 text-sm text-emerald-800">Keine harten EPA-Exit-Trigger aktiv.</p>
+                {% else %}
+                    <ul class="mt-2 space-y-1 text-sm text-rose-800">
+                        {% for trigger in hardTriggers %}
+                            <li class="rounded-md bg-white px-2 py-1 ring-1 ring-rose-100" title="{{ trigger.triggers is defined ? trigger.triggers|join(', ') : '' }}">{{ trigger.label ?? trigger|replace({'_': ' '}) }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+                {% if softWarnings is not empty %}
+                    <p class="mt-3 text-xs font-semibold uppercase text-amber-700">Soft Warnings / Risk Notes</p>
+                    <ul class="mt-2 space-y-1 text-sm text-amber-800">
+                        {% for warning in softWarnings %}
+                            <li class="rounded-md bg-white px-2 py-1 ring-1 ring-amber-100" title="{{ warning.triggers is defined ? warning.triggers|join(', ') : '' }}">{{ warning.label ?? warning|replace({'_': ' '}) }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </div>
+            <div class="rounded-md bg-slate-50 p-4">
+                <h3 class="text-sm font-semibold text-slate-950">Einordnung</h3>
+                <p class="mt-2 text-sm text-slate-700">
+                    EPA bewertet die Verkaufsperspektive getrennt von SEPA. Ein hoher EPA-Score bedeutet nicht automatisch ein schlechtes Buy-Setup, sondern erhoehten Exit-, Trim- oder Risk-Management-Druck.
+                </p>
+                {% if detail.model.not_included_yet is defined %}
+                    <p class="mt-2 text-xs text-slate-500">Bewusst noch nicht enthalten: {{ detail.model.not_included_yet|join(', ') }}.</p>
+                {% endif %}
+            </div>
+        </div>
+    {% else %}
+        <div class="mt-4 rounded-md border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">
+            Noch kein EPA / Exit & Risk Snapshot vorhanden. Starte den Python-Job `python stock-system/scripts/run_epa.py --mode=db --source=portfolio`.
+        </div>
+    {% endif %}
+</section>

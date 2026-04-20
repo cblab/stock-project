@@ -91,10 +91,55 @@ Execution details are stored in `detail_json.execution_layer`; the main table
 also stores `vcp_score`, `microstructure_score`, `breakout_readiness_score`,
 `structure_score`, and `execution_score` for direct display and filtering.
 
-The web UI includes `/signal-matrix`, a consolidated table that joins the
+The web UI includes `/buy-signal-matrix`, a consolidated table that joins the
 latest Kronos/Sentiment run item with the latest SEPA snapshot per instrument.
-It defaults to sorting by merged Kronos/Sentiment score and then SEPA total
-score.
+The legacy `/signal-matrix` route remains as an alias. The Buy Signal Matrix
+defaults to sorting by merged Kronos/Sentiment score and then SEPA total score.
+
+## EPA / Exit & Risk Layer
+
+EPA means Exit Point Analysis. It is the sell-side counterpart to SEPA and is
+run as a separate deterministic DB-first job:
+
+```powershell
+python stock-system\scripts\run_epa.py --mode=db --source=portfolio
+python stock-system\scripts\run_epa.py --mode=db --source=watchlist
+python stock-system\scripts\run_epa.py --mode=db --source=all
+python stock-system\scripts\run_epa.py --mode=db --source=all --tickers=LITE,COHR,ASML
+```
+
+EPA writes historical snapshots to `instrument_epa_snapshot` with one row per
+instrument and `as_of_date`. It uses active DB instruments and respects the same
+`portfolio`, `watchlist`, and `all` scope modes as SEPA.
+
+The first EPA layer uses OHLCV, moving averages, ATR, relative strength versus
+the market benchmark, and the latest SEPA snapshot as context. It does not use
+fundamental data or ownership data.
+
+Implemented EPA blocks:
+
+- Failure Exit Score: failed setup pressure, 10/20-DMA loss, recent pullback,
+  and heavy down-days after a setup.
+- Trend Exit Score: 20/50/200-DMA loss, moving-average slope deterioration,
+  momentum breakdown, and relative-strength breakdown.
+- Climax / Overextension Score: extension from 20/50-DMA, vertical acceleration,
+  volume surge, ATR and range expansion.
+- Risk Management / Stop Quality: stop distance, trailing distance, volatility,
+  and tightening need after short-term trend loss.
+
+EPA actions are `HOLD`, `TIGHTEN_RISK`, `TRIM`, `EXIT`, and `FAILED_SETUP`.
+Hard triggers can force `EXIT` or `FAILED_SETUP`; soft warnings drive
+`TIGHTEN_RISK` or `TRIM` when risk is elevated but the structure has not fully
+failed.
+
+The web UI shows EPA on each instrument detail page under
+`EPA / Exit & Risk Snapshot`. The new `/sell-signal-matrix` page shows the
+sell-side matrix with EPA action, total risk, Failure, Trend Exit, Climax, Risk,
+freshness, and instrument links. Buy and Sell matrices are intentionally kept
+separate:
+
+- Buy Signal Matrix: Kronos, Sentiment, Merged Score, SEPA Structure/Execution.
+- Sell Signal Matrix: EPA Exit & Risk only.
 
 ## Start
 

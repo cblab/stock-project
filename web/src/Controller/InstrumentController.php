@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\Instrument;
 use App\Form\InstrumentType;
+use App\Repository\InstrumentEpaSnapshotRepository;
 use App\Repository\InstrumentRepository;
 use App\Repository\InstrumentSepaSnapshotRepository;
 use App\Repository\PipelineRunItemRepository;
@@ -88,12 +89,14 @@ class InstrumentController extends AbstractController
         Instrument $instrument,
         PipelineRunItemRepository $pipelineRunItemRepository,
         InstrumentSepaSnapshotRepository $sepaSnapshotRepository,
+        InstrumentEpaSnapshotRepository $epaSnapshotRepository,
     ): Response
     {
         return $this->render('instrument/show.html.twig', [
             'instrument' => $instrument,
             'lastRunItem' => $pipelineRunItemRepository->findLatestForInstrument($instrument),
             'sepaSnapshot' => $sepaSnapshotRepository->findLatestForInstrument($instrument),
+            'epaSnapshot' => $epaSnapshotRepository->findLatestForInstrument($instrument),
         ]);
     }
 

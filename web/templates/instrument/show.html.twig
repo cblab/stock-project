@@ -24,6 +24,10 @@
         {% include 'instrument/_sepa_snapshot.html.twig' with {sepaSnapshot: sepaSnapshot} only %}
     </div>
 
+    <div class="mb-6">
+        {% include 'instrument/_epa_snapshot.html.twig' with {epaSnapshot: epaSnapshot} only %}
+    </div>
+
     <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <dl class="grid gap-4 text-sm md:grid-cols-3">
             <div><dt class="text-slate-500">Input Ticker</dt><dd class="font-medium">{{ instrument.inputTicker }}</dd></div>
