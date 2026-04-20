@@ -9,6 +9,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Entity(repositoryClass: PipelineRunItemRepository::class)]
 #[ORM\Index(columns: ['decision'], name: 'idx_pipeline_run_item_decision')]
 #[ORM\Index(columns: ['sentiment_mode'], name: 'idx_pipeline_run_item_sentiment_mode')]
+#[ORM\Index(columns: ['instrument_id', 'pipeline_run_id', 'id'], name: 'idx_pipeline_run_item_instrument_run_id')]
 class PipelineRunItem
 {
     #[ORM\Id]

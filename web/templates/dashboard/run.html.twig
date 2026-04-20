@@ -1,7 +1,7 @@
 {% extends 'base.html.twig' %}
 {% import 'dashboard/_ui.html.twig' as ui %}
 
-{% block title %}Run {{ run.runId }}{% endblock %}
+{% block title %}Run {{ run.runKey }}{% endblock %}
 
 {% block body %}
     {% set columns = {
@@ -15,7 +15,7 @@
     <div class="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
             <a class="text-sm text-slate-500 hover:text-slate-950" href="{{ path('app_runs_index') }}">Zurueck zu Runs</a>
-            <h1 class="mt-1 text-2xl font-semibold text-slate-950">Run {{ run.runId }}</h1>
+            <h1 class="mt-1 text-2xl font-semibold text-slate-950">Run {{ run.runKey }}</h1>
             <p class="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-500">
                 <span class="compact-badge {{ run.runScope == 'watchlist' ? 'bg-sky-50 text-sky-700 ring-sky-200' : 'bg-emerald-50 text-emerald-700 ring-emerald-200' }}">
                     {{ run.runScope == 'watchlist' ? 'Watchlist-Run' : 'Portfolio-Run' }}

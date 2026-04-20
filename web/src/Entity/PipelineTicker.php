@@ -6,6 +6,12 @@ use App\Repository\PipelineTickerRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
+/**
+ * Legacy pre-instrument run item table.
+ *
+ * New DB-first pipeline paths write PipelineRunItem. This entity is retained so
+ * older imported runs remain readable and rollback migrations stay valid.
+ */
 #[ORM\Entity(repositoryClass: PipelineTickerRepository::class)]
 #[ORM\Index(columns: ['decision'], name: 'idx_pipeline_ticker_decision')]
 #[ORM\Index(columns: ['asset_class'], name: 'idx_pipeline_ticker_asset_class')]

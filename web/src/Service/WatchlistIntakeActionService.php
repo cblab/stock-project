@@ -6,8 +6,10 @@ use Doctrine\DBAL\Connection;
 
 class WatchlistIntakeActionService
 {
-    public function __construct(private readonly Connection $connection)
-    {
+    public function __construct(
+        private readonly Connection $connection,
+        private readonly IntakeSnapshotRefreshLauncher $snapshotRefreshLauncher,
+    ) {
     }
 
     public function apply(int $candidateId, string $action): void
@@ -61,11 +63,15 @@ class WatchlistIntakeActionService
                 ['id' => $candidate['latest_candidate_id']],
             );
         }
+
+        if ($action === 'add' && $added) {
+            $this->snapshotRefreshLauncher->queueForTicker((string) $candidate['ticker']);
+        }
     }
 
     private function addTickerToWatchlist(string $ticker, string $sectorLabel): bool
     {
-        $instrument = $this->connection->fetchAssociative('SELECT * FROM instrument WHERE UPPER(input_ticker) = UPPER(?) LIMIT 1', [$ticker]);
+        $instrument = $this->connection->fetchAssociative('SELECT * FROM instrument WHERE input_ticker = ? LIMIT 1', [$ticker]);
         $now = (new \DateTimeImmutable())->format('Y-m-d H:i:s');
         $note = sprintf("Manual Watchlist Intake from %s.", $sectorLabel);
 

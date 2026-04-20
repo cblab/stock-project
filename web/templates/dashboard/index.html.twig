@@ -32,7 +32,7 @@
         <div class="grid gap-4 md:grid-cols-4">
             <div class="metric-card">
                 <p class="text-xs font-semibold uppercase text-slate-500">Neuester Run</p>
-                <p class="mt-2 text-xl font-semibold text-slate-950">{{ newest.runId }}</p>
+                <p class="mt-2 text-xl font-semibold text-slate-950">{{ newest.runKey }}</p>
             </div>
             <div class="metric-card">
                 <p class="text-xs font-semibold uppercase text-slate-500">Ticker</p>
@@ -69,7 +69,7 @@
                     {% for run in runs %}
                         {% set isWatchlist = run.runScope == 'watchlist' %}
                         <tr class="{{ isWatchlist ? 'bg-sky-50/35' : 'bg-emerald-50/25' }} hover:bg-slate-50">
-                            <td class="font-medium text-slate-950">{{ run.runId }}</td>
+                            <td class="font-medium text-slate-950">{{ run.runKey }}</td>
                             <td><span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">{{ run.status }}</span></td>
                             <td>
                                 <span class="rounded-full px-2.5 py-1 text-xs font-medium ring-1 {{ isWatchlist ? 'bg-sky-50 text-sky-700 ring-sky-200' : 'bg-emerald-50 text-emerald-700 ring-emerald-200' }}">
@@ -86,7 +86,7 @@
                             <td class="text-right">
                                 <div class="flex items-center justify-end gap-3">
                                     <a class="font-medium text-slate-950 underline decoration-slate-300 underline-offset-4 hover:decoration-slate-900" href="{{ path('app_run_show', {id: run.id}) }}">Details</a>
-                                    <form method="post" action="{{ path('app_run_delete', {id: run.id}) }}" onsubmit="return confirm('Run {{ run.runId }} wirklich löschen?');">
+                                    <form method="post" action="{{ path('app_run_delete', {id: run.id}) }}" onsubmit="return confirm('Run {{ run.runKey }} wirklich loeschen?');">
                                         <button class="text-sm font-medium text-rose-700 underline decoration-rose-200 underline-offset-4 hover:decoration-rose-700" type="submit">Löschen</button>
                                     </form>
                                 </div>

@@ -11,6 +11,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Entity(repositoryClass: PipelineRunRepository::class)]
 #[ORM\UniqueConstraint(name: 'uniq_pipeline_run_run_id', columns: ['run_id'])]
 #[ORM\UniqueConstraint(name: 'uniq_pipeline_run_run_key', columns: ['run_key'])]
+#[ORM\Index(columns: ['created_at', 'id'], name: 'idx_pipeline_run_created_id')]
 class PipelineRun
 {
     #[ORM\Id]
@@ -18,6 +19,7 @@ class PipelineRun
     #[ORM\Column]
     private ?int $id = null;
 
+    /** Legacy external/import identifier. Prefer runKey for new code. */
     #[ORM\Column(length: 64)]
     private string $runId = '';
 
@@ -106,6 +108,7 @@ class PipelineRun
     public function setRunId(string $runId): self { $this->runId = $runId; $this->runKey = $this->runKey ?: $runId; return $this; }
     public function getRunKey(): string { return $this->runKey ?: $this->runId; }
     public function setRunKey(string $runKey): self { $this->runKey = $runKey; $this->runId = $this->runId ?: $runKey; return $this; }
+    public function getCanonicalRunKey(): string { return $this->getRunKey(); }
     public function getStatus(): string { return $this->status; }
     public function setStatus(string $status): self { $this->status = $status; return $this; }
     public function getRunScope(): string { return $this->runScope; }

@@ -8,6 +8,11 @@ use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
+ * Legacy repository for pre-instrument pipeline_ticker rows.
+ *
+ * New code should read PipelineRunItemRepository unless it intentionally needs
+ * historic imported rows from the old table.
+ *
  * @extends ServiceEntityRepository<PipelineTicker>
  */
 class PipelineTickerRepository extends ServiceEntityRepository
