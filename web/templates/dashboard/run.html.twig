@@ -5,91 +5,119 @@
 
 {% block body %}
     {% set columns = {
-        inputTicker: ['Ticker', 'vom Nutzer gewuenschtes Symbol'],
-        providerTicker: ['Provider', 'tatsaechlich verwendeter Datenprovider-Ticker'],
-        assetClass: ['Asset', 'Equity oder ETF'],
-        region: ['Region', 'Marktregion oder Mappingregion'],
-        sentimentMode: ['Sentiment Mode', 'equity_direct fuer Einzelaktien, etf_context fuer ETFs'],
-        kronosNormalizedScore: ['K Norm', 'normalisierter Kronos-Score im Bereich [-1, 1]'],
-        sentimentNormalizedScore: ['S Norm', 'normalisierter Sentiment-Score im Bereich [-1, 1]'],
-        mergedScore: ['Merged', '60% Kronos Normalized + 40% Sentiment Normalized'],
-        decision: ['Decision', 'Ergebnis nach Threshold-Logik'],
-        marketDataStatus: ['Daten', 'Status der geladenen Marktdaten'],
-        newsStatus: ['News', 'Status der Nachrichtenbasis']
+        inputTicker: ['Instrument', 'Ticker, Provider, Name und Stammdaten'],
+        mergedScore: ['Signals', 'Kronos, Sentiment und Merged Score'],
+        decision: ['Status', 'Decision, Marktdaten, News und Sentiment-Modus'],
+        sepaTotal: ['SEPA', 'Neuester SEPA / Minervini Snapshot'],
+        lastRun: ['Aktualitaet', 'Run-Zeitpunkt und Links']
     } %}
 
-    <div class="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+    <div class="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
             <a class="text-sm text-slate-500 hover:text-slate-950" href="{{ path('app_runs_index') }}">Zurueck zu Runs</a>
             <h1 class="mt-1 text-2xl font-semibold text-slate-950">Run {{ run.runId }}</h1>
-            <p class="mt-1 text-sm text-slate-500">
-                <span class="rounded-full px-2.5 py-1 text-xs font-medium ring-1 {{ run.runScope == 'watchlist' ? 'bg-sky-50 text-sky-700 ring-sky-200' : 'bg-emerald-50 text-emerald-700 ring-emerald-200' }}">
+            <p class="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-500">
+                <span class="compact-badge {{ run.runScope == 'watchlist' ? 'bg-sky-50 text-sky-700 ring-sky-200' : 'bg-emerald-50 text-emerald-700 ring-emerald-200' }}">
                     {{ run.runScope == 'watchlist' ? 'Watchlist-Run' : 'Portfolio-Run' }}
                 </span>
-                <span class="ml-2">{{ run.runPath }}</span>
+                <span>{{ run.dataFrequency ?: '-' }} / {{ run.horizonLabel ?: '-' }} / {{ run.scoreValidityHours ?: '-' }}h</span>
             </p>
         </div>
-        <div class="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm">
-            <span class="font-medium text-slate-950">Kronos:</span>
-            {{ run.dataFrequency ?: '-' }} Candles,
-            {{ run.horizonSteps ?: '-' }} Schritte,
-            {{ run.horizonLabel ?: '-' }},
-            {{ run.scoreValidityHours ?: '-' }}h Gueltigkeit
+        <div class="grid grid-cols-4 gap-2 text-center text-xs">
+            <div class="rounded-md border border-slate-200 bg-white px-3 py-2 shadow-sm"><p class="font-semibold text-slate-950">{{ run.decisionEntryCount }}</p><p class="text-slate-500">ENTRY</p></div>
+            <div class="rounded-md border border-slate-200 bg-white px-3 py-2 shadow-sm"><p class="font-semibold text-slate-950">{{ run.decisionWatchCount }}</p><p class="text-slate-500">WATCH</p></div>
+            <div class="rounded-md border border-slate-200 bg-white px-3 py-2 shadow-sm"><p class="font-semibold text-slate-950">{{ run.decisionHoldCount }}</p><p class="text-slate-500">HOLD</p></div>
+            <div class="rounded-md border border-slate-200 bg-white px-3 py-2 shadow-sm"><p class="font-semibold text-slate-950">{{ run.decisionNoTradeCount }}</p><p class="text-slate-500">NO TRADE</p></div>
         </div>
     </div>
 
-    <div class="grid gap-4 md:grid-cols-4">
-        <div class="metric-card" title="ENTRY: merged_score >= 0.35"><p class="text-xs font-semibold uppercase text-slate-500">ENTRY</p><p class="mt-2 text-xl font-semibold">{{ run.decisionEntryCount }}</p></div>
-        <div class="metric-card" title="WATCH: merged_score >= 0.15 und < 0.35"><p class="text-xs font-semibold uppercase text-slate-500">WATCH</p><p class="mt-2 text-xl font-semibold">{{ run.decisionWatchCount }}</p></div>
-        <div class="metric-card" title="HOLD: merged_score zwischen -0.15 und 0.15"><p class="text-xs font-semibold uppercase text-slate-500">HOLD</p><p class="mt-2 text-xl font-semibold">{{ run.decisionHoldCount }}</p></div>
-        <div class="metric-card" title="NO TRADE: merged_score <= -0.15"><p class="text-xs font-semibold uppercase text-slate-500">NO TRADE</p><p class="mt-2 text-xl font-semibold">{{ run.decisionNoTradeCount }}</p></div>
-    </div>
-
-    <section class="mt-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-        <h2 class="text-sm font-semibold uppercase text-slate-500">Score-Modell</h2>
-        <p class="mt-2 text-sm text-slate-700">Scores liegen in <span class="font-medium">[-1, 1]</span>. Merged = 60% Kronos Normalized + 40% Sentiment Normalized. Thresholds: ENTRY ab 0.35, WATCH ab 0.15, HOLD zwischen -0.15 und 0.15, NO TRADE bis -0.15.</p>
-    </section>
-
-    <section class="mt-6 overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
+    <section class="rounded-lg border border-slate-200 bg-white shadow-sm">
         <table class="data-table">
+            <colgroup>
+                <col class="w-[26%]">
+                <col class="w-[22%]">
+                <col class="w-[18%]">
+                <col class="w-[21%]">
+                <col class="w-[13%]">
+            </colgroup>
             <thead>
                 <tr>
                     {% for field, meta in columns %}
                         {% set nextDir = currentSort == field and currentDir == 'asc' ? 'desc' : 'asc' %}
                         {% set active = currentSort == field %}
                         <th title="{{ meta[1] }}">
-                            <a class="inline-flex items-center gap-1 rounded px-1 py-0.5 {{ active ? 'text-slate-950' : 'text-slate-500 hover:text-slate-950' }}" href="{{ path('app_run_show', {id: run.id, sort: field, dir: nextDir}) }}">
-                                <span>{{ meta[0] }}</span>
-                                <span class="text-[10px]">{{ active ? (currentDir == 'asc' ? 'ASC' : 'DESC') : 'SORT' }}</span>
-                            </a>
+                            {% if field == 'sepaTotal' or field == 'lastRun' %}
+                                <span class="inline-flex items-center rounded px-1 py-0.5 text-slate-500">{{ meta[0] }}</span>
+                            {% else %}
+                                <a class="inline-flex items-center gap-1 rounded px-1 py-0.5 {{ active ? 'text-slate-950' : 'text-slate-500 hover:text-slate-950' }}" href="{{ path('app_run_show', {id: run.id, sort: field, dir: nextDir}) }}">
+                                    <span>{{ meta[0] }}</span>
+                                    <span class="text-[10px]">{{ active ? (currentDir == 'asc' ? 'ASC' : 'DESC') : 'SORT' }}</span>
+                                </a>
+                            {% endif %}
                         </th>
-                        {% if field == 'inputTicker' %}
-                            <th title="Unternehmens- oder ETF-Name und optionale WKN">Name</th>
-                        {% endif %}
                     {% endfor %}
                 </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
                 {% for ticker in tickers %}
+                    {% set sepa = sepaSnapshotsByInstrumentId[ticker.instrument.id] ?? null %}
+                    {% set lightClasses = sepa and sepa.trafficLight == 'Gruen'
+                        ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+                        : (sepa and sepa.trafficLight == 'Gelb' ? 'bg-amber-50 text-amber-700 ring-amber-200' : (sepa and sepa.trafficLight == 'Rot' ? 'bg-rose-50 text-rose-700 ring-rose-200' : 'bg-slate-100 text-slate-700 ring-slate-200')) %}
                     <tr class="hover:bg-slate-50">
-                        <td class="font-medium text-slate-950" title="Ticker: vom Nutzer gewuenschtes Symbol"><a class="underline decoration-slate-300 underline-offset-4 hover:decoration-slate-900" href="{{ path('app_ticker_show', {id: ticker.id}) }}">{{ ticker.displayTicker }}</a></td>
-                        <td title="Name und WKN aus den Instrument-Stammdaten">
-                            <div class="max-w-[16rem] truncate font-medium text-slate-800">{{ ticker.instrument.name ?: '-' }}</div>
-                            {% if ticker.instrument.wkn %}
-                                <div class="text-xs text-slate-500">WKN {{ ticker.instrument.wkn }}</div>
+                        <td>
+                            <div class="flex min-w-0 items-start justify-between gap-2">
+                                <div class="min-w-0">
+                                    <a class="font-semibold text-slate-950 underline decoration-slate-300 underline-offset-4 hover:decoration-slate-900" href="{{ path('app_ticker_show', {id: ticker.id}) }}">{{ ticker.displayTicker }}</a>
+                                    <div class="truncate text-xs font-medium text-slate-700">{{ ticker.instrument.name ?: ticker.providerTicker }}</div>
+                                    <div class="mt-1 flex flex-wrap gap-1">
+                                        {{ ui.asset_badge(ticker.assetClass) }}
+                                        {% if ticker.region %}<span class="compact-badge bg-slate-100 text-slate-600 ring-slate-200">{{ ticker.region }}</span>{% endif %}
+                                        {% if ticker.instrument.wkn %}<span class="text-[11px] text-slate-500">WKN {{ ticker.instrument.wkn }}</span>{% endif %}
+                                    </div>
+                                </div>
+                                <span class="text-[11px] text-slate-400">{{ ticker.providerTicker }}</span>
+                            </div>
+                        </td>
+                        <td>
+                            <dl class="signal-stack max-w-[16rem]">
+                                <dt>K</dt><dt>S</dt><dt>M</dt>
+                                <dd>{{ ticker.kronosNormalizedScore is not null ? ticker.kronosNormalizedScore|number_format(3) : '-' }}</dd>
+                                <dd>{{ ticker.sentimentNormalizedScore is not null ? ticker.sentimentNormalizedScore|number_format(3) : '-' }}</dd>
+                                <dd class="text-slate-950">{{ ticker.mergedScore is not null ? ticker.mergedScore|number_format(3) : '-' }}</dd>
+                            </dl>
+                            <div class="mt-1 text-[11px] text-slate-500">Sentiment: {{ ticker.sentimentLabel ?: '-' }}</div>
+                        </td>
+                        <td>
+                            <div class="flex flex-wrap gap-1">{{ ui.decision_badge(ticker.decision) }} {{ ui.mode_badge(ticker.sentimentMode) }}</div>
+                            <div class="mt-1 flex flex-wrap gap-1">{{ ui.status_badge(ticker.marketDataStatus) }} {{ ui.status_badge(ticker.newsStatus) }}</div>
+                        </td>
+                        <td>
+                            {% if sepa %}
+                                <div class="flex items-start justify-between gap-2">
+                                    <dl class="signal-stack flex-1">
+                                        <dt>Str</dt><dt>Exe</dt><dt>Tot</dt>
+                                        <dd>{{ sepa.structureScore|number_format(1) }}</dd>
+                                        <dd>{{ sepa.executionScore|number_format(1) }}</dd>
+                                        <dd class="text-slate-950">{{ sepa.totalScore|number_format(1) }}</dd>
+                                    </dl>
+                                    <span class="compact-badge {{ lightClasses }}">{{ sepa.trafficLight }}</span>
+                                </div>
+                                <div class="mt-1 text-[11px] text-slate-500">SEPA {{ sepa.asOfDate|date('d.m.Y') }}</div>
+                            {% else %}
+                                <span class="text-slate-400">-</span>
                             {% endif %}
                         </td>
-                        <td title="Provider-Ticker fuer Datenabfragen">{{ ticker.providerTicker }}</td>
-                        <td>{{ ui.asset_badge(ticker.assetClass) }}</td>
-                        <td title="Mappingregion">{{ ticker.region ?: '-' }}</td>
-                        <td>{{ ui.mode_badge(ticker.sentimentMode) }}</td>
-                        <td title="Normalisierter Kronos-Score [-1, 1]">{{ ticker.kronosNormalizedScore is not null ? ticker.kronosNormalizedScore|number_format(3) : '-' }}</td>
-                        <td title="Normalisierter Sentiment-Score [-1, 1]">{{ ticker.sentimentNormalizedScore is not null ? ticker.sentimentNormalizedScore|number_format(3) : '-' }}</td>
-                        <td class="font-medium" title="60% Kronos + 40% Sentiment">{{ ticker.mergedScore is not null ? ticker.mergedScore|number_format(3) : '-' }}</td>
-                        <td>{{ ui.decision_badge(ticker.decision) }}</td>
-                        <td>{{ ui.status_badge(ticker.marketDataStatus) }}</td>
-                        <td>{{ ui.status_badge(ticker.newsStatus) }}</td>
+                        <td>
+                            <div class="text-xs text-slate-700">{{ run.finishedAt ? run.finishedAt|date('d.m. H:i') : (run.startedAt ? run.startedAt|date('d.m. H:i') : run.createdAt|date('d.m. H:i')) }}</div>
+                            <div class="mt-1 space-y-0.5 text-[11px]">
+                                <a class="block text-slate-500 underline decoration-slate-300 underline-offset-4 hover:text-slate-950" href="{{ path('app_ticker_show', {id: ticker.id}) }}">Ticker-Run</a>
+                                <a class="block text-slate-500 underline decoration-slate-300 underline-offset-4 hover:text-slate-950" href="{{ path('app_instrument_show', {id: ticker.instrument.id}) }}">Instrument</a>
+                            </div>
+                        </td>
                     </tr>
+                {% else %}
+                    <tr><td class="px-4 py-6 text-center text-slate-500" colspan="{{ columns|length }}">Keine Ticker im Run.</td></tr>
                 {% endfor %}
             </tbody>
         </table>

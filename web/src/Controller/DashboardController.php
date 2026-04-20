@@ -6,6 +6,7 @@ use App\Entity\PipelineRun;
 use App\Entity\PipelineRunItem;
 use App\Repository\PipelineRunRepository;
 use App\Repository\PipelineRunItemRepository;
+use App\Repository\InstrumentSepaSnapshotRepository;
 use App\Service\PipelineRunLauncher;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -50,6 +51,7 @@ class DashboardController extends AbstractController
         Request $request,
         PipelineRunRepository $pipelineRunRepository,
         PipelineRunItemRepository $pipelineRunItemRepository,
+        InstrumentSepaSnapshotRepository $sepaSnapshotRepository,
     ): Response
     {
         $run = $pipelineRunRepository->find($id);
@@ -60,9 +62,16 @@ class DashboardController extends AbstractController
         $sort = PipelineRunItemRepository::normalizeSort((string) $request->query->get('sort', 'mergedScore'));
         $direction = PipelineRunItemRepository::normalizeDirection((string) $request->query->get('dir', 'desc'));
 
+        $tickers = $pipelineRunItemRepository->findForRunSorted($run, $sort, $direction);
+        $instrumentIds = array_map(
+            static fn (PipelineRunItem $item): ?int => $item->getInstrument()->getId(),
+            $tickers,
+        );
+
         return $this->render('dashboard/run.html.twig', [
             'run' => $run,
-            'tickers' => $pipelineRunItemRepository->findForRunSorted($run, $sort, $direction),
+            'tickers' => $tickers,
+            'sepaSnapshotsByInstrumentId' => $sepaSnapshotRepository->findLatestIndexedByInstrumentIds($instrumentIds),
             'currentSort' => $sort,
             'currentDir' => $direction,
         ]);

@@ -28,4 +28,36 @@ class InstrumentSepaSnapshotRepository extends ServiceEntityRepository
             ->getQuery()
             ->getOneOrNullResult();
     }
+
+    /**
+     * @param int[] $instrumentIds
+     * @return array<int, InstrumentSepaSnapshot>
+     */
+    public function findLatestIndexedByInstrumentIds(array $instrumentIds): array
+    {
+        $instrumentIds = array_values(array_unique(array_filter(array_map('intval', $instrumentIds))));
+        if ($instrumentIds === []) {
+            return [];
+        }
+
+        $rows = $this->createQueryBuilder('snapshot')
+            ->join('snapshot.instrument', 'instrument')
+            ->addSelect('instrument')
+            ->andWhere('instrument.id IN (:instrumentIds)')
+            ->setParameter('instrumentIds', $instrumentIds)
+            ->orderBy('snapshot.asOfDate', 'DESC')
+            ->addOrderBy('snapshot.id', 'DESC')
+            ->getQuery()
+            ->getResult();
+
+        $latest = [];
+        foreach ($rows as $snapshot) {
+            $instrumentId = $snapshot->getInstrument()->getId();
+            if ($instrumentId !== null && !isset($latest[$instrumentId])) {
+                $latest[$instrumentId] = $snapshot;
+            }
+        }
+
+        return $latest;
+    }
 }

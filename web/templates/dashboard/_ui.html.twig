@@ -1,24 +1,24 @@
 {% macro decision_badge(decision) %}
     {% set classes = decision == 'ENTRY' ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : (decision == 'WATCH' ? 'bg-blue-50 text-blue-700 ring-blue-200' : (decision == 'NO TRADE' ? 'bg-rose-50 text-rose-700 ring-rose-200' : 'bg-slate-100 text-slate-700 ring-slate-200')) %}
     {% set tooltip = decision == 'ENTRY' ? 'ENTRY: merged_score >= 0.35, stark positives kombiniertes Signal.' : (decision == 'WATCH' ? 'WATCH: merged_score >= 0.15 und < 0.35, positiv aber noch kein Entry.' : (decision == 'NO TRADE' ? 'NO TRADE: merged_score <= -0.15, negatives kombiniertes Signal.' : 'HOLD: merged_score zwischen -0.15 und 0.15, gemischtes oder schwaches Signal.')) %}
-    <span class="rounded-full px-2 py-1 text-xs font-semibold ring-1 {{ classes }}" title="{{ tooltip }}">{{ decision }}</span>
+    <span class="compact-badge {{ classes }}" title="{{ tooltip }}">{{ decision }}</span>
 {% endmacro %}
 
 {% macro asset_badge(assetClass) %}
     {% set isEtf = assetClass == 'ETF' %}
-    <span class="rounded-full px-2 py-1 text-xs font-medium ring-1 {{ isEtf ? 'bg-violet-50 text-violet-700 ring-violet-200' : 'bg-slate-100 text-slate-700 ring-slate-200' }}" title="{{ isEtf ? 'ETF: Sentiment laeuft primaer ueber Kontext, Holdings und Makroprofil.' : 'Equity: Sentiment laeuft primaer ueber direkte Ticker-News.' }}">{{ assetClass }}</span>
+    <span class="compact-badge {{ isEtf ? 'bg-violet-50 text-violet-700 ring-violet-200' : 'bg-slate-100 text-slate-700 ring-slate-200' }}" title="{{ isEtf ? 'ETF: Sentiment laeuft primaer ueber Kontext, Holdings und Makroprofil.' : 'Equity: Sentiment laeuft primaer ueber direkte Ticker-News.' }}">{{ assetClass }}</span>
 {% endmacro %}
 
 {% macro mode_badge(mode) %}
     {% set tooltip = mode == 'etf_context' ? 'etf_context: ETF-Sentiment nutzt Kontextpfad statt nur direkte ETF-News.' : (mode == 'equity_direct' ? 'equity_direct: Sentiment basiert auf direkten Ticker-News.' : 'Sentiment-Modus aus dem Pipeline-Explain-JSON.') %}
-    <span class="rounded-full bg-white px-2 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200" title="{{ tooltip }}">{{ mode ?: '-' }}</span>
+    <span class="compact-badge bg-white text-slate-700 ring-slate-200" title="{{ tooltip }}">{{ mode ?: '-' }}</span>
 {% endmacro %}
 
 {% macro status_badge(status) %}
     {% set ok = status == 'ok' %}
     {% set warn = status in ['no_articles', 'profile_only'] %}
     {% set classes = ok ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : (warn ? 'bg-amber-50 text-amber-700 ring-amber-200' : 'bg-slate-100 text-slate-700 ring-slate-200') %}
-    <span class="rounded-full px-2 py-1 text-xs font-medium ring-1 {{ classes }}" title="Status aus Pipeline-Run: {{ status ?: '-' }}">{{ status ?: '-' }}</span>
+    <span class="compact-badge {{ classes }}" title="Status aus Pipeline-Run: {{ status ?: '-' }}">{{ status ?: '-' }}</span>
 {% endmacro %}
 
 {% macro relevance_badge(relevance) %}
