@@ -138,6 +138,16 @@ class InstrumentController extends AbstractController
         return $this->redirectToRoute($this->returnRoute($request));
     }
 
+    #[Route('/instrument/{id}/delete', name: 'app_instrument_delete', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function delete(Instrument $instrument, Request $request, EntityManagerInterface $entityManager): Response
+    {
+        $returnRoute = $this->returnRoute($request);
+        $entityManager->remove($instrument);
+        $entityManager->flush();
+
+        return $this->redirectToRoute($returnRoute);
+    }
+
     private function returnRoute(Request $request): string
     {
         $route = (string) $request->request->get('return_route', 'app_portfolio_index');

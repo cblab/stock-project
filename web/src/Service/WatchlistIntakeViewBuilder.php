@@ -17,13 +17,12 @@ class WatchlistIntakeViewBuilder
         'status' => 'registry_status',
         'sepa' => 'sepa_total',
         'merged' => 'merged_score',
-        'prüfung' => 'last_seen_at',
         'pruefung' => 'last_seen_at',
         'seen' => 'seen_count',
     ];
 
     /** @return array{run: ?array<string, mixed>, sectors: array<int, array<string, mixed>>, candidates: array<int, array<string, mixed>>, pagination: array<string, int>, metrics: array<string, int>, sort: array{key: string, dir: string}} */
-    public function latest(int $page = 1, int $perPage = 10, string $sort = 'priority', string $dir = 'desc'): array
+    public function latest(int $page = 1, int $perPage = 10, string $sort = 'priority', string $dir = 'desc', bool $showRejected = false): array
     {
         $page = max(1, $page);
         $perPage = max(5, min(100, $perPage));
@@ -34,7 +33,7 @@ class WatchlistIntakeViewBuilder
         ) ?: null;
 
         if ($run === null) {
-            return ['run' => null, 'sectors' => [], 'candidates' => [], 'pagination' => $this->pagination(1, $perPage, 0), 'metrics' => $this->emptyMetrics(), 'sort' => ['key' => $sort, 'dir' => $dir]];
+            return ['run' => null, 'sectors' => [], 'candidates' => [], 'pagination' => $this->pagination(1, $perPage, 0), 'metrics' => $this->emptyMetrics(), 'sort' => ['key' => $sort, 'dir' => $dir], 'showRejected' => $showRejected];
         }
 
         $sectors = $this->connection->fetchAllAssociative(
@@ -42,14 +41,15 @@ class WatchlistIntakeViewBuilder
             [$run['id']]
         );
         $metrics = $this->registryMetrics();
-        $totalCandidates = $metrics['total_candidates'];
+        $where = $showRejected ? '' : ' WHERE active_candidate = 1';
+        $totalCandidates = (int) $this->connection->fetchOne('SELECT COUNT(*) FROM watchlist_candidate_registry'.$where);
         $pages = max(1, (int) ceil($totalCandidates / $perPage));
         $page = min($page, $pages);
         $offset = ($page - 1) * $perPage;
         $orderExpression = self::SORT_COLUMNS[$sort];
         $orderSql = $orderExpression.' '.$dir.', registry_priority DESC, latest_intake_score DESC, last_seen_at DESC, ticker ASC';
         $candidates = $this->connection->fetchAllAssociative(
-            $this->registrySelectSql().' ORDER BY '.$orderSql.' LIMIT '.$perPage.' OFFSET '.$offset
+            $this->registrySelectSql().$where.' ORDER BY '.$orderSql.' LIMIT '.$perPage.' OFFSET '.$offset
         );
 
         return [
@@ -59,6 +59,7 @@ class WatchlistIntakeViewBuilder
             'pagination' => $this->pagination($page, $perPage, $totalCandidates),
             'metrics' => $metrics,
             'sort' => ['key' => $sort, 'dir' => $dir],
+            'showRejected' => $showRejected,
         ];
     }
 
@@ -67,7 +68,7 @@ class WatchlistIntakeViewBuilder
         return "
             SELECT
                 r.*,
-                COALESCE(r.manual_state, r.latest_status) AS registry_status,
+                CASE WHEN r.manual_state IS NULL THEN 'ACTIVE_CANDIDATE' ELSE r.manual_state END AS registry_status,
                 CAST(JSON_UNQUOTE(JSON_EXTRACT(r.latest_sepa_json, '$.total')) AS DECIMAL(10,4)) AS sepa_total,
                 CAST(JSON_UNQUOTE(JSON_EXTRACT(r.latest_buy_signals_json, '$.merged_score')) AS DECIMAL(10,4)) AS merged_score,
                 (
@@ -84,9 +85,8 @@ class WatchlistIntakeViewBuilder
                         WHEN 'TOP_CANDIDATE' THEN 15
                         WHEN 'STRONG_CANDIDATE' THEN 9
                         WHEN 'RESEARCH_ONLY' THEN 2
-                        WHEN 'RECHECK_LATER' THEN 1
                         WHEN 'ADDED_TO_WATCHLIST' THEN -20
-                        WHEN 'DISMISSED' THEN -25
+                        WHEN 'REJECTED' THEN -25
                         ELSE 0
                       END
                     + COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(r.latest_sepa_json, '$.total')) AS DECIMAL(10,4)), 0) * 0.15
@@ -110,8 +110,7 @@ class WatchlistIntakeViewBuilder
                 COUNT(*) AS total_candidates,
                 SUM(active_candidate = 1) AS active_candidates,
                 SUM(manual_state = 'ADDED_TO_WATCHLIST') AS manually_added,
-                SUM(manual_state = 'DISMISSED') AS dismissed,
-                SUM(manual_state = 'RECHECK_LATER') AS recheck_later,
+                SUM(manual_state = 'REJECTED') AS rejected,
                 SUM(COALESCE(manual_state, latest_status) = 'TOP_CANDIDATE') AS top_candidates,
                 SUM(COALESCE(manual_state, latest_status) = 'STRONG_CANDIDATE') AS strong_candidates
             FROM watchlist_candidate_registry"
@@ -127,8 +126,7 @@ class WatchlistIntakeViewBuilder
             'total_candidates' => 0,
             'active_candidates' => 0,
             'manually_added' => 0,
-            'dismissed' => 0,
-            'recheck_later' => 0,
+            'rejected' => 0,
             'top_candidates' => 0,
             'strong_candidates' => 0,
         ];
@@ -137,7 +135,8 @@ class WatchlistIntakeViewBuilder
     private function normalizeRegistryRow(array $row): array
     {
         $row = $this->normalizeJson($row, ['latest_buy_signals_json', 'latest_sepa_json', 'latest_epa_json', 'latest_detail_json']);
-        $row['status'] = $row['manual_state'] ?: $row['latest_status'];
+        $row['status'] = $row['manual_state'] ?: 'ACTIVE_CANDIDATE';
+        $row['proposal_status'] = $row['latest_status'];
         $row['intake_score'] = $row['latest_intake_score'];
         $row['reason'] = $row['latest_reason'];
         $row['hard_checks'] = array_merge(

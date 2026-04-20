@@ -19,8 +19,7 @@ class WatchlistIntakeActionService
 
         $status = match ($action) {
             'add' => 'ADDED_TO_WATCHLIST',
-            'dismiss' => 'DISMISSED',
-            'recheck' => 'RECHECK_LATER',
+            'dismiss' => 'REJECTED',
             default => throw new \InvalidArgumentException('Unknown intake action.'),
         };
 
@@ -28,13 +27,12 @@ class WatchlistIntakeActionService
         $reason = match ($action) {
             'add' => 'manual_add',
             'dismiss' => 'manual_dismiss',
-            'recheck' => 'manual_recheck_later',
             default => 'manual_action',
         };
         if ($action === 'add') {
             $added = $this->addTickerToWatchlist((string) $candidate['ticker'], (string) $candidate['sector_label']);
             if (!$added) {
-                $status = 'DISMISSED';
+                $status = 'ADDED_TO_WATCHLIST';
                 $reason = 'already_active_instrument';
             }
         }
@@ -43,7 +41,7 @@ class WatchlistIntakeActionService
             'watchlist_candidate_registry',
             [
                 'manual_state' => $status,
-                'active_candidate' => in_array($status, ['ADDED_TO_WATCHLIST', 'DISMISSED'], true) ? 0 : 1,
+                'active_candidate' => in_array($status, ['ADDED_TO_WATCHLIST', 'REJECTED'], true) ? 0 : 1,
                 'latest_reason' => $reason,
                 'updated_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
             ],

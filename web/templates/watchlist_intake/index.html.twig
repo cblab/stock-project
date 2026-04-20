@@ -1,9 +1,9 @@
 {% extends 'base.html.twig' %}
 
-{% macro sort_header(label, key, sort, pagination, title) %}
+{% macro sort_header(label, key, sort, pagination, showRejected, title) %}
     {% set active = sort.key == key %}
     {% set nextDir = active and sort.dir == 'asc' ? 'desc' : 'asc' %}
-    <a class="inline-flex items-center gap-1 hover:text-slate-950" href="{{ path('app_watchlist_intake', {sort: key, dir: nextDir, page: 1, perPage: pagination.per_page}) }}" title="{{ title }}">
+    <a class="inline-flex items-center gap-1 hover:text-slate-950" href="{{ path('app_watchlist_intake', {sort: key, dir: nextDir, page: 1, perPage: pagination.per_page, showRejected: showRejected ? 1 : 0}) }}" title="{{ title }}">
         <span>{{ label }}</span>
         <span class="text-[10px] {{ active ? 'text-slate-500' : 'text-slate-300' }}">{{ active ? (sort.dir == 'asc' ? '^' : 'v') : '<>' }}</span>
     </a>
@@ -62,9 +62,15 @@
             {{ diagnostics.cooldown_skipped|default(0) }} wegen Kandidaten-Cooldown pro Ticker uebersprungen,
             {{ diagnostics.eligible_after_exclusions|default(0) }} nach Ausschluessen im Kandidatenpool,
             {{ diagnostics.written_candidates|default(0) }} historische Lauf-Kandidaten gespeichert.
-            Registry: {{ metrics.active_candidates }} aktiv, {{ metrics.dismissed }} verworfen, {{ metrics.recheck_later }} spaeter pruefen.
+            Registry: {{ metrics.active_candidates }} aktiv, {{ metrics.rejected }} abgelehnt.
             <span class="text-slate-500" title="Wenn hier 0 Vorschlaege stehen, sind meist viele einzelne Ticker im 14-Tage-Cooldown oder der konfigurierte Sektorpool ist nach aktiven Bestandsausschluessen leer. Der Cooldown gilt pro Kandidat/Ticker, nicht pro Sektor.">Warum 0?</span>
         </section>
+
+        <div class="mb-3 flex justify-end">
+            <a class="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50" href="{{ path('app_watchlist_intake', {sort: sort.key, dir: sort.dir, page: 1, perPage: pagination.per_page, showRejected: showRejected ? 0 : 1}) }}">
+                {{ showRejected ? 'Abgelehnte ausblenden' : 'Abgelehnte anzeigen' }}
+            </a>
+        </div>
 
         <section class="mb-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
             <h2 class="text-sm font-semibold uppercase text-slate-500">Top-Sektoren</h2>
@@ -97,8 +103,8 @@
                         Seite {{ pagination.page }} von {{ pagination.pages }} - {{ pagination.total }} Vorschlaege
                     </span>
                     <div class="flex gap-2">
-                        <a class="rounded-md border border-slate-200 px-3 py-1 text-slate-700 hover:bg-slate-50 {{ pagination.page <= 1 ? 'pointer-events-none opacity-40' : '' }}" href="{{ path('app_watchlist_intake', {page: pagination.page - 1, perPage: pagination.per_page, sort: sort.key, dir: sort.dir}) }}">Zurueck</a>
-                        <a class="rounded-md border border-slate-200 px-3 py-1 text-slate-700 hover:bg-slate-50 {{ pagination.page >= pagination.pages ? 'pointer-events-none opacity-40' : '' }}" href="{{ path('app_watchlist_intake', {page: pagination.page + 1, perPage: pagination.per_page, sort: sort.key, dir: sort.dir}) }}">Weiter</a>
+                        <a class="rounded-md border border-slate-200 px-3 py-1 text-slate-700 hover:bg-slate-50 {{ pagination.page <= 1 ? 'pointer-events-none opacity-40' : '' }}" href="{{ path('app_watchlist_intake', {page: pagination.page - 1, perPage: pagination.per_page, sort: sort.key, dir: sort.dir, showRejected: showRejected ? 1 : 0}) }}">Zurueck</a>
+                        <a class="rounded-md border border-slate-200 px-3 py-1 text-slate-700 hover:bg-slate-50 {{ pagination.page >= pagination.pages ? 'pointer-events-none opacity-40' : '' }}" href="{{ path('app_watchlist_intake', {page: pagination.page + 1, perPage: pagination.per_page, sort: sort.key, dir: sort.dir, showRejected: showRejected ? 1 : 0}) }}">Weiter</a>
                     </div>
                 </div>
             {% endif %}
@@ -115,14 +121,14 @@
                 </colgroup>
                 <thead>
                     <tr>
-                        <th>{{ table.sort_header('Ticker', 'ticker', sort, pagination, 'Ticker aus der kumulativen Candidate Registry.') }}</th>
-                        <th>{{ table.sort_header('Sektor', 'sector', sort, pagination, 'Aktueller Sektor-Kontext aus der letzten Sichtung.') }}</th>
-                        <th>{{ table.sort_header('Status', 'status', sort, pagination, 'Registry Status: aktueller Vorschlagsstatus oder manuelle Nutzerentscheidung.') }}</th>
-                        <th>{{ table.sort_header('SEPA', 'sepa', sort, pagination, 'Sortiert nach SEPA Total als primaere Struktur- und Setup-Qualitaet.') }}</th>
-                        <th>{{ table.sort_header('Merged Score', 'merged', sort, pagination, 'Kombinierter Kronos-/Sentiment-Wert, sofern vorhanden.') }}</th>
-                        <th>{{ table.sort_header('Seen Count', 'seen', sort, pagination, 'Wie oft der Kandidat ueber Intake-Laeufe hinweg wieder aufgetaucht ist.') }}</th>
-                        <th>{{ table.sort_header('Pruefung', 'pruefung', sort, pagination, 'Letzte Sichtung und aktueller Grund der Proposal-Klasse.') }}</th>
-                        <th title="Manuelle Aktion: aufnehmen, verwerfen oder spaeter erneut pruefen.">Aktionen</th>
+                        <th>{{ table.sort_header('Ticker', 'ticker', sort, pagination, showRejected, 'Ticker aus der kumulativen Candidate Registry.') }}</th>
+                        <th>{{ table.sort_header('Sektor', 'sector', sort, pagination, showRejected, 'Aktueller Sektor-Kontext aus der letzten Sichtung.') }}</th>
+                        <th>{{ table.sort_header('Status', 'status', sort, pagination, showRejected, 'Registry Status: aktueller Vorschlagsstatus oder manuelle Nutzerentscheidung.') }}</th>
+                        <th>{{ table.sort_header('SEPA', 'sepa', sort, pagination, showRejected, 'Sortiert nach SEPA Total als primaere Struktur- und Setup-Qualitaet.') }}</th>
+                        <th>{{ table.sort_header('Merged Score', 'merged', sort, pagination, showRejected, 'Kombinierter Kronos-/Sentiment-Wert, sofern vorhanden.') }}</th>
+                        <th>{{ table.sort_header('Seen Count', 'seen', sort, pagination, showRejected, 'Wie oft der Kandidat ueber Intake-Laeufe hinweg wieder aufgetaucht ist.') }}</th>
+                        <th>{{ table.sort_header('Pruefung', 'pruefung', sort, pagination, showRejected, 'Letzte Sichtung und aktueller Grund der Proposal-Klasse.') }}</th>
+                        <th title="Manuelle Aktion: zur Watchlist uebernehmen oder ablehnen.">Aktionen</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
@@ -130,12 +136,10 @@
                         {% set checks = candidate.hard_checks %}
                         {% set price = candidate.detail.price_strength ?? {} %}
                         {% set statusTone =
-                            candidate.status == 'TOP_CANDIDATE' ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' :
-                            (candidate.status == 'STRONG_CANDIDATE' ? 'bg-sky-50 text-sky-700 ring-sky-200' :
+                            candidate.status == 'ACTIVE_CANDIDATE' ? 'bg-sky-50 text-sky-700 ring-sky-200' :
                             (candidate.status == 'ADDED_TO_WATCHLIST' ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' :
-                            (candidate.status == 'DISMISSED' ? 'bg-slate-100 text-slate-600 ring-slate-200' :
-                            (candidate.status == 'RECHECK_LATER' ? 'bg-amber-50 text-amber-700 ring-amber-200' :
-                            (candidate.status == 'REJECTED' ? 'bg-rose-50 text-rose-700 ring-rose-200' : 'bg-amber-50 text-amber-700 ring-amber-200'))))) %}
+                            (candidate.status == 'REJECTED' ? 'bg-slate-100 text-slate-600 ring-slate-200' :
+                            'bg-amber-50 text-amber-700 ring-amber-200')) %}
                         <tr>
                             <td>
                                 <div class="font-semibold text-slate-950">{{ candidate.ticker }}</div>
@@ -149,6 +153,7 @@
                             </td>
                             <td>
                                 <span class="compact-badge {{ statusTone }}" title="Proposal Status: Systemvorschlag oder manuelle Nutzerentscheidung.">{{ candidate.status }}</span>
+                                <div class="mt-1 text-[11px] text-slate-500">{{ candidate.proposal_status }}</div>
                                 <div class="mt-1 text-[11px] text-slate-500">Latest {{ candidate.latest_intake_score|number_format(1) }}</div>
                                 <div class="text-[11px] text-slate-500">Best {{ candidate.best_intake_score|number_format(1) }}</div>
                                 {% if checks.signal_source is defined %}
@@ -189,13 +194,10 @@
                             <td>
                                 <div class="flex flex-col gap-1">
                                     <form method="post" action="{{ path('app_watchlist_intake_action', {id: candidate.id, action: 'add'}) }}">
-                                        <button class="w-full rounded-md bg-slate-950 px-2 py-1 text-[11px] font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300" title="Diesen Kandidaten manuell in die Watchlist aufnehmen." {{ candidate.status == 'ADDED_TO_WATCHLIST' ? 'disabled' : '' }}>Aufnehmen</button>
+                                        <button class="w-full rounded-md bg-slate-950 px-2 py-1 text-[11px] font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300" title="Diesen Kandidaten manuell in die Watchlist aufnehmen." {{ candidate.status == 'ADDED_TO_WATCHLIST' ? 'disabled' : '' }}>Zur Watchlist</button>
                                     </form>
                                     <form method="post" action="{{ path('app_watchlist_intake_action', {id: candidate.id, action: 'dismiss'}) }}">
-                                        <button class="w-full rounded-md border border-slate-200 px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50" title="Diesen Vorschlag verwerfen und im Status DISMISSED markieren.">Verwerfen</button>
-                                    </form>
-                                    <form method="post" action="{{ path('app_watchlist_intake_action', {id: candidate.id, action: 'recheck'}) }}">
-                                        <button class="w-full rounded-md border border-amber-200 px-2 py-1 text-[11px] font-medium text-amber-800 hover:bg-amber-50" title="Diesen Vorschlag fuer eine spaetere erneute Pruefung markieren.">Spaeter pruefen</button>
+                                        <button class="w-full rounded-md border border-slate-200 px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100" title="Diesen Vorschlag ablehnen und aus der aktiven Kandidatenliste ausblenden." {{ candidate.status == 'REJECTED' ? 'disabled' : '' }}>Ablehnen</button>
                                     </form>
                                 </div>
                             </td>
@@ -211,8 +213,8 @@
                         Zeige {{ candidates|length }} von {{ pagination.total }} Vorschlaegen
                     </span>
                     <div class="flex gap-2">
-                        <a class="rounded-md border border-slate-200 px-3 py-1 text-slate-700 hover:bg-slate-50 {{ pagination.page <= 1 ? 'pointer-events-none opacity-40' : '' }}" href="{{ path('app_watchlist_intake', {page: pagination.page - 1, perPage: pagination.per_page, sort: sort.key, dir: sort.dir}) }}">Zurueck</a>
-                        <a class="rounded-md border border-slate-200 px-3 py-1 text-slate-700 hover:bg-slate-50 {{ pagination.page >= pagination.pages ? 'pointer-events-none opacity-40' : '' }}" href="{{ path('app_watchlist_intake', {page: pagination.page + 1, perPage: pagination.per_page, sort: sort.key, dir: sort.dir}) }}">Weiter</a>
+                        <a class="rounded-md border border-slate-200 px-3 py-1 text-slate-700 hover:bg-slate-50 {{ pagination.page <= 1 ? 'pointer-events-none opacity-40' : '' }}" href="{{ path('app_watchlist_intake', {page: pagination.page - 1, perPage: pagination.per_page, sort: sort.key, dir: sort.dir, showRejected: showRejected ? 1 : 0}) }}">Zurueck</a>
+                        <a class="rounded-md border border-slate-200 px-3 py-1 text-slate-700 hover:bg-slate-50 {{ pagination.page >= pagination.pages ? 'pointer-events-none opacity-40' : '' }}" href="{{ path('app_watchlist_intake', {page: pagination.page + 1, perPage: pagination.per_page, sort: sort.key, dir: sort.dir, showRejected: showRejected ? 1 : 0}) }}">Weiter</a>
                     </div>
                 </div>
             {% endif %}
