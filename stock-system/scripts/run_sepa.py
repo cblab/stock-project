@@ -65,6 +65,9 @@ def main() -> int:
                     "total_score": snapshot.total_score,
                     "traffic_light": snapshot.traffic_light,
                     "kill_triggers": snapshot.kill_triggers,
+                    "hard_triggers": snapshot.hard_triggers,
+                    "soft_warnings": snapshot.soft_warnings,
+                    "traffic_light_reason": snapshot.detail.get("traffic_light_reason"),
                 }
                 for snapshot in snapshots
             ],
@@ -78,4 +81,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

@@ -49,6 +49,25 @@ FinBERT checkpoint, but no local FinGPT Llama/ChatGLM base model plus LoRA
 sentiment checkpoint. Direct FinGPT inference can be enabled by setting
 `fingpt_base_model_path` and `fingpt_lora_model_path` in `config/models.yaml`.
 
+## SEPA / Minervi Phase-1 calibration
+
+The SEPA traffic light separates structural failure from entry and risk
+warnings:
+
+- Hard kill triggers: market or data failure, price below the 200-DMA, 50-DMA
+  below 200-DMA, 50-DMA structure break, 63-day momentum breakdown, lost base
+  support, missing relative-strength leadership, negative up/down volume, and
+  strong distribution.
+- Soft warnings: unattractive stop distance, overextension from the 50-DMA,
+  sharp recent momentum drawdown, deep or chaotic base, expanding base
+  volatility, high ATR risk, distance from 52-week high, insufficient
+  category history, and low superperformance potential.
+
+Red is reserved for multiple hard structure failures, a hard failure with a
+weak total score, or a very low total score. Strong leaders with no hard
+failure but late-entry risk are Yellow instead of Red. Green requires a strong
+score and no active hard or soft warnings.
+
 ## Start
 
 ```powershell
@@ -56,6 +75,9 @@ python -m pip install -r stock-system\requirements.txt
 python stock-system\scripts\run_pipeline.py
 ```
 
-The Kronos config uses the local `Kronos-small` model and the Hugging Face
-tokenizer id `NeoQuasar/Kronos-Tokenizer-base`. For a fully offline run, place
-that tokenizer locally and change `kronos_tokenizer_path`.
+The Kronos config uses the local `NeoQuasar/Kronos-base` checkpoint at
+`E:/stock-project/models/kronos/models/Kronos-base`. `Kronos-base` uses the
+`NeoQuasar/Kronos-Tokenizer-base` tokenizer, so `kronos_tokenizer_path` should
+continue to point at
+`E:/stock-project/models/kronos/tokenizers/Kronos-Tokenizer-base` for offline
+runs.

@@ -20,10 +20,10 @@ def score_relative_strength(df, benchmark_df) -> ScoreResult:
     rel_63 = ret_63 - bench_ret_63
     rel_126 = ret_126 - bench_ret_126
 
-    high_score = 35.0 if distance_to_high >= -0.05 else (25.0 if distance_to_high >= -0.10 else (15.0 if distance_to_high >= -0.20 else 5.0))
-    rel63_score = 35.0 if rel_63 >= 0.10 else (25.0 if rel_63 >= 0.03 else (15.0 if rel_63 >= 0 else 0.0))
-    rel126_score = 20.0 if rel_126 >= 0.10 else (14.0 if rel_126 >= 0.03 else (8.0 if rel_126 >= 0 else 0.0))
-    leadership_score = 10.0 if ret_63 > 0 and ret_126 > 0 and rel_63 > 0 else 0.0
+    high_score = _tier(distance_to_high, [(-0.03, 28), (-0.08, 24), (-0.15, 17), (-0.25, 8)], 3)
+    rel63_score = _tier(rel_63, [(2.00, 34), (1.00, 31), (0.50, 27), (0.20, 22), (0.07, 16), (0.02, 10), (0.0, 5)], 0)
+    rel126_score = _tier(rel_126, [(3.00, 24), (1.50, 21), (0.75, 17), (0.25, 12), (0.08, 8), (0.0, 4)], 0)
+    leadership_score = 10.0 if ret_63 > 0 and ret_126 > 0 and rel_63 > 0 and rel_126 > 0 else (5.0 if ret_63 > 0 and rel_63 > 0 else 0.0)
     score = high_score + rel63_score + rel126_score + leadership_score
 
     triggers = []
@@ -53,3 +53,9 @@ def _return(series, periods: int) -> float:
     base = float(series.iloc[-periods - 1])
     return (float(series.iloc[-1]) / base) - 1.0 if base else 0.0
 
+
+def _tier(value: float, tiers: list[tuple[float, float]], default: float) -> float:
+    for threshold, score in tiers:
+        if value >= threshold:
+            return score
+    return default
