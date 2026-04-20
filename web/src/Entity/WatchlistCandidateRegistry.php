@@ -13,6 +13,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Index(columns: ['active_candidate'], name: 'idx_watchlist_candidate_registry_active')]
 #[ORM\Index(columns: ['latest_intake_score'], name: 'idx_watchlist_candidate_registry_score')]
 #[ORM\Index(columns: ['last_seen_at'], name: 'idx_watchlist_candidate_registry_last_seen')]
+#[ORM\Index(columns: ['active_candidate', 'last_seen_at', 'id'], name: 'idx_watchlist_candidate_registry_active_seen')]
 #[ORM\Index(columns: ['latest_run_id'], name: 'IDX_WATCHLIST_CANDIDATE_REGISTRY_RUN')]
 #[ORM\Index(columns: ['latest_candidate_id'], name: 'IDX_WATCHLIST_CANDIDATE_REGISTRY_CANDIDATE')]
 class WatchlistCandidateRegistry

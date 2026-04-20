@@ -52,7 +52,7 @@ class IntakeRepository:
                     ORDER BY e2.as_of_date DESC, e2.id DESC
                     LIMIT 1
                 )
-                WHERE UPPER(i.input_ticker) = UPPER(%s)
+                WHERE i.input_ticker = %s
                 LIMIT 1
                 """,
                 (ticker,),
@@ -68,7 +68,7 @@ class IntakeRepository:
 
     def instrument_exists(self, ticker: str) -> bool:
         with self.connection.cursor() as cursor:
-            cursor.execute("SELECT id FROM instrument WHERE UPPER(input_ticker) = UPPER(%s) LIMIT 1", (ticker,))
+            cursor.execute("SELECT id FROM instrument WHERE input_ticker = %s LIMIT 1", (ticker,))
             return cursor.fetchone() is not None
 
     def add_to_watchlist(self, ticker: str, *, name: str | None, region: str, note: str) -> int:
@@ -117,7 +117,7 @@ class IntakeRepository:
                     last_seen_at AS created_at,
                     manual_state
                 FROM watchlist_candidate_registry
-                WHERE UPPER(ticker) = UPPER(%s)
+                WHERE ticker = %s
                 LIMIT 1
                 """,
                 (ticker,),
@@ -131,7 +131,7 @@ class IntakeRepository:
                 """
                 SELECT *
                 FROM watchlist_candidate_registry
-                WHERE UPPER(ticker) = UPPER(%s)
+                WHERE ticker = %s
                 LIMIT 1
                 """,
                 (ticker,),
@@ -244,6 +244,8 @@ class IntakeRepository:
 
     def upsert_registry(self, *, run_id: int, candidate_id: int, candidate) -> None:
         now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        # The registry stores these JSON blobs as a cached projection of the latest
+        # candidate evaluation. Each new sighting refreshes the projection.
         latest_buy_signals = {
             "decision": candidate.hard_checks.get("decision"),
             "kronos_score": candidate.hard_checks.get("kronos_score"),

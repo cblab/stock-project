@@ -40,7 +40,7 @@ class ImportRunCommand extends Command
             return Command::FAILURE;
         }
 
-        $io->success(sprintf('Imported run %s with %d run items.', $run->getRunId(), $run->getRunItems()->count()));
+        $io->success(sprintf('Imported run %s with %d run items.', $run->getRunKey(), $run->getRunItems()->count()));
 
         return Command::SUCCESS;
     }

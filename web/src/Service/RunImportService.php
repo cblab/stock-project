@@ -29,8 +29,10 @@ class RunImportService
         }
 
         $summary = $this->readJsonFile($summaryPath);
-        $runId = basename($runPath);
-        $run = $this->pipelineRunRepository->findOneBy(['runId' => $runId]) ?? new PipelineRun();
+        $runKey = basename($runPath);
+        $run = $this->pipelineRunRepository->findOneBy(['runKey' => $runKey])
+            ?? $this->pipelineRunRepository->findOneBy(['runId' => $runKey])
+            ?? new PipelineRun();
 
         if ($run->getId() !== null) {
             foreach ($run->getRunItems() as $item) {
@@ -45,12 +47,12 @@ class RunImportService
         $stats = $summary['calibration']['score_statistics'] ?? [];
 
         $run
-            ->setRunId($runId)
-            ->setRunKey($runId)
+            ->setRunId($runKey)
+            ->setRunKey($runKey)
             ->setRunScope('portfolio')
             ->setStatus('completed')
             ->setRunPath(str_replace('/', DIRECTORY_SEPARATOR, $runPath))
-            ->setStartedAt($this->parseStartedAt($runId))
+            ->setStartedAt($this->parseStartedAt($runKey))
             ->setSummaryGenerated(true)
             ->setDataFrequency($this->nullableString($forecast['data_frequency'] ?? null))
             ->setHorizonSteps($this->nullableInt($forecast['horizon_steps'] ?? null))
@@ -85,7 +87,7 @@ class RunImportService
                 }
             } catch (\Throwable $error) {
                 $this->logger->error('Ticker import failed.', [
-                    'run' => $runId,
+                    'run' => $runKey,
                     'ticker' => $row['ticker'] ?? $row['input_ticker'] ?? 'unknown',
                     'error' => $error->getMessage(),
                 ]);

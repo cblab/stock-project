@@ -10,6 +10,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Index(columns: ['run_id'], name: 'IDX_SECTOR_INTAKE_CANDIDATE_RUN')]
 #[ORM\Index(columns: ['status'], name: 'idx_sector_intake_candidate_status')]
 #[ORM\Index(columns: ['added_to_watchlist'], name: 'idx_sector_intake_candidate_added')]
+#[ORM\Index(columns: ['ticker', 'created_at', 'id'], name: 'idx_sector_intake_candidate_ticker_created_id')]
 class SectorIntakeCandidate
 {
     #[ORM\Id]
