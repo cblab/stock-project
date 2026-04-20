@@ -1,28 +1,27 @@
 {% extends 'base.html.twig' %}
 {% import 'dashboard/_ui.html.twig' as ui %}
 
-{% block title %}Buy Signal Matrix{% endblock %}
+{% block title %}Sell Signal Matrix{% endblock %}
 
 {% block body %}
     {% set columns = {
         ticker: ['Ticker', 'Instrument-Detailseite'],
         name: ['Name / Meta', 'Name, WKN, Asset und Region'],
-        scope: ['Scope', 'Portfolio, Watchlist und letzter Run Scope'],
-        merged: ['Signals', 'Kronos, Sentiment und Merged Score'],
-        decision: ['Decision', 'Pipeline-Entscheidung und Sentiment Label'],
-        sepaTotal: ['SEPA', 'Structure, Execution, Total und Ampel'],
-        lastRun: ['Aktualitaet', 'Letzter Kronos/Sentiment Run und SEPA Snapshot'],
+        scope: ['Scope', 'Portfolio oder Watchlist'],
+        action: ['Action', 'EPA Handlungsklasse'],
+        total: ['EPA', 'EPA Total, Failure, Trend Exit, Climax und Risk'],
+        asOf: ['Aktualitaet', 'EPA Snapshot und letzter Run'],
         links: ['Links', 'Detail-Links']
     } %}
 
     <div class="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-            <p class="text-sm font-medium uppercase text-slate-500">Buy Signal Matrix</p>
-            <h1 class="mt-1 text-2xl font-semibold text-slate-950">Buy Signal Matrix</h1>
-            <p class="mt-1 text-sm text-slate-600">Kompakte Kaufperspektive aus Kronos, Sentiment und SEPA / Minervini.</p>
+            <p class="text-sm font-medium uppercase text-slate-500">Sell Signal Matrix</p>
+            <h1 class="mt-1 text-2xl font-semibold text-slate-950">Sell Signal Matrix</h1>
+            <p class="mt-1 text-sm text-slate-600">Kompakte Verkaufsperspektive aus EPA / Exit & Risk Snapshots.</p>
         </div>
         <div class="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm">
-            <span class="font-medium text-slate-950">{{ items|length }}</span> Instrumente
+            <span class="font-medium text-slate-950">{{ items|length }}</span> aktive Instrumente
         </div>
     </div>
 
@@ -30,13 +29,12 @@
         <table class="data-table">
             <colgroup>
                 <col class="w-[12%]">
-                <col class="w-[22%]">
+                <col class="w-[24%]">
+                <col class="w-[11%]">
+                <col class="w-[13%]">
+                <col class="w-[24%]">
                 <col class="w-[12%]">
-                <col class="w-[17%]">
-                <col class="w-[12%]">
-                <col class="w-[15%]">
-                <col class="w-[7%]">
-                <col class="w-[3%]">
+                <col class="w-[4%]">
             </colgroup>
             <thead>
                 <tr>
@@ -48,7 +46,7 @@
                             {% if field == 'links' %}
                                 <span>{{ meta[0] }}</span>
                             {% else %}
-                                <a class="inline-flex items-center gap-1 rounded px-1 py-0.5 {{ active ? 'text-slate-950' : 'text-slate-500 hover:text-slate-950' }}" href="{{ path('app_buy_signal_matrix', {sort: sortField, dir: nextDir}) }}">
+                                <a class="inline-flex items-center gap-1 rounded px-1 py-0.5 {{ active ? 'text-slate-950' : 'text-slate-500 hover:text-slate-950' }}" href="{{ path('app_sell_signal_matrix', {sort: sortField, dir: nextDir}) }}">
                                     <span>{{ meta[0] }}</span>
                                     <span class="text-[10px]">{{ active ? (currentDir == 'asc' ? 'ASC' : 'DESC') : 'SORT' }}</span>
                                 </a>
@@ -59,9 +57,6 @@
             </thead>
             <tbody class="divide-y divide-slate-100">
                 {% for item in items %}
-                    {% set lightClasses = item.traffic_light == 'Gruen'
-                        ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
-                        : (item.traffic_light == 'Gelb' ? 'bg-amber-50 text-amber-700 ring-amber-200' : (item.traffic_light == 'Rot' ? 'bg-rose-50 text-rose-700 ring-rose-200' : 'bg-slate-100 text-slate-700 ring-slate-200')) %}
                     <tr class="hover:bg-slate-50">
                         <td>
                             <a class="font-semibold text-slate-950 underline decoration-slate-300 underline-offset-4 hover:decoration-slate-900" href="{{ path('app_instrument_show', {id: item.instrument_id}) }}">{{ item.display_ticker ?: item.input_ticker }}</a>
@@ -80,39 +75,34 @@
                                 <span class="compact-badge {{ item.is_portfolio ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : 'bg-sky-50 text-sky-700 ring-sky-200' }}">{{ item.is_portfolio ? 'Portfolio' : 'Watchlist' }}</span>
                                 <span class="compact-badge {{ item.active ? 'bg-slate-100 text-slate-700 ring-slate-200' : 'bg-rose-50 text-rose-700 ring-rose-200' }}">{{ item.active ? 'Aktiv' : 'Inaktiv' }}</span>
                             </div>
-                            <div class="mt-1 text-[11px] text-slate-500">Run: {{ item.run_scope ?: '-' }}</div>
                         </td>
                         <td>
-                            <dl class="signal-stack max-w-[15rem]">
-                                <dt>K</dt><dt>S</dt><dt>M</dt>
-                                <dd>{{ item.kronos_normalized_score is not null ? item.kronos_normalized_score|number_format(3) : '-' }}</dd>
-                                <dd>{{ item.sentiment_normalized_score is not null ? item.sentiment_normalized_score|number_format(3) : '-' }}</dd>
-                                <dd class="text-slate-950">{{ item.merged_score is not null ? item.merged_score|number_format(3) : '-' }}</dd>
-                            </dl>
+                            {{ item.action ? ui.epa_action_badge(item.action) : '-' }}
+                            {% if item.epa_detail.action_reason is defined %}
+                                <div class="mt-1 text-[11px] text-slate-500">{{ item.epa_detail.action_reason|replace({'_': ' '}) }}</div>
+                            {% endif %}
                         </td>
                         <td>
-                            {{ item.decision ? ui.decision_badge(item.decision) : '-' }}
-                            <div class="mt-1 text-[11px] text-slate-500">Sent: {{ item.sentiment_label ?: '-' }}</div>
-                        </td>
-                        <td>
-                            {% if item.sepa_total_score is not null %}
-                                <div class="flex items-start justify-between gap-2">
-                                    <dl class="signal-stack flex-1">
-                                        <dt>Str</dt><dt>Exe</dt><dt>Tot</dt>
-                                        <dd>{{ item.structure_score is not null ? item.structure_score|number_format(1) : '-' }}</dd>
-                                        <dd>{{ item.execution_score is not null ? item.execution_score|number_format(1) : '-' }}</dd>
-                                        <dd class="text-slate-950">{{ item.sepa_total_score|number_format(1) }}</dd>
-                                    </dl>
-                                    <span class="compact-badge {{ lightClasses }}">{{ item.traffic_light }}</span>
-                                </div>
+                            {% if item.epa_total_score is not null %}
+                                <dl class="signal-stack max-w-[18rem]">
+                                    <dt>Tot</dt><dt>Fail</dt><dt>Trend</dt><dt>Clx</dt><dt>Risk</dt>
+                                    <dd class="text-slate-950">{{ item.epa_total_score|number_format(1) }}</dd>
+                                    <dd>{{ item.failure_score|number_format(1) }}</dd>
+                                    <dd>{{ item.trend_exit_score|number_format(1) }}</dd>
+                                    <dd>{{ item.climax_score|number_format(1) }}</dd>
+                                    <dd>{{ item.risk_score|number_format(1) }}</dd>
+                                </dl>
+                                {% set hardCount = item.hard_triggers|length %}
+                                {% set softCount = item.soft_warnings|length %}
+                                <div class="mt-1 text-[11px] text-slate-500">Hard {{ hardCount }} / Soft {{ softCount }}</div>
                             {% else %}
                                 <span class="text-slate-400">-</span>
                             {% endif %}
                         </td>
                         <td>
                             <div class="space-y-0.5 text-[11px] text-slate-600">
+                                <div>EPA: {{ item.epa_as_of_date ? item.epa_as_of_date|date('d.m.y') : '-' }}</div>
                                 <div>Run: {{ item.last_run_at ? item.last_run_at|date('d.m. H:i') : '-' }}</div>
-                                <div>SEPA: {{ item.last_sepa_date ? item.last_sepa_date|date('d.m.y') : '-' }}</div>
                             </div>
                         </td>
                         <td>
@@ -121,14 +111,11 @@
                                 {% if item.run_id %}
                                     <a class="block text-slate-500 underline decoration-slate-300 underline-offset-4 hover:text-slate-950" href="{{ path('app_run_show', {id: item.run_id}) }}">Run</a>
                                 {% endif %}
-                                {% if item.run_item_id %}
-                                    <a class="block text-slate-500 underline decoration-slate-300 underline-offset-4 hover:text-slate-950" href="{{ path('app_ticker_show', {id: item.run_item_id}) }}">Ticker</a>
-                                {% endif %}
                             </div>
                         </td>
                     </tr>
                 {% else %}
-                    <tr><td class="px-4 py-6 text-center text-slate-500" colspan="{{ columns|length }}">Keine Signale vorhanden.</td></tr>
+                    <tr><td class="px-4 py-6 text-center text-slate-500" colspan="{{ columns|length }}">Keine EPA-Signale vorhanden.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
