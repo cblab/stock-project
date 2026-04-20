@@ -22,7 +22,7 @@ def evaluate_candidates(
     market: CachedMarketClient,
     repository: IntakeRepository,
     dry_run: bool,
-) -> list[CandidateDecision]:
+) -> tuple[list[CandidateDecision], dict]:
     settings = config.get("intake", {})
     per_sector = int(settings.get("candidates_per_sector", 8))
     cooldown_days = int(settings.get("cooldown_days", 14))
@@ -31,22 +31,51 @@ def evaluate_candidates(
     decisions: list[CandidateDecision] = []
     seen_tickers: set[str] = set()
     excluded_tickers = repository.active_instrument_tickers()
+    diagnostics = {
+        "raw_candidates": 0,
+        "excluded_active": 0,
+        "excluded_duplicate": 0,
+        "eligible_after_exclusions": 0,
+        "cooldown_skipped": 0,
+        "price_checked": 0,
+        "written_candidates": 0,
+        "sectors": [],
+    }
 
     for sector in sectors:
-        pool = [_normalize_ticker(ticker) for ticker in dict.fromkeys(sector_config.get(sector.key, {}).get("candidates", []))]
-        pool = [
-            ticker
-            for ticker in pool
-            if ticker and ticker.upper() not in seen_tickers and ticker.upper() not in excluded_tickers
-        ]
+        raw_pool = [_normalize_ticker(ticker) for ticker in dict.fromkeys(sector_config.get(sector.key, {}).get("candidates", []))]
+        raw_pool = [ticker for ticker in raw_pool if ticker]
+        active_excluded = [ticker for ticker in raw_pool if ticker.upper() in excluded_tickers]
+        duplicate_excluded = [ticker for ticker in raw_pool if ticker.upper() in seen_tickers and ticker.upper() not in excluded_tickers]
+        pool = [ticker for ticker in raw_pool if ticker.upper() not in seen_tickers and ticker.upper() not in excluded_tickers]
+        diagnostics["raw_candidates"] += len(raw_pool)
+        diagnostics["excluded_active"] += len(active_excluded)
+        diagnostics["excluded_duplicate"] += len(duplicate_excluded)
+        diagnostics["eligible_after_exclusions"] += len(pool)
         tickers = _rotating_slice(pool, len(pool), run_offset + sector.rank)
-        ranked = _rank_by_price_strength(tickers, market, repository, cooldown_days)[:per_sector]
+        ranked, sector_cooldown_skipped = _rank_by_price_strength(tickers, market, repository, cooldown_days)
+        ranked = ranked[:per_sector]
+        diagnostics["cooldown_skipped"] += sector_cooldown_skipped
+        diagnostics["price_checked"] += len(ranked)
         seen_tickers.update(str(item["ticker"]).upper() for item in ranked)
+        diagnostics["sectors"].append(
+            {
+                "sector_key": sector.key,
+                "sector_label": sector.label,
+                "raw_candidates": len(raw_pool),
+                "excluded_active": len(active_excluded),
+                "excluded_duplicate": len(duplicate_excluded),
+                "eligible_after_exclusions": len(pool),
+                "cooldown_skipped": sector_cooldown_skipped,
+                "written_candidates": len(ranked),
+            }
+        )
         for candidate_rank, item in enumerate(ranked, start=1):
             decision = _evaluate_candidate(item["ticker"], sector, candidate_rank, settings, repository, item)
             detail = {**decision.detail, "price_strength": item, "dry_run": dry_run}
             decisions.append(CandidateDecision(**{**decision.__dict__, "detail": detail}))
-    return decisions
+    diagnostics["written_candidates"] = len(decisions)
+    return decisions, diagnostics
 
 
 def _rotating_slice(pool: list[str], size: int, seed: int) -> list[str]:
@@ -58,11 +87,13 @@ def _rotating_slice(pool: list[str], size: int, seed: int) -> list[str]:
     return rotated[:size]
 
 
-def _rank_by_price_strength(tickers: list[str], market: CachedMarketClient, repository: IntakeRepository, cooldown_days: int) -> list[dict]:
+def _rank_by_price_strength(tickers: list[str], market: CachedMarketClient, repository: IntakeRepository, cooldown_days: int) -> tuple[list[dict], int]:
     ranked = []
+    cooldown_skipped = 0
     for ticker in tickers:
         in_cooldown, _previous = repository.is_in_cooldown(ticker, cooldown_days)
         if in_cooldown:
+            cooldown_skipped += 1
             continue
         try:
             frame = market.history(ticker, period="18mo", interval="1d")
@@ -87,7 +118,7 @@ def _rank_by_price_strength(tickers: list[str], market: CachedMarketClient, repo
             )
         except Exception as exc:
             ranked.append({"ticker": ticker, "price_score": 0.0, "error": str(exc), "cooldown": False})
-    return sorted(ranked, key=lambda item: -item.get("price_score", 0.0))
+    return sorted(ranked, key=lambda item: -item.get("price_score", 0.0)), cooldown_skipped
 
 
 def _evaluate_candidate(ticker: str, sector: SectorResult, rank: int, settings: dict, repository: IntakeRepository, price_item: dict) -> CandidateDecision:

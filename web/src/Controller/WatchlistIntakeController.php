@@ -5,15 +5,19 @@ namespace App\Controller;
 use App\Service\WatchlistIntakeViewBuilder;
 use App\Service\WatchlistIntakeActionService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
 class WatchlistIntakeController extends AbstractController
 {
     #[Route('/watchlist-intake', name: 'app_watchlist_intake')]
-    public function __invoke(WatchlistIntakeViewBuilder $viewBuilder): Response
+    public function __invoke(Request $request, WatchlistIntakeViewBuilder $viewBuilder): Response
     {
-        return $this->render('watchlist_intake/index.html.twig', $viewBuilder->latest());
+        return $this->render('watchlist_intake/index.html.twig', $viewBuilder->latest(
+            max(1, $request->query->getInt('page', 1)),
+            max(5, min(100, $request->query->getInt('perPage', 10))),
+        ));
     }
 
     #[Route('/watchlist-intake/candidate/{id}/{action}', name: 'app_watchlist_intake_action', methods: ['POST'], requirements: ['id' => '\d+', 'action' => 'add|dismiss|recheck'])]

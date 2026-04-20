@@ -171,9 +171,10 @@ Rate-limit controls are built in: sector/candidate lists are deliberately small,
 candidate pools rotate per run, active portfolio/watchlist instruments are
 excluded from proposals, Yahoo/yfinance requests are paused between downloads,
 and OHLCV responses are cached under `.cache/sector_intake` for the configured
-TTL. Candidates are also cooled down in the DB for about 14 days unless they
-were strong/top candidates. New candidates without verified DB snapshots get a
-lightweight OHLCV-based SEPA proxy so the proposal row is still interpretable.
+TTL. Individual ticker candidates are cooled down in the DB for about 14 days
+unless they were strong/top candidates. New candidates without verified DB
+snapshots get a lightweight OHLCV-based SEPA proxy so the proposal row is still
+interpretable.
 
 The latest run is visible in the web UI at `/watchlist-intake` with selected
 sectors, proposal classes, reasons, and manual actions. Available user actions
