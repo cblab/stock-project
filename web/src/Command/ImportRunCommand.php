@@ -3,6 +3,7 @@
 namespace App\Command;
 
 use App\Service\RunImportService;
+use App\Service\RuntimePathConfig;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -13,7 +14,10 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 #[AsCommand(name: 'app:import-run', description: 'Import one stock pipeline run from a run directory.')]
 class ImportRunCommand extends Command
 {
-    public function __construct(private readonly RunImportService $runImportService)
+    public function __construct(
+        private readonly RunImportService $runImportService,
+        private readonly RuntimePathConfig $paths,
+    )
     {
         parent::__construct();
     }
@@ -29,7 +33,7 @@ class ImportRunCommand extends Command
         $path = $input->getOption('path');
 
         if (!is_string($path) || trim($path) === '') {
-            $io->error('Please pass --path="E:/stock-project/runs/YYYY-MM-DD_HH-MM".');
+            $io->error(sprintf('Please pass --path="%s".', $this->paths->projectRoot().DIRECTORY_SEPARATOR.'runs'.DIRECTORY_SEPARATOR.'YYYY-MM-DD_HH-MM'));
             return Command::INVALID;
         }
 

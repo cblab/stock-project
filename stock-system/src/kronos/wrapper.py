@@ -39,7 +39,7 @@ class KronosForecaster:
             except ImportError as exc:
                 raise RuntimeError(
                     "Missing Kronos runtime dependencies. Install stock-system/requirements.txt "
-                    "and make sure repos/Kronos is present."
+                    "and make sure KRONOS_DIR points to the local Kronos repository."
                 ) from exc
 
         tokenizer = KronosTokenizer.from_pretrained(self.config.tokenizer_path)

@@ -2,13 +2,10 @@
 
 namespace App\Service;
 
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
-
 class IntakeSnapshotRefreshLauncher
 {
     public function __construct(
-        #[Autowire('%kernel.project_dir%')]
-        private readonly string $webProjectDir,
+        private readonly RuntimePathConfig $paths,
     ) {
     }
 
@@ -19,13 +16,12 @@ class IntakeSnapshotRefreshLauncher
             return;
         }
 
-        $projectRoot = dirname($this->webProjectDir);
-        $logDir = $this->webProjectDir.DIRECTORY_SEPARATOR.'var'.DIRECTORY_SEPARATOR.'log';
-        if (!is_dir($logDir)) {
-            mkdir($logDir, 0775, true);
-        }
+        $projectRoot = $this->paths->projectRoot();
+        $logDir = $this->paths->logDir();
+        $this->paths->ensureDirectory($logDir, 'log');
+        $this->paths->validateForPythonJobs(requireExternalRepos: false);
 
-        $python = $this->pythonBinary();
+        $python = $this->paths->pythonBinary();
         $this->startJob($projectRoot, $logDir, $python, 'run_sepa.py', $ticker);
         $this->startJob($projectRoot, $logDir, $python, 'run_epa.py', $ticker);
     }
@@ -39,23 +35,12 @@ class IntakeSnapshotRefreshLauncher
         $stdout = $logDir.DIRECTORY_SEPARATOR.sprintf('%s_%s_%s.out.log', $jobName, $safeTicker, $stamp);
         $stderr = $logDir.DIRECTORY_SEPARATOR.sprintf('%s_%s_%s.err.log', $jobName, $safeTicker, $stamp);
 
-        $pythonPath = implode(PATH_SEPARATOR, [
-            $projectRoot.DIRECTORY_SEPARATOR.'.deps',
-            $projectRoot.DIRECTORY_SEPARATOR.'stock-system'.DIRECTORY_SEPARATOR.'src',
-            getenv('PYTHONPATH') ?: '',
-        ]);
-        $hfHome = $projectRoot.DIRECTORY_SEPARATOR.'.hf-cache';
-        $yfinanceCache = $this->webProjectDir.DIRECTORY_SEPARATOR.'var'.DIRECTORY_SEPARATOR.'pipeline-cache'.DIRECTORY_SEPARATOR.'intake_refresh_'.$safeTicker;
+        $yfinanceCache = $this->paths->yfinanceCache('intake_refresh_'.$safeTicker);
+        $this->paths->ensureDirectory($yfinanceCache, 'YFinance cache');
 
-        if (!is_dir($yfinanceCache)) {
-            mkdir($yfinanceCache, 0775, true);
+        foreach ($this->paths->pythonEnvironment($yfinanceCache) as $key => $value) {
+            putenv($key.'='.$value);
         }
-
-        putenv('PYTHONPATH='.$pythonPath);
-        putenv('HF_HOME='.$hfHome);
-        putenv('HUGGINGFACE_HUB_CACHE='.$hfHome.DIRECTORY_SEPARATOR.'hub');
-        putenv('TRANSFORMERS_CACHE='.$hfHome.DIRECTORY_SEPARATOR.'transformers');
-        putenv('YFINANCE_CACHE_DIR='.$yfinanceCache);
 
         $previousCwd = getcwd();
         chdir($projectRoot);
@@ -76,15 +61,4 @@ class IntakeSnapshotRefreshLauncher
         }
     }
 
-    private function pythonBinary(): string
-    {
-        $configured = getenv('STOCK_PIPELINE_PYTHON');
-        if (is_string($configured) && trim($configured) !== '') {
-            return trim($configured);
-        }
-
-        $default = 'C:\\Python312\\python.exe';
-
-        return is_file($default) ? $default : 'python';
-    }
 }

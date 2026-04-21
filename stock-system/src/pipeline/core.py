@@ -132,7 +132,7 @@ class PipelineCore:
                 KronosConfig(
                     model_path=self.models["kronos_model_path"],
                     tokenizer_path=self.models.get("kronos_tokenizer_path") or "NeoQuasar/Kronos-Tokenizer-base",
-                    repo_path=str(self.project_root / "repos" / "Kronos"),
+                    repo_path=self.models["kronos_repo_path"],
                     lookback=int(self.settings.get("kronos_lookback", 128)),
                     pred_len=self.horizon_steps,
                     data_frequency=self.market_interval,

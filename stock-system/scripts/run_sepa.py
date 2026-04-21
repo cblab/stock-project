@@ -2,21 +2,8 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
-import sys
-from pathlib import Path
 
-
-SCRIPT_PATH = Path(__file__).resolve()
-STOCK_SYSTEM_ROOT = SCRIPT_PATH.parents[1]
-SRC_ROOT = STOCK_SYSTEM_ROOT / "src"
-PROJECT_ROOT = STOCK_SYSTEM_ROOT.parent
-LOCAL_DEPS = PROJECT_ROOT / ".deps"
-if LOCAL_DEPS.exists() and str(LOCAL_DEPS) not in sys.path:
-    sys.path.insert(0, str(LOCAL_DEPS))
-if str(SRC_ROOT) not in sys.path:
-    sys.path.insert(0, str(SRC_ROOT))
-os.environ.setdefault("YFINANCE_CACHE_DIR", str(PROJECT_ROOT / ".cache" / "yfinance"))
+from bootstrap import PROJECT_ROOT
 
 from db.adapters import DBInputAdapter
 from db.connection import connect

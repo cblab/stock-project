@@ -7,20 +7,21 @@ use Doctrine\ORM\EntityManagerInterface;
 
 class PipelineRunLauncher
 {
-    public function __construct(private readonly EntityManagerInterface $entityManager)
+    public function __construct(
+        private readonly EntityManagerInterface $entityManager,
+        private readonly RuntimePathConfig $paths,
+    )
     {
     }
 
-    public function queueRun(string $projectRoot, string $source = 'portfolio'): PipelineRun
+    public function queueRun(string $source = 'portfolio'): PipelineRun
     {
         $source = $source === 'watchlist' ? 'watchlist' : 'portfolio';
         $now = new \DateTimeImmutable();
         $runKey = $now->format('Y-m-d_H-i-s').'-'.$source;
-        $projectRoot = rtrim(str_replace('\\', DIRECTORY_SEPARATOR, $projectRoot), DIRECTORY_SEPARATOR);
-        $logDir = $projectRoot.DIRECTORY_SEPARATOR.'web'.DIRECTORY_SEPARATOR.'var'.DIRECTORY_SEPARATOR.'log';
-        if (!is_dir($logDir)) {
-            mkdir($logDir, 0775, true);
-        }
+        $projectRoot = $this->paths->projectRoot();
+        $logDir = $this->paths->logDir();
+        $this->paths->ensureDirectory($logDir, 'log');
 
         $run = (new PipelineRun())
             ->setRunId($runKey)
@@ -34,26 +35,17 @@ class PipelineRunLauncher
         $this->entityManager->persist($run);
         $this->entityManager->flush();
 
+        $this->paths->validateForPythonJobs();
         $script = $projectRoot.DIRECTORY_SEPARATOR.'stock-system'.DIRECTORY_SEPARATOR.'scripts'.DIRECTORY_SEPARATOR.'run_pipeline.py';
-        $python = $this->pythonBinary();
+        $python = $this->paths->pythonBinary();
         $stdout = $logDir.DIRECTORY_SEPARATOR.'pipeline_run_'.$run->getId().'.out.log';
         $stderr = $logDir.DIRECTORY_SEPARATOR.'pipeline_run_'.$run->getId().'.err.log';
-        $pythonPath = implode(PATH_SEPARATOR, [
-            $projectRoot.DIRECTORY_SEPARATOR.'.deps',
-            $projectRoot.DIRECTORY_SEPARATOR.'stock-system'.DIRECTORY_SEPARATOR.'src',
-            getenv('PYTHONPATH') ?: '',
-        ]);
-        $hfHome = $projectRoot.DIRECTORY_SEPARATOR.'.hf-cache';
-        $yfinanceCache = $projectRoot.DIRECTORY_SEPARATOR.'web'.DIRECTORY_SEPARATOR.'var'.DIRECTORY_SEPARATOR.'pipeline-cache'.DIRECTORY_SEPARATOR.'yfinance_run_'.$run->getId();
-        if (!is_dir($yfinanceCache)) {
-            mkdir($yfinanceCache, 0775, true);
-        }
+        $yfinanceCache = $this->paths->yfinanceCache('yfinance_run_'.$run->getId());
+        $this->paths->ensureDirectory($yfinanceCache, 'YFinance cache');
 
-        putenv('PYTHONPATH='.$pythonPath);
-        putenv('HF_HOME='.$hfHome);
-        putenv('HUGGINGFACE_HUB_CACHE='.$hfHome.DIRECTORY_SEPARATOR.'hub');
-        putenv('TRANSFORMERS_CACHE='.$hfHome.DIRECTORY_SEPARATOR.'transformers');
-        putenv('YFINANCE_CACHE_DIR='.$yfinanceCache);
+        foreach ($this->paths->pythonEnvironment($yfinanceCache) as $key => $value) {
+            putenv($key.'='.$value);
+        }
 
         $previousCwd = getcwd();
         chdir($projectRoot);
@@ -78,7 +70,7 @@ class PipelineRunLauncher
                 ->setFinishedAt(new \DateTimeImmutable())
                 ->setNotes('Unable to start Python process from Symfony.');
         } else {
-            $run->setNotes(sprintf('Started from Symfony UI with %s. Working directory: %s. Logs: %s / %s. PYTHONPATH includes .deps and stock-system/src. YFinance cache: %s.', $python, $projectRoot, $stdout, $stderr, $yfinanceCache));
+            $run->setNotes(sprintf('Started from Symfony UI with %s. Working directory: %s. Logs: %s / %s. Runtime paths come from PROJECT_ROOT/MODELS_DIR/KRONOS_DIR/FINGPT_DIR. YFinance cache: %s.', $python, $projectRoot, $stdout, $stderr, $yfinanceCache));
         }
 
         $this->entityManager->flush();
@@ -86,21 +78,9 @@ class PipelineRunLauncher
         return $run;
     }
 
-    public function queuePortfolioRun(string $projectRoot): PipelineRun
+    public function queuePortfolioRun(): PipelineRun
     {
-        return $this->queueRun($projectRoot, 'portfolio');
-    }
-
-    private function pythonBinary(): string
-    {
-        $configured = getenv('STOCK_PIPELINE_PYTHON');
-        if (is_string($configured) && trim($configured) !== '') {
-            return trim($configured);
-        }
-
-        $default = 'C:\\Python312\\python.exe';
-
-        return is_file($default) ? $default : 'python';
+        return $this->queueRun('portfolio');
     }
 
 }

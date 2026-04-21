@@ -38,7 +38,8 @@ added.
 
 ## FinGPT integration status
 
-The adapter actively inspects these local paths:
+The adapter actively inspects the configured FinGPT repository. By default
+`FINGPT_DIR` resolves to `PROJECT_ROOT/repos/FinGPT`, so the expected paths are:
 
 - `repos/FinGPT/fingpt/FinGPT_Sentiment_Analysis_v1`
 - `repos/FinGPT/fingpt/FinGPT_Sentiment_Analysis_v3`
@@ -48,6 +49,32 @@ The current default run uses FinBERT because this workspace contains a local
 FinBERT checkpoint, but no local FinGPT Llama/ChatGLM base model plus LoRA
 sentiment checkpoint. Direct FinGPT inference can be enabled by setting
 `fingpt_base_model_path` and `fingpt_lora_model_path` in `config/models.yaml`.
+
+## Runtime path configuration
+
+Python scripts and Symfony launchers share the same path variables. Set local
+machine values in `web/.env.local` or as real environment variables:
+
+```dotenv
+PROJECT_ROOT=E:/stock-project
+PYTHON_BIN=C:/Python312/python.exe
+MODELS_DIR=E:/stock-project/models
+KRONOS_DIR=E:/stock-project/repos/Kronos
+FINGPT_DIR=E:/stock-project/repos/FinGPT
+```
+
+Defaults are project-relative:
+
+- `PROJECT_ROOT`: repository root discovered from `stock-system/` or `web/`
+- `MODELS_DIR`: `PROJECT_ROOT/models`
+- `KRONOS_DIR`: `PROJECT_ROOT/repos/Kronos`
+- `FINGPT_DIR`: `PROJECT_ROOT/repos/FinGPT`
+- `PYTHON_BIN`: `python` on Windows, `python3` elsewhere
+
+Model entries in `stock-system/config/models.yaml` may be absolute or relative.
+Relative model paths are resolved below `MODELS_DIR`; repo paths default to
+`KRONOS_DIR` and `FINGPT_DIR`. Missing Kronos/FinGPT repositories or model
+directories fail early with an explicit path and environment-variable hint.
 
 ## SEPA / Minervi Phase-1 calibration
 
@@ -190,9 +217,7 @@ python -m pip install -r stock-system\requirements.txt
 python stock-system\scripts\run_pipeline.py
 ```
 
-The Kronos config uses the local `NeoQuasar/Kronos-base` checkpoint at
-`E:/stock-project/models/kronos/models/Kronos-base`. `Kronos-base` uses the
-`NeoQuasar/Kronos-Tokenizer-base` tokenizer, so `kronos_tokenizer_path` should
-continue to point at
-`E:/stock-project/models/kronos/tokenizers/Kronos-Tokenizer-base` for offline
-runs.
+The default Kronos config uses `MODELS_DIR/kronos/models/Kronos-base`.
+`Kronos-base` uses the `NeoQuasar/Kronos-Tokenizer-base` tokenizer, so offline
+runs expect `MODELS_DIR/kronos/tokenizers/Kronos-Tokenizer-base` unless
+`kronos_tokenizer_path` is overridden.

@@ -3,9 +3,11 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
+from common.runtime_config import RuntimeConfig
 
-STOCK_SYSTEM_ROOT = Path(__file__).resolve().parents[2]
-PROJECT_ROOT = STOCK_SYSTEM_ROOT.parent
+RUNTIME = RuntimeConfig.from_env()
+STOCK_SYSTEM_ROOT = RUNTIME.stock_system_root
+PROJECT_ROOT = RUNTIME.project_root
 RUNS_ROOT = PROJECT_ROOT / "runs"
 
 

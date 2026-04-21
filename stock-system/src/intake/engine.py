@@ -25,7 +25,7 @@ class SectorWatchlistIntakeEngine:
     def run(self, *, mode: str = "db", dry_run: bool = True) -> dict:
         run_id = self.repository.create_run(mode=mode, dry_run=True, config=self.config)
         try:
-            sectors = discover_top_sectors(self.config, self.market)
+            sectors, sector_diagnostics = discover_top_sectors(self.config, self.market)
             for sector in sectors:
                 self.repository.write_sector(run_id, sector)
             candidates, diagnostics = evaluate_candidates(
@@ -35,6 +35,7 @@ class SectorWatchlistIntakeEngine:
                 repository=self.repository,
                 dry_run=True,
             )
+            diagnostics = {**diagnostics, **sector_diagnostics}
             for candidate in candidates:
                 candidate_id = self.repository.write_candidate(run_id, candidate)
                 self.repository.upsert_registry(run_id=run_id, candidate_id=candidate_id, candidate=candidate)

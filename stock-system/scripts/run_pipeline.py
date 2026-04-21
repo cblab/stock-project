@@ -2,25 +2,9 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
-import sys
 from pathlib import Path
 
-
-SCRIPT_PATH = Path(__file__).resolve()
-STOCK_SYSTEM_ROOT = SCRIPT_PATH.parents[1]
-SRC_ROOT = STOCK_SYSTEM_ROOT / "src"
-PROJECT_ROOT = STOCK_SYSTEM_ROOT.parent
-LOCAL_DEPS = PROJECT_ROOT / ".deps"
-HF_CACHE = PROJECT_ROOT / ".hf-cache"
-HF_CACHE.mkdir(parents=True, exist_ok=True)
-os.environ.setdefault("HF_HOME", str(HF_CACHE))
-os.environ.setdefault("HUGGINGFACE_HUB_CACHE", str(HF_CACHE / "hub"))
-os.environ.setdefault("TRANSFORMERS_CACHE", str(HF_CACHE / "transformers"))
-if LOCAL_DEPS.exists() and str(LOCAL_DEPS) not in sys.path:
-    sys.path.insert(0, str(LOCAL_DEPS))
-if str(SRC_ROOT) not in sys.path:
-    sys.path.insert(0, str(SRC_ROOT))
+from bootstrap import PROJECT_ROOT, RUNTIME, STOCK_SYSTEM_ROOT
 
 from common.config_loader import load_configs, load_yaml
 from common.paths import create_run_dir
@@ -43,7 +27,7 @@ def parse_args() -> argparse.Namespace:
 
 def build_core() -> tuple[PipelineCore, dict, dict]:
     config_dir = STOCK_SYSTEM_ROOT / "config"
-    models, settings = load_configs(config_dir, require_tickers=False)
+    models, settings = load_configs(config_dir, require_tickers=False, runtime=RUNTIME)
     core = PipelineCore(
         project_root=PROJECT_ROOT,
         config_dir=config_dir,
