@@ -1,8 +1,19 @@
 {% extends 'base.html.twig' %}
+{% import 'dashboard/_ui.html.twig' as ui %}
+
+{% macro sort_header(label, key, currentSort, currentDir, returnRoute, title) %}
+    {% set active = currentSort == key %}
+    {% set nextDir = active and currentDir == 'asc' ? 'desc' : 'asc' %}
+    <a class="inline-flex items-center gap-1 rounded px-1 py-0.5 {{ active ? 'text-slate-950' : 'text-slate-500 hover:text-slate-950' }}" href="{{ path(returnRoute, {sort: key, dir: nextDir}) }}" title="{{ title }}">
+        <span>{{ label }}</span>
+        <span class="text-[10px]">{{ active ? (currentDir == 'asc' ? 'ASC' : 'DESC') : 'SORT' }}</span>
+    </a>
+{% endmacro %}
 
 {% block title %}{{ pageTitle }}{% endblock %}
 
 {% block body %}
+    {% import _self as table %}
     <div class="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
             <p class="text-sm font-medium uppercase text-slate-500">{{ pageEyebrow }}</p>
@@ -21,12 +32,17 @@
         <table class="data-table">
             <thead>
                 <tr>
-                    <th>Ticker</th>
-                    <th>Provider</th>
-                    <th>Name</th>
+                    <th>{{ sortableList ? table.sort_header('Ticker', 'ticker', currentSort, currentDir, returnRoute, 'Nach Eingabe-Ticker sortieren.') : 'Ticker' }}</th>
+                    <th>{{ sortableList ? table.sort_header('Provider', 'provider', currentSort, currentDir, returnRoute, 'Nach Provider-Ticker sortieren.') : 'Provider' }}</th>
+                    <th>{{ sortableList ? table.sort_header('Name', 'name', currentSort, currentDir, returnRoute, 'Nach Instrumentname sortieren.') : 'Name' }}</th>
                     <th>WKN</th>
-                    <th>Asset</th>
-                    <th>Region</th>
+                    <th>{{ sortableList ? table.sort_header('Asset', 'asset', currentSort, currentDir, returnRoute, 'Nach Asset-Klasse sortieren.') : 'Asset' }}</th>
+                    <th>{{ sortableList ? table.sort_header('Region', 'region', currentSort, currentDir, returnRoute, 'Nach Region sortieren.') : 'Region' }}</th>
+                    {% if signalColumn == 'sell' %}
+                        <th>{{ table.sort_header('Sell Signal', 'sellSignal', currentSort, currentDir, returnRoute, 'Nach neuester EPA-Aktion sortieren.') }}</th>
+                    {% elseif signalColumn == 'buy' %}
+                        <th>{{ table.sort_header('Buy Decision', 'buyDecision', currentSort, currentDir, returnRoute, 'Nach letzter Buy-/Pipeline-Entscheidung sortieren.') }}</th>
+                    {% endif %}
                     {% if showPortfolioColumn %}<th>Portfolio</th>{% endif %}
                     {% if showActiveColumn %}<th>Aktiv</th>{% endif %}
                     <th></th>
@@ -34,19 +50,33 @@
             </thead>
             <tbody class="divide-y divide-slate-100">
                 {% for instrument in instruments %}
+                    {% set id = instrument.id %}
+                    {% set inputTicker = instrument.input_ticker|default(instrument.inputTicker) %}
+                    {% set providerTicker = instrument.provider_ticker|default(instrument.providerTicker) %}
+                    {% set name = instrument.name|default(null) %}
+                    {% set wkn = instrument.wkn|default(null) %}
+                    {% set assetClass = instrument.asset_class|default(instrument.assetClass) %}
+                    {% set region = instrument.region|default(null) %}
+                    {% set isPortfolio = instrument.is_portfolio is defined ? instrument.is_portfolio : instrument.portfolio %}
+                    {% set isActive = instrument.active %}
                     <tr class="hover:bg-slate-50">
-                        <td class="font-medium text-slate-950">{{ instrument.inputTicker }}</td>
-                        <td>{{ instrument.providerTicker }}</td>
-                        <td>{{ instrument.name ?: '-' }}</td>
-                        <td>{{ instrument.wkn ?: '-' }}</td>
-                        <td>{{ instrument.assetClass }}</td>
-                        <td>{{ instrument.region ?: '-' }}</td>
+                        <td class="font-medium text-slate-950">{{ inputTicker }}</td>
+                        <td>{{ providerTicker }}</td>
+                        <td>{{ name ?: '-' }}</td>
+                        <td>{{ wkn ?: '-' }}</td>
+                        <td>{{ assetClass }}</td>
+                        <td>{{ region ?: '-' }}</td>
+                        {% if signalColumn == 'sell' %}
+                            <td>{{ instrument.sell_signal is defined and instrument.sell_signal ? ui.epa_action_badge(instrument.sell_signal) : '-' }}</td>
+                        {% elseif signalColumn == 'buy' %}
+                            <td>{{ instrument.buy_decision is defined and instrument.buy_decision ? ui.decision_badge(instrument.buy_decision) : '-' }}</td>
+                        {% endif %}
                         {% if showPortfolioColumn %}
                             <td>
-                                <form method="post" action="{{ path('app_instrument_toggle_portfolio', {id: instrument.id}) }}">
+                                <form method="post" action="{{ path('app_instrument_toggle_portfolio', {id: id}) }}">
                                     <input type="hidden" name="return_route" value="{{ returnRoute }}">
                                     <label class="inline-flex items-center gap-2 text-xs font-medium text-slate-600">
-                                        <input class="h-4 w-4 rounded border-slate-300 text-emerald-600" type="checkbox" {{ instrument.portfolio ? 'checked' : '' }} onchange="this.form.requestSubmit()">
+                                        <input class="h-4 w-4 rounded border-slate-300 text-emerald-600" type="checkbox" {{ isPortfolio ? 'checked' : '' }} onchange="this.form.requestSubmit()">
                                         <span>Portfolio</span>
                                     </label>
                                 </form>
@@ -54,20 +84,20 @@
                         {% endif %}
                         {% if showActiveColumn %}
                             <td>
-                                <form method="post" action="{{ path('app_instrument_toggle_active', {id: instrument.id}) }}">
+                                <form method="post" action="{{ path('app_instrument_toggle_active', {id: id}) }}">
                                     <input type="hidden" name="return_route" value="{{ returnRoute }}">
                                     <label class="inline-flex items-center gap-2 text-xs font-medium text-slate-600">
-                                        <input class="h-4 w-4 rounded border-slate-300 text-emerald-600" type="checkbox" {{ instrument.active ? 'checked' : '' }} onchange="this.form.requestSubmit()">
-                                        <span>{{ instrument.active ? 'Aktiv' : 'Inaktiv' }}</span>
+                                        <input class="h-4 w-4 rounded border-slate-300 text-emerald-600" type="checkbox" {{ isActive ? 'checked' : '' }} onchange="this.form.requestSubmit()">
+                                        <span>{{ isActive ? 'Aktiv' : 'Inaktiv' }}</span>
                                     </label>
                                 </form>
                             </td>
                         {% endif %}
                         <td class="text-right">
                             <div class="flex items-center justify-end gap-2">
-                                <a class="font-medium text-slate-950 underline decoration-slate-300 underline-offset-4 hover:decoration-slate-900" href="{{ path('app_instrument_show', {id: instrument.id}) }}">Details</a>
+                                <a class="font-medium text-slate-950 underline decoration-slate-300 underline-offset-4 hover:decoration-slate-900" href="{{ path('app_instrument_show', {id: id}) }}">Details</a>
                                 {% if returnRoute in ['app_portfolio_index', 'app_watchlist_index'] %}
-                                    <form method="post" action="{{ path('app_instrument_delete', {id: instrument.id}) }}" onsubmit="return confirm('Instrument {{ instrument.inputTicker }} endgueltig loeschen?');">
+                                    <form method="post" action="{{ path('app_instrument_delete', {id: id}) }}" onsubmit="return confirm('Instrument {{ inputTicker }} endgueltig loeschen?');">
                                         <input type="hidden" name="return_route" value="{{ returnRoute }}">
                                         <button class="rounded-md border border-rose-200 px-2 py-1 text-[11px] font-medium text-rose-700 hover:bg-rose-50" title="Instrument endgueltig loeschen. Abhaengige Runs und Snapshots werden per Cascade entfernt.">Loeschen</button>
                                     </form>
@@ -76,7 +106,7 @@
                         </td>
                     </tr>
                 {% else %}
-                    <tr><td class="px-4 py-6 text-center text-slate-500" colspan="9">{{ emptyMessage }}</td></tr>
+                    <tr><td class="px-4 py-6 text-center text-slate-500" colspan="{{ signalColumn ? 10 : 9 }}">{{ emptyMessage }}</td></tr>
                 {% endfor %}
             </tbody>
         </table>
