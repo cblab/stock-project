@@ -16,7 +16,7 @@ Die App liest die lokale Datenbankverbindung aus `.env.local`.
 DB_HOST=127.0.0.1
 DB_PORT=3306
 DB_NAME=stock_project
-DB_USER=root
+DB_USER=
 DB_PASSWORD=
 DATABASE_URL="mysql://root:@127.0.0.1:3306/stock_project?serverVersion=10.4.32-MariaDB&charset=utf8mb4"
 ```
@@ -29,9 +29,9 @@ Auf einem neuen Rechner reicht meist diese lokale Ergaenzung:
 ```dotenv
 PROJECT_ROOT=E:/stock-project
 PYTHON_BIN=C:/Python312/python.exe
-MODELS_DIR=E:/stock-project/models
-KRONOS_DIR=E:/stock-project/repos/Kronos
-FINGPT_DIR=E:/stock-project/repos/FinGPT
+MODELS_DIR=C:/stock-project/models
+KRONOS_DIR=C:/stock-project/repos/Kronos
+FINGPT_DIR=C:/stock-project/repos/FinGPT
 ```
 
 Alle Werte sind optional, wenn die Standardstruktur genutzt wird:
@@ -42,9 +42,9 @@ Web-Jobs, bricht der Launcher mit einer klaren Fehlermeldung ab.
 ## Setup
 
 ```powershell
-E:\xampp\php\php.exe bin\console doctrine:database:create --if-not-exists
-E:\xampp\php\php.exe bin\console doctrine:migrations:migrate --no-interaction
-E:\xampp\php\php.exe bin\console tailwind:build
+php bin\console doctrine:database:create --if-not-exists
+php bin\console doctrine:migrations:migrate --no-interaction
+php bin\console tailwind:build
 ```
 
 ## Runs importieren
@@ -64,4 +64,4 @@ php -S 127.0.0.1:8000 -t public
 
 Dann `http://127.0.0.1:8000/` oeffnen.
 
-Fuer XAMPP/Apache sollte `web/public/` als DocumentRoot genutzt werden, nicht `web/`.
+Fuer Nginx/Apache sollte `web/public/` als DocumentRoot genutzt werden, nicht `web/`.
