@@ -38,9 +38,7 @@ class IntakeSnapshotRefreshLauncher
         $yfinanceCache = $this->paths->yfinanceCache('intake_refresh_'.$safeTicker);
         $this->paths->ensureDirectory($yfinanceCache, 'YFinance cache');
 
-        foreach ($this->paths->pythonEnvironment($yfinanceCache) as $key => $value) {
-            putenv($key.'='.$value);
-        }
+        $this->paths->exportEnvironment($yfinanceCache);
 
         $previousCwd = getcwd();
         chdir($projectRoot);

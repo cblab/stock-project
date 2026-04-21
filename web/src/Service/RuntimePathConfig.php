@@ -77,7 +77,7 @@ class RuntimePathConfig
         return implode(PATH_SEPARATOR, array_filter([
             $this->localDepsDir(),
             $this->stockSystemSrc(),
-            getenv('PYTHONPATH') ?: '',
+            $this->env('PYTHONPATH') ?: '',
         ]));
     }
 
@@ -132,12 +132,22 @@ class RuntimePathConfig
 
     private function env(string $key): ?string
     {
-        $value = getenv($key);
-        if (!is_string($value) || trim($value) === '') {
-            return null;
+        foreach ([$_ENV[$key] ?? null, $_SERVER[$key] ?? null, getenv($key)] as $value) {
+            if (is_string($value) && trim($value) !== '') {
+                return trim($value);
+            }
         }
 
-        return trim($value);
+        return null;
+    }
+
+    public function exportEnvironment(string $yfinanceCache): void
+    {
+        foreach ($this->pythonEnvironment($yfinanceCache) as $key => $value) {
+            putenv($key.'='.$value);
+            $_ENV[$key] = $value;
+            $_SERVER[$key] = $value;
+        }
     }
 
     private function join(string ...$parts): string
