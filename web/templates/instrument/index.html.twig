@@ -51,11 +51,11 @@
             <tbody class="divide-y divide-slate-100">
                 {% for instrument in instruments %}
                     {% set id = instrument.id %}
-                    {% set inputTicker = instrument.input_ticker|default(instrument.inputTicker) %}
-                    {% set providerTicker = instrument.provider_ticker|default(instrument.providerTicker) %}
+                    {% set inputTicker = instrument.input_ticker is defined ? instrument.input_ticker : instrument.inputTicker %}
+                    {% set providerTicker = instrument.provider_ticker is defined ? instrument.provider_ticker : instrument.providerTicker %}
                     {% set name = instrument.name|default(null) %}
                     {% set wkn = instrument.wkn|default(null) %}
-                    {% set assetClass = instrument.asset_class|default(instrument.assetClass) %}
+                    {% set assetClass = instrument.asset_class is defined ? instrument.asset_class : instrument.assetClass %}
                     {% set region = instrument.region|default(null) %}
                     {% set isPortfolio = instrument.is_portfolio is defined ? instrument.is_portfolio : instrument.portfolio %}
                     {% set isActive = instrument.active %}
