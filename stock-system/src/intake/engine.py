@@ -5,7 +5,7 @@ from pathlib import Path
 from intake.candidates import evaluate_candidates
 from intake.config import load_intake_config
 from intake.market import CachedMarketClient
-from intake.repository import IntakeRepository
+from intake.repository import IntakeRepository, summarize_error
 from intake.sector_discovery import discover_top_sectors
 
 
@@ -56,8 +56,8 @@ class SectorWatchlistIntakeEngine:
                     "cooldown_days": self.config.get("intake", {}).get("cooldown_days", 14),
                 },
             }
-            self.repository.finish_run(run_id, status="completed", summary=summary)
+            self.repository.finish_run(run_id, status="success", summary=summary, exit_code=0)
             return summary
         except Exception as exc:
-            self.repository.finish_run(run_id, status="failed", summary={"error": str(exc)})
+            self.repository.finish_run(run_id, status="failed", summary={"error": str(exc)}, exit_code=1, error_summary=summarize_error(exc))
             raise

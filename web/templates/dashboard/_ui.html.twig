@@ -21,6 +21,11 @@
     <span class="compact-badge {{ classes }}" title="Status aus Pipeline-Run: {{ status ?: '-' }}">{{ status ?: '-' }}</span>
 {% endmacro %}
 
+{% macro run_status_badge(status) %}
+    {% set classes = status == 'success' ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : (status == 'running' ? 'bg-blue-50 text-blue-700 ring-blue-200' : (status == 'queued' ? 'bg-amber-50 text-amber-700 ring-amber-200' : (status == 'failed' ? 'bg-rose-50 text-rose-700 ring-rose-200' : 'bg-slate-100 text-slate-700 ring-slate-200'))) %}
+    <span class="compact-badge {{ classes }}" title="Run-Status: {{ status ?: '-' }}">{{ status ?: '-' }}</span>
+{% endmacro %}
+
 {% macro epa_action_badge(action) %}
     {% set classes = action == 'FAILED_SETUP' ? 'bg-rose-100 text-rose-800 ring-rose-200' : (action == 'EXIT' ? 'bg-rose-50 text-rose-700 ring-rose-200' : (action == 'TRIM' ? 'bg-orange-50 text-orange-700 ring-orange-200' : (action == 'TIGHTEN_RISK' ? 'bg-amber-50 text-amber-700 ring-amber-200' : 'bg-emerald-50 text-emerald-700 ring-emerald-200'))) %}
     {% set tooltip = action == 'FAILED_SETUP' ? 'FAILED_SETUP: frueher Setup-Fehlschlag oder harter Failure-Trigger.' : (action == 'EXIT' ? 'EXIT: harter Trend-/Risk-Exit oder stark erhoehter EPA-Risk-Score.' : (action == 'TRIM' ? 'TRIM: Teilgewinn/De-Risking wegen Climax oder starker Ueberdehnung.' : (action == 'TIGHTEN_RISK' ? 'TIGHTEN_RISK: halten, aber Stop/Risiko enger fuehren.' : 'HOLD: Trend intakt, kein unmittelbarer EPA-Handlungsdruck.'))) %}

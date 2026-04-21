@@ -62,6 +62,18 @@ class PipelineRun
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     private ?string $notes = null;
 
+    #[ORM\Column(nullable: true)]
+    private ?int $exitCode = null;
+
+    #[ORM\Column(length: 1024, nullable: true)]
+    private ?string $stdoutLogPath = null;
+
+    #[ORM\Column(length: 1024, nullable: true)]
+    private ?string $stderrLogPath = null;
+
+    #[ORM\Column(length: 512, nullable: true)]
+    private ?string $errorSummary = null;
+
     #[ORM\Column]
     private int $decisionEntryCount = 0;
 
@@ -133,6 +145,14 @@ class PipelineRun
     public function setSummaryGenerated(bool $summaryGenerated): self { $this->summaryGenerated = $summaryGenerated; return $this; }
     public function getNotes(): ?string { return $this->notes; }
     public function setNotes(?string $notes): self { $this->notes = $notes; return $this; }
+    public function getExitCode(): ?int { return $this->exitCode; }
+    public function setExitCode(?int $exitCode): self { $this->exitCode = $exitCode; return $this; }
+    public function getStdoutLogPath(): ?string { return $this->stdoutLogPath; }
+    public function setStdoutLogPath(?string $stdoutLogPath): self { $this->stdoutLogPath = $stdoutLogPath; return $this; }
+    public function getStderrLogPath(): ?string { return $this->stderrLogPath; }
+    public function setStderrLogPath(?string $stderrLogPath): self { $this->stderrLogPath = $stderrLogPath; return $this; }
+    public function getErrorSummary(): ?string { return $this->errorSummary; }
+    public function setErrorSummary(?string $errorSummary): self { $this->errorSummary = $errorSummary; return $this; }
     public function getDecisionEntryCount(): int { return $this->decisionEntryCount; }
     public function setDecisionEntryCount(int $count): self { $this->decisionEntryCount = $count; return $this; }
     public function getDecisionWatchCount(): int { return $this->decisionWatchCount; }

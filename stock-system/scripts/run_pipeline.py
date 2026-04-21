@@ -11,6 +11,7 @@ from common.paths import create_run_dir
 from data.symbol_mapper import load_symbol_map, resolve_symbols
 from db.adapters import DBInputAdapter, DBOutputAdapter
 from db.connection import connect
+from db.run_tracking import mark_pipeline_run_failed
 from pipeline.core import PipelineCore, ensure_run_tree
 
 
@@ -75,10 +76,26 @@ def run_db_mode(args: argparse.Namespace) -> dict:
 
 def main() -> int:
     args = parse_args()
-    result = run_db_mode(args) if args.mode == "db" else run_json_mode(args)
+    try:
+        result = run_db_mode(args) if args.mode == "db" else run_json_mode(args)
+    except Exception as exc:
+        if args.mode == "db" and args.run_id is not None:
+            _mark_existing_run_failed(args.run_id, exc)
+        raise
     if not args.quiet:
         print(json.dumps(result, indent=2, ensure_ascii=False, default=str))
     return 0
+
+
+def _mark_existing_run_failed(run_id: int, error: Exception) -> None:
+    try:
+        connection = connect(PROJECT_ROOT)
+    except Exception:
+        return
+    try:
+        mark_pipeline_run_failed(connection, run_id, error)
+    finally:
+        connection.close()
 
 
 if __name__ == "__main__":

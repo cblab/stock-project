@@ -436,15 +436,24 @@ class IntakeRepository:
         self.connection.commit()
         return {"ticker": ticker, "status": status_by_action[action], "added_to_watchlist": added}
 
-    def finish_run(self, run_id: int, *, status: str, summary: dict) -> None:
+    def finish_run(self, run_id: int, *, status: str, summary: dict, exit_code: int | None = None, error_summary: str | None = None) -> None:
         now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
         with self.connection.cursor() as cursor:
             cursor.execute(
                 """
                 UPDATE sector_intake_run
-                SET status = %s, summary_json = %s, updated_at = %s
+                SET status = %s, summary_json = %s, exit_code = %s, error_summary = %s, updated_at = %s
                 WHERE id = %s
                 """,
-                (status, json.dumps(summary, ensure_ascii=False, default=str), now, run_id),
+                (status, json.dumps(summary, ensure_ascii=False, default=str), exit_code, error_summary, now, run_id),
             )
         self.connection.commit()
+
+
+def summarize_error(error: Exception | str) -> str:
+    text = str(error).strip().replace("\r", " ").replace("\n", " ")
+    while "  " in text:
+        text = text.replace("  ", " ")
+    if not text:
+        return "Unknown error."
+    return text[:512]

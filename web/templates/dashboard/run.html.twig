@@ -13,15 +13,27 @@
     } %}
 
     <div class="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        {% set isWatchlistRun = run.runScope == 'watchlist' %}
+        {% set isRefreshRun = run.runScope == 'snapshot_refresh' %}
         <div>
             <a class="text-sm text-slate-500 hover:text-slate-950" href="{{ path('app_runs_index') }}">Zurueck zu Runs</a>
             <h1 class="mt-1 text-2xl font-semibold text-slate-950">Run {{ run.runKey }}</h1>
             <p class="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-500">
-                <span class="compact-badge {{ run.runScope == 'watchlist' ? 'bg-sky-50 text-sky-700 ring-sky-200' : 'bg-emerald-50 text-emerald-700 ring-emerald-200' }}">
-                    {{ run.runScope == 'watchlist' ? 'Watchlist-Run' : 'Portfolio-Run' }}
+                <span class="compact-badge {{ isRefreshRun ? 'bg-violet-50 text-violet-700 ring-violet-200' : (isWatchlistRun ? 'bg-sky-50 text-sky-700 ring-sky-200' : 'bg-emerald-50 text-emerald-700 ring-emerald-200') }}">
+                    {{ isRefreshRun ? 'Snapshot-Refresh' : (isWatchlistRun ? 'Watchlist-Run' : 'Portfolio-Run') }}
                 </span>
+                {{ ui.run_status_badge(run.status) }}
+                <span>Exit: {{ run.exitCode is not null ? run.exitCode : '-' }}</span>
                 <span>{{ run.dataFrequency ?: '-' }} / {{ run.horizonLabel ?: '-' }} / {{ run.scoreValidityHours ?: '-' }}h</span>
             </p>
+            {% if run.errorSummary or run.stdoutLogPath or run.stderrLogPath %}
+                <p class="mt-2 max-w-4xl text-xs text-slate-500">
+                    {% if run.errorSummary %}<span class="font-medium text-rose-700">{{ run.errorSummary }}</span>{% endif %}
+                    {% if run.stdoutLogPath or run.stderrLogPath %}
+                        <span title="{{ (run.stdoutLogPath ?: '-') ~ ' / ' ~ (run.stderrLogPath ?: '-') }}">Logs: {{ run.stdoutLogPath ? 'stdout' : '-' }} / {{ run.stderrLogPath ? 'stderr' : '-' }}</span>
+                    {% endif %}
+                </p>
+            {% endif %}
         </div>
         <div class="grid grid-cols-4 gap-2 text-center text-xs">
             <div class="rounded-md border border-slate-200 bg-white px-3 py-2 shadow-sm"><p class="font-semibold text-slate-950">{{ run.decisionEntryCount }}</p><p class="text-slate-500">ENTRY</p></div>

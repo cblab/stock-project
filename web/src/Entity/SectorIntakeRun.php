@@ -35,6 +35,18 @@ class SectorIntakeRun
     #[ORM\Column(type: Types::JSON, nullable: true)]
     private ?array $summaryJson = null;
 
+    #[ORM\Column(nullable: true)]
+    private ?int $exitCode = null;
+
+    #[ORM\Column(length: 1024, nullable: true)]
+    private ?string $stdoutLogPath = null;
+
+    #[ORM\Column(length: 1024, nullable: true)]
+    private ?string $stderrLogPath = null;
+
+    #[ORM\Column(length: 512, nullable: true)]
+    private ?string $errorSummary = null;
+
     #[ORM\Column]
     private \DateTimeImmutable $createdAt;
 
