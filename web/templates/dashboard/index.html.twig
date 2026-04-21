@@ -1,4 +1,5 @@
 {% extends 'base.html.twig' %}
+{% import 'dashboard/_ui.html.twig' as ui %}
 
 {% block title %}Pipeline Runs{% endblock %}
 
@@ -44,7 +45,7 @@
             </div>
             <div class="metric-card">
                 <p class="text-xs font-semibold uppercase text-slate-500">Score-Spanne</p>
-                <p class="mt-2 text-xl font-semibold text-slate-950">{{ newest.scoreMin|number_format(3) }} bis {{ newest.scoreMax|number_format(3) }}</p>
+                <p class="mt-2 text-xl font-semibold text-slate-950">{{ newest.scoreMin is not null ? newest.scoreMin|number_format(3) : '-' }} bis {{ newest.scoreMax is not null ? newest.scoreMax|number_format(3) : '-' }}</p>
             </div>
         </div>
 
@@ -56,33 +57,43 @@
                         <th>Status</th>
                         <th>Scope</th>
                         <th>Start</th>
+                        <th>Exit</th>
                         <th>Ticker</th>
                         <th>ENTRY</th>
                         <th>WATCH</th>
                         <th>HOLD</th>
                         <th>NO TRADE</th>
                         <th>Score Mean</th>
+                        <th>Fehler / Logs</th>
                         <th></th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
                     {% for run in runs %}
                         {% set isWatchlist = run.runScope == 'watchlist' %}
-                        <tr class="{{ isWatchlist ? 'bg-sky-50/35' : 'bg-emerald-50/25' }} hover:bg-slate-50">
+                        {% set isRefresh = run.runScope == 'snapshot_refresh' %}
+                        <tr class="{{ isRefresh ? 'bg-violet-50/25' : (isWatchlist ? 'bg-sky-50/35' : 'bg-emerald-50/25') }} hover:bg-slate-50">
                             <td class="font-medium text-slate-950">{{ run.runKey }}</td>
-                            <td><span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">{{ run.status }}</span></td>
+                            <td>{{ ui.run_status_badge(run.status) }}</td>
                             <td>
-                                <span class="rounded-full px-2.5 py-1 text-xs font-medium ring-1 {{ isWatchlist ? 'bg-sky-50 text-sky-700 ring-sky-200' : 'bg-emerald-50 text-emerald-700 ring-emerald-200' }}">
-                                    {{ isWatchlist ? 'Watchlist' : 'Portfolio' }}
+                                <span class="rounded-full px-2.5 py-1 text-xs font-medium ring-1 {{ isRefresh ? 'bg-violet-50 text-violet-700 ring-violet-200' : (isWatchlist ? 'bg-sky-50 text-sky-700 ring-sky-200' : 'bg-emerald-50 text-emerald-700 ring-emerald-200') }}">
+                                    {{ isRefresh ? 'Snapshot' : (isWatchlist ? 'Watchlist' : 'Portfolio') }}
                                 </span>
                             </td>
                             <td>{{ run.startedAt ? run.startedAt|date('d.m.Y H:i') : '-' }}</td>
+                            <td>{{ run.exitCode is not null ? run.exitCode : '-' }}</td>
                             <td>{{ run.displayItems|length }}</td>
                             <td>{{ run.decisionEntryCount }}</td>
                             <td>{{ run.decisionWatchCount }}</td>
                             <td>{{ run.decisionHoldCount }}</td>
                             <td>{{ run.decisionNoTradeCount }}</td>
                             <td>{{ run.scoreMean is not null ? run.scoreMean|number_format(3) : '-' }}</td>
+                            <td class="max-w-[18rem] text-xs text-slate-600">
+                                <div class="truncate" title="{{ run.errorSummary ?: run.notes ?: '' }}">{{ run.errorSummary ?: '-' }}</div>
+                                {% if run.stdoutLogPath or run.stderrLogPath %}
+                                    <div class="mt-1 truncate text-[11px] text-slate-400" title="{{ (run.stdoutLogPath ?: '-') ~ ' / ' ~ (run.stderrLogPath ?: '-') }}">Logs gesetzt</div>
+                                {% endif %}
+                            </td>
                             <td class="text-right">
                                 <div class="flex items-center justify-end gap-3">
                                     <a class="font-medium text-slate-950 underline decoration-slate-300 underline-offset-4 hover:decoration-slate-900" href="{{ path('app_run_show', {id: run.id}) }}">Details</a>

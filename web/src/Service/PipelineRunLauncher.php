@@ -41,6 +41,9 @@ class PipelineRunLauncher
         $stdout = $logDir.DIRECTORY_SEPARATOR.'pipeline_run_'.$run->getId().'.out.log';
         $stderr = $logDir.DIRECTORY_SEPARATOR.'pipeline_run_'.$run->getId().'.err.log';
         $yfinanceCache = $this->paths->yfinanceCache('yfinance_run_'.$run->getId());
+        $run
+            ->setStdoutLogPath($stdout)
+            ->setStderrLogPath($stderr);
 
         try {
             $this->paths->ensureDirectory($yfinanceCache, 'YFinance cache');
@@ -69,7 +72,9 @@ class PipelineRunLauncher
             if ($exitCode !== 0) {
                 $run
                     ->setStatus('failed')
+                    ->setExitCode($exitCode)
                     ->setFinishedAt(new \DateTimeImmutable())
+                    ->setErrorSummary('Python-Prozess konnte nicht gestartet werden.')
                     ->setNotes('Unable to start Python process from Symfony.');
             } else {
                 $run->setNotes(sprintf('Started from Symfony UI with %s. Working directory: %s. Logs: %s / %s. Runtime paths come from PROJECT_ROOT/MODELS_DIR/KRONOS_DIR/FINGPT_DIR. YFinance cache: %s.', $python, $projectRoot, $stdout, $stderr, $yfinanceCache));
@@ -77,7 +82,9 @@ class PipelineRunLauncher
         } catch (\Throwable $error) {
             $run
                 ->setStatus('failed')
+                ->setExitCode(1)
                 ->setFinishedAt(new \DateTimeImmutable())
+                ->setErrorSummary($this->summarizeError($error->getMessage()))
                 ->setNotes('Unable to start Python process from Symfony: '.$error->getMessage());
         }
 
@@ -89,6 +96,16 @@ class PipelineRunLauncher
     public function queuePortfolioRun(): PipelineRun
     {
         return $this->queueRun('portfolio');
+    }
+
+    private function summarizeError(string $message): string
+    {
+        $message = trim(preg_replace('/\s+/', ' ', $message) ?? $message);
+        if ($message === '') {
+            return 'Unbekannter Startfehler.';
+        }
+
+        return substr($message, 0, 512);
     }
 
 }

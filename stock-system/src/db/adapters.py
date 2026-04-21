@@ -82,7 +82,7 @@ class DBOutputAdapter:
                 cursor.execute(
                     """
                     UPDATE pipeline_run
-                    SET status = 'running', started_at = COALESCE(started_at, %s), data_frequency = %s, horizon_steps = %s, horizon_label = %s, score_validity_hours = %s
+                    SET status = 'running', started_at = COALESCE(started_at, %s), data_frequency = %s, horizon_steps = %s, horizon_label = %s, score_validity_hours = %s, exit_code = NULL, error_summary = NULL
                     WHERE id = %s
                     """,
                     (
@@ -176,7 +176,7 @@ class DBOutputAdapter:
             cursor.execute(
                 """
                 UPDATE pipeline_run
-                SET status = 'completed', finished_at = %s, summary_generated = 1,
+                SET status = 'success', finished_at = %s, exit_code = 0, error_summary = NULL, summary_generated = 1,
                     decision_entry_count = %s, decision_watch_count = %s, decision_hold_count = %s, decision_no_trade_count = %s,
                     score_min = %s, score_max = %s, score_mean = %s, score_median = %s
                 WHERE id = %s
@@ -199,12 +199,22 @@ class DBOutputAdapter:
     def fail(self, error: Exception) -> None:
         if self.run_id is None:
             return
+        summary = summarize_error(error)
         with self.connection.cursor() as cursor:
             cursor.execute(
-                "UPDATE pipeline_run SET status = 'failed', finished_at = %s, notes = %s WHERE id = %s",
-                (datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"), str(error), self.run_id),
+                "UPDATE pipeline_run SET status = 'failed', finished_at = %s, exit_code = 1, error_summary = %s, notes = %s WHERE id = %s",
+                (datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"), summary, str(error), self.run_id),
             )
         self.connection.commit()
+
+
+def summarize_error(error: Exception | str) -> str:
+    text = str(error).strip().replace("\r", " ").replace("\n", " ")
+    while "  " in text:
+        text = text.replace("  ", " ")
+    if not text:
+        return "Unknown error."
+    return text[:512]
 
 
 def _json_list(value) -> list[str]:

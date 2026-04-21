@@ -39,7 +39,10 @@
         {% if run %}
             <div class="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm">
                 <span class="font-medium text-slate-950">Letzter Lauf: {{ run.status }}</span>
-                <span class="text-slate-500"> / Registry View</span>
+                <span class="text-slate-500"> / Exit: {{ run.exit_code is defined and run.exit_code is not null ? run.exit_code : '-' }} / Registry View</span>
+                {% if run.error_summary is defined and run.error_summary %}
+                    <div class="mt-1 max-w-sm truncate text-xs text-rose-700" title="{{ run.error_summary }}">{{ run.error_summary }}</div>
+                {% endif %}
             </div>
         {% endif %}
     </div>
@@ -72,6 +75,9 @@
 
         <section class="mb-5 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
             <span class="font-medium text-slate-950">Letzter Lauf:</span>
+            {% if run.error_summary is defined and run.error_summary %}
+                <span class="font-medium text-rose-700" title="{{ run.error_summary }}">{{ run.error_summary }}</span>,
+            {% endif %}
             {{ diagnostics.excluded_active|default(0) }} wegen aktivem Portfolio-/Watchlist-Bestand ausgeschlossen,
             {{ diagnostics.cooldown_skipped|default(0) }} wegen Kandidaten-Cooldown pro Ticker uebersprungen,
             {{ diagnostics.eligible_after_exclusions|default(0) }} nach Ausschluessen im Kandidatenpool,
