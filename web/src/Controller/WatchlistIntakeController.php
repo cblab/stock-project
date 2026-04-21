@@ -14,12 +14,16 @@ class WatchlistIntakeController extends AbstractController
     #[Route('/watchlist-intake', name: 'app_watchlist_intake')]
     public function __invoke(Request $request, WatchlistIntakeViewBuilder $viewBuilder): Response
     {
+        $rejectedFilter = (string) $request->query->get('rejected', '');
+        $showRejected = $rejectedFilter === 'show'
+            || ($rejectedFilter === '' && $request->query->getBoolean('showRejected', false));
+
         return $this->render('watchlist_intake/index.html.twig', $viewBuilder->latest(
             max(1, $request->query->getInt('page', 1)),
             max(5, min(100, $request->query->getInt('perPage', 10))),
             (string) $request->query->get('sort', 'priority'),
             strtolower((string) $request->query->get('dir', 'desc')),
-            $request->query->getBoolean('showRejected', false),
+            $showRejected,
         ));
     }
 

@@ -21,7 +21,7 @@ class WatchlistIntakeViewBuilder
         'seen' => 'seen_count',
     ];
 
-    /** @return array{run: ?array<string, mixed>, sectors: array<int, array<string, mixed>>, candidates: array<int, array<string, mixed>>, pagination: array<string, int>, metrics: array<string, int>, sort: array{key: string, dir: string}} */
+    /** @return array{run: ?array<string, mixed>, sectors: array<int, array<string, mixed>>, candidates: array<int, array<string, mixed>>, pagination: array<string, mixed>, metrics: array<string, int>, sort: array{key: string, dir: string}, showRejected: bool} */
     public function latest(int $page = 1, int $perPage = 10, string $sort = 'priority', string $dir = 'desc', bool $showRejected = false): array
     {
         $page = max(1, $page);
@@ -41,7 +41,7 @@ class WatchlistIntakeViewBuilder
             [$run['id']]
         );
         $metrics = $this->registryMetrics();
-        $where = $showRejected ? '' : ' WHERE active_candidate = 1';
+        $where = $showRejected ? '' : " WHERE COALESCE(manual_state, latest_status, 'ACTIVE_CANDIDATE') <> 'REJECTED'";
         $totalCandidates = (int) $this->connection->fetchOne('SELECT COUNT(*) FROM watchlist_candidate_registry'.$where);
         $pages = max(1, (int) ceil($totalCandidates / $perPage));
         $page = min($page, $pages);
@@ -68,7 +68,7 @@ class WatchlistIntakeViewBuilder
         return "
             SELECT
                 r.*,
-                CASE WHEN r.manual_state IS NULL THEN 'ACTIVE_CANDIDATE' ELSE r.manual_state END AS registry_status,
+                COALESCE(r.manual_state, r.latest_status, 'ACTIVE_CANDIDATE') AS registry_status,
                 CAST(JSON_UNQUOTE(JSON_EXTRACT(r.latest_sepa_json, '$.total')) AS DECIMAL(10,4)) AS sepa_total,
                 CAST(JSON_UNQUOTE(JSON_EXTRACT(r.latest_buy_signals_json, '$.merged_score')) AS DECIMAL(10,4)) AS merged_score,
                 (
@@ -135,7 +135,7 @@ class WatchlistIntakeViewBuilder
     private function normalizeRegistryRow(array $row): array
     {
         $row = $this->normalizeJson($row, ['latest_buy_signals_json', 'latest_sepa_json', 'latest_epa_json', 'latest_detail_json']);
-        $row['status'] = $row['manual_state'] ?: 'ACTIVE_CANDIDATE';
+        $row['status'] = $row['registry_status'] ?: 'ACTIVE_CANDIDATE';
         $row['proposal_status'] = $row['latest_status'];
         $row['intake_score'] = $row['latest_intake_score'];
         $row['reason'] = $row['latest_reason'];
@@ -161,15 +161,46 @@ class WatchlistIntakeViewBuilder
         return $row;
     }
 
-    /** @return array{page: int, per_page: int, total: int, pages: int} */
+    /** @return array{page: int, per_page: int, total: int, pages: int, page_items: array<int, int|string>} */
     private function pagination(int $page, int $perPage, int $total): array
     {
+        $pages = max(1, (int) ceil($total / $perPage));
+
         return [
             'page' => $page,
             'per_page' => $perPage,
             'total' => $total,
-            'pages' => max(1, (int) ceil($total / $perPage)),
+            'pages' => $pages,
+            'page_items' => $this->pageItems($page, $pages),
         ];
+    }
+
+    /** @return array<int, int|string> */
+    private function pageItems(int $page, int $pages): array
+    {
+        if ($pages <= 7) {
+            return range(1, $pages);
+        }
+
+        $visible = [1, $pages];
+        for ($candidate = $page - 2; $candidate <= $page + 2; $candidate++) {
+            if ($candidate > 1 && $candidate < $pages) {
+                $visible[] = $candidate;
+            }
+        }
+
+        sort($visible);
+        $items = [];
+        $previous = null;
+        foreach (array_values(array_unique($visible)) as $item) {
+            if ($previous !== null && $item > $previous + 1) {
+                $items[] = '...';
+            }
+            $items[] = $item;
+            $previous = $item;
+        }
+
+        return $items;
     }
 
     /** @param string[] $jsonFields */

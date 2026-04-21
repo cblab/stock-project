@@ -3,10 +3,24 @@
 {% macro sort_header(label, key, sort, pagination, showRejected, title) %}
     {% set active = sort.key == key %}
     {% set nextDir = active and sort.dir == 'asc' ? 'desc' : 'asc' %}
-    <a class="inline-flex items-center gap-1 hover:text-slate-950" href="{{ path('app_watchlist_intake', {sort: key, dir: nextDir, page: 1, perPage: pagination.per_page, showRejected: showRejected ? 1 : 0}) }}" title="{{ title }}">
+    <a class="inline-flex items-center gap-1 hover:text-slate-950" href="{{ path('app_watchlist_intake', {sort: key, dir: nextDir, page: 1, perPage: pagination.per_page, rejected: showRejected ? 'show' : 'hide'}) }}" title="{{ title }}">
         <span>{{ label }}</span>
         <span class="text-[10px] {{ active ? 'text-slate-500' : 'text-slate-300' }}">{{ active ? (sort.dir == 'asc' ? '^' : 'v') : '<>' }}</span>
     </a>
+{% endmacro %}
+
+{% macro pagination_nav(pagination, sort, showRejected) %}
+    <nav class="flex flex-wrap items-center justify-end gap-1" aria-label="Seitennavigation">
+        <a class="rounded-md border border-slate-200 px-3 py-1 text-slate-700 hover:bg-slate-50 {{ pagination.page <= 1 ? 'pointer-events-none opacity-40' : '' }}" href="{{ path('app_watchlist_intake', {page: pagination.page - 1, perPage: pagination.per_page, sort: sort.key, dir: sort.dir, rejected: showRejected ? 'show' : 'hide'}) }}">Zurueck</a>
+        {% for item in pagination.page_items %}
+            {% if item == '...' %}
+                <span class="px-2 py-1 text-slate-400">...</span>
+            {% else %}
+                <a class="min-w-8 rounded-md border px-3 py-1 text-center {{ item == pagination.page ? 'border-slate-950 bg-slate-950 font-semibold text-white' : 'border-slate-200 text-slate-700 hover:bg-slate-50' }}" href="{{ path('app_watchlist_intake', {page: item, perPage: pagination.per_page, sort: sort.key, dir: sort.dir, rejected: showRejected ? 'show' : 'hide'}) }}">{{ item }}</a>
+            {% endif %}
+        {% endfor %}
+        <a class="rounded-md border border-slate-200 px-3 py-1 text-slate-700 hover:bg-slate-50 {{ pagination.page >= pagination.pages ? 'pointer-events-none opacity-40' : '' }}" href="{{ path('app_watchlist_intake', {page: pagination.page + 1, perPage: pagination.per_page, sort: sort.key, dir: sort.dir, rejected: showRejected ? 'show' : 'hide'}) }}">Weiter</a>
+    </nav>
 {% endmacro %}
 
 {% block title %}Watchlist Intake{% endblock %}
@@ -67,7 +81,7 @@
         </section>
 
         <div class="mb-3 flex justify-end">
-            <a class="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50" href="{{ path('app_watchlist_intake', {sort: sort.key, dir: sort.dir, page: 1, perPage: pagination.per_page, showRejected: showRejected ? 0 : 1}) }}">
+            <a class="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50" href="{{ path('app_watchlist_intake', {sort: sort.key, dir: sort.dir, page: 1, perPage: pagination.per_page, rejected: showRejected ? 'hide' : 'show'}) }}">
                 {{ showRejected ? 'Abgelehnte ausblenden' : 'Abgelehnte anzeigen' }}
             </a>
         </div>
@@ -102,10 +116,7 @@
                     <span class="text-slate-600">
                         Seite {{ pagination.page }} von {{ pagination.pages }} - {{ pagination.total }} Vorschlaege
                     </span>
-                    <div class="flex gap-2">
-                        <a class="rounded-md border border-slate-200 px-3 py-1 text-slate-700 hover:bg-slate-50 {{ pagination.page <= 1 ? 'pointer-events-none opacity-40' : '' }}" href="{{ path('app_watchlist_intake', {page: pagination.page - 1, perPage: pagination.per_page, sort: sort.key, dir: sort.dir, showRejected: showRejected ? 1 : 0}) }}">Zurueck</a>
-                        <a class="rounded-md border border-slate-200 px-3 py-1 text-slate-700 hover:bg-slate-50 {{ pagination.page >= pagination.pages ? 'pointer-events-none opacity-40' : '' }}" href="{{ path('app_watchlist_intake', {page: pagination.page + 1, perPage: pagination.per_page, sort: sort.key, dir: sort.dir, showRejected: showRejected ? 1 : 0}) }}">Weiter</a>
-                    </div>
+                    {{ table.pagination_nav(pagination, sort, showRejected) }}
                 </div>
             {% endif %}
             <table class="data-table">
@@ -136,10 +147,12 @@
                         {% set checks = candidate.hard_checks %}
                         {% set price = candidate.detail.price_strength ?? {} %}
                         {% set statusTone =
-                            candidate.status == 'ACTIVE_CANDIDATE' ? 'bg-sky-50 text-sky-700 ring-sky-200' :
-                            (candidate.status == 'ADDED_TO_WATCHLIST' ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' :
-                            (candidate.status == 'REJECTED' ? 'bg-slate-100 text-slate-600 ring-slate-200' :
-                            'bg-amber-50 text-amber-700 ring-amber-200')) %}
+                            candidate.status == 'TOP_CANDIDATE' ? 'bg-emerald-100 text-emerald-800 ring-emerald-300' :
+                            (candidate.status == 'STRONG_CANDIDATE' ? 'bg-lime-100 text-lime-800 ring-lime-300' :
+                            (candidate.status == 'RESEARCH_ONLY' ? 'bg-amber-100 text-amber-800 ring-amber-300' :
+                            (candidate.status == 'ADDED_TO_WATCHLIST' ? 'bg-cyan-100 text-cyan-800 ring-cyan-300' :
+                            (candidate.status == 'REJECTED' ? 'bg-rose-100 text-rose-800 ring-rose-300' :
+                            'bg-sky-100 text-sky-800 ring-sky-300')))) %}
                         <tr>
                             <td>
                                 <div class="font-semibold text-slate-950">{{ candidate.ticker }}</div>
@@ -152,8 +165,10 @@
                                 <div class="text-[11px] text-slate-500" title="Erste und letzte Sichtung in der Registry.">{{ candidate.first_seen_at|date('d.m.') }} bis {{ candidate.last_seen_at|date('d.m.') }}</div>
                             </td>
                             <td>
-                                <span class="compact-badge {{ statusTone }}" title="Proposal Status: Systemvorschlag oder manuelle Nutzerentscheidung.">{{ candidate.status }}</span>
-                                <div class="mt-1 text-[11px] text-slate-500">{{ candidate.proposal_status }}</div>
+                                <span class="compact-badge font-semibold {{ statusTone }}" title="Effektiver Registry-Status: manuelle Nutzerentscheidung gewinnt, sonst aktueller Systemvorschlag.">{{ candidate.status }}</span>
+                                {% if candidate.manual_state %}
+                                    <div class="mt-1 text-[11px] text-slate-500">System {{ candidate.proposal_status }}</div>
+                                {% endif %}
                                 <div class="mt-1 text-[11px] text-slate-500">Latest {{ candidate.latest_intake_score|number_format(1) }}</div>
                                 <div class="text-[11px] text-slate-500">Best {{ candidate.best_intake_score|number_format(1) }}</div>
                                 {% if checks.signal_source is defined %}
@@ -171,16 +186,13 @@
                                     <dd>{{ checks.sepa_total is defined and checks.sepa_total is not null ? checks.sepa_total|number_format(1) : '-' }}</dd>
                                     <dd>{{ checks.traffic_light ?? '-' }}</dd>
                                 </dl>
-                                {% if checks.epa_action is defined %}
-                                    <div class="mt-1 text-[11px] text-slate-500" title="EPA wird hier nur angezeigt, aber nicht als Intake-Gate verwendet.">EPA Kontext: {{ checks.epa_action ?: '-' }}</div>
-                                {% endif %}
                             </td>
                             <td>
-                                <div class="font-semibold text-slate-950" title="Merged Score kombiniert Kronos und Sentiment, sofern bereits DB-Signale fuer diesen Kandidaten existieren.">
+                                <div class="text-base font-bold leading-tight text-slate-950" title="Merged Score kombiniert Kronos und Sentiment, sofern bereits DB-Signale fuer diesen Kandidaten existieren.">
                                     {{ checks.merged_score is defined and checks.merged_score is not null ? checks.merged_score|number_format(3) : '-' }}
                                 </div>
                                 {% if price.price_score is defined %}
-                                    <div class="mt-1 text-[11px] text-slate-500" title="Preisfilter bleibt Detailkontext aus dem Intake-Lauf, ist aber nicht der Merged Score.">Px {{ price.price_score|number_format(1) }}</div>
+                                    <div class="mt-1 text-[11px] text-slate-500" title="Preisfilter bleibt Detailkontext aus dem Intake-Lauf, ist aber nicht der Merged Score.">Px <span class="font-bold text-slate-700">{{ price.price_score|number_format(1) }}</span></div>
                                 {% endif %}
                             </td>
                             <td>
@@ -212,10 +224,7 @@
                     <span class="text-slate-600">
                         Zeige {{ candidates|length }} von {{ pagination.total }} Vorschlaegen
                     </span>
-                    <div class="flex gap-2">
-                        <a class="rounded-md border border-slate-200 px-3 py-1 text-slate-700 hover:bg-slate-50 {{ pagination.page <= 1 ? 'pointer-events-none opacity-40' : '' }}" href="{{ path('app_watchlist_intake', {page: pagination.page - 1, perPage: pagination.per_page, sort: sort.key, dir: sort.dir, showRejected: showRejected ? 1 : 0}) }}">Zurueck</a>
-                        <a class="rounded-md border border-slate-200 px-3 py-1 text-slate-700 hover:bg-slate-50 {{ pagination.page >= pagination.pages ? 'pointer-events-none opacity-40' : '' }}" href="{{ path('app_watchlist_intake', {page: pagination.page + 1, perPage: pagination.per_page, sort: sort.key, dir: sort.dir, showRejected: showRejected ? 1 : 0}) }}">Weiter</a>
-                    </div>
+                    {{ table.pagination_nav(pagination, sort, showRejected) }}
                 </div>
             {% endif %}
         </section>
