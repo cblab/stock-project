@@ -4,15 +4,28 @@ from intake.market import CachedMarketClient
 from intake.models import SectorResult
 
 
-def discover_top_sectors(config: dict, market: CachedMarketClient) -> list[SectorResult]:
+def discover_top_sectors(config: dict, market: CachedMarketClient) -> tuple[list[SectorResult], dict]:
     sectors = config.get("sector_proxies", [])
     settings = config.get("intake", {})
     top_n = int(settings.get("top_sectors", 3))
     min_score = float(settings.get("min_sector_score", 50))
     benchmark = market.history("SPY", period="6mo", interval="1d")
     results = []
+    skipped = []
     for item in sectors:
-        frame = market.history(str(item["proxy"]), period="6mo", interval="1d")
+        proxy = str(item["proxy"])
+        try:
+            frame = market.history(proxy, period="6mo", interval="1d")
+        except Exception as exc:
+            skipped.append(
+                {
+                    "key": str(item.get("key", "")),
+                    "label": str(item.get("label", "")),
+                    "proxy": proxy,
+                    "reason": str(exc),
+                }
+            )
+            continue
         ret_1m = _return_pct(frame["close"], 21)
         ret_3m = _return_pct(frame["close"], 63)
         bench_1m = _return_pct(benchmark["close"], 21)
@@ -36,10 +49,17 @@ def discover_top_sectors(config: dict, market: CachedMarketClient) -> list[Secto
         )
     ranked = sorted(results, key=lambda item: item.score, reverse=True)
     selected = [item for item in ranked if item.score >= min_score][:top_n]
-    return [
+    selected = [
         SectorResult(**{**item.__dict__, "rank": index + 1})
         for index, item in enumerate(selected)
     ]
+    diagnostics = {
+        "configured_sector_proxies": len(sectors),
+        "ranked_sector_proxies": len(results),
+        "selected_sector_proxies": len(selected),
+        "skipped_sector_proxies": skipped,
+    }
+    return selected, diagnostics
 
 
 def _return_pct(series, periods: int) -> float:

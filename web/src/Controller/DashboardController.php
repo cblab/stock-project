@@ -28,8 +28,7 @@ class DashboardController extends AbstractController
     #[Route('/runs/start/{source}', name: 'app_runs_start', methods: ['POST'], requirements: ['source' => 'portfolio|watchlist'])]
     public function start(string $source, PipelineRunLauncher $launcher): Response
     {
-        $projectRoot = dirname($this->getParameter('kernel.project_dir'));
-        $run = $launcher->queueRun($projectRoot, $source);
+        $run = $launcher->queueRun($source);
 
         return $this->redirectToRoute('app_run_show', ['id' => $run->getId()]);
     }

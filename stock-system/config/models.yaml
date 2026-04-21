@@ -1,7 +1,14 @@
-kronos_model_path: "E:/stock-project/models/kronos/models/Kronos-base"
-kronos_tokenizer_path: "E:/stock-project/models/kronos/tokenizers/Kronos-Tokenizer-base"
-sentiment_model_path: "E:/stock-project/models/sentiment/models/finbert"
-fingpt_repo_path: "E:/stock-project/repos/FinGPT"
+# Relative model paths are resolved under MODELS_DIR.
+# MODELS_DIR defaults to PROJECT_ROOT/models.
+kronos_model_path: "kronos/models/Kronos-base"
+kronos_tokenizer_path: "kronos/tokenizers/Kronos-Tokenizer-base"
+sentiment_model_path: "sentiment/models/finbert"
+
+# Repo paths default to KRONOS_DIR and FINGPT_DIR.
+# KRONOS_DIR defaults to PROJECT_ROOT/repos/Kronos.
+# FINGPT_DIR defaults to PROJECT_ROOT/repos/FinGPT.
+kronos_repo_path:
+fingpt_repo_path:
 fingpt_base_model_path:
 fingpt_lora_model_path:
 prefer_fingpt: true
