@@ -8,6 +8,7 @@ use App\Repository\InstrumentEpaSnapshotRepository;
 use App\Repository\InstrumentRepository;
 use App\Repository\InstrumentSepaSnapshotRepository;
 use App\Repository\PipelineRunItemRepository;
+use App\Service\WatchlistCandidateRegistryResetService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -139,11 +140,28 @@ class InstrumentController extends AbstractController
     }
 
     #[Route('/instrument/{id}/delete', name: 'app_instrument_delete', methods: ['POST'], requirements: ['id' => '\d+'])]
-    public function delete(Instrument $instrument, Request $request, EntityManagerInterface $entityManager): Response
+    public function delete(
+        Instrument $instrument,
+        Request $request,
+        EntityManagerInterface $entityManager,
+        WatchlistCandidateRegistryResetService $registryResetService,
+    ): Response
     {
         $returnRoute = $this->returnRoute($request);
-        $entityManager->remove($instrument);
-        $entityManager->flush();
+        $ticker = $instrument->getInputTicker();
+
+        $connection = $entityManager->getConnection();
+        $connection->beginTransaction();
+        try {
+            $entityManager->remove($instrument);
+            $entityManager->flush();
+            $registryResetService->reactivateAfterInstrumentDelete($ticker);
+            $connection->commit();
+        } catch (\Throwable $error) {
+            $connection->rollBack();
+
+            throw $error;
+        }
 
         return $this->redirectToRoute($returnRoute);
     }
