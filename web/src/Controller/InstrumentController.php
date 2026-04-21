@@ -19,13 +19,20 @@ class InstrumentController extends AbstractController
 {
     #[Route('/portfolio', name: 'app_portfolio_index')]
     #[Route('/instruments', name: 'app_instruments_index')]
-    public function index(InstrumentRepository $instrumentRepository): Response
+    public function index(InstrumentRepository $instrumentRepository, Request $request): Response
     {
+        $sort = (string) $request->query->get('sort', 'ticker');
+        $dir = (string) $request->query->get('dir', 'asc');
+
         return $this->render('instrument/index.html.twig', [
-            'instruments' => $instrumentRepository->findPortfolioInstruments(),
+            'instruments' => $instrumentRepository->findPortfolioInstruments($sort, $dir),
             'pageTitle' => 'Portfolio',
             'pageEyebrow' => 'Aktive Auswahl',
             'emptyMessage' => 'Noch keine Portfolio-Instrumente vorhanden.',
+            'signalColumn' => 'sell',
+            'sortableList' => true,
+            'currentSort' => $sort,
+            'currentDir' => strtolower($dir) === 'desc' ? 'desc' : 'asc',
             'showPortfolioColumn' => true,
             'showActiveColumn' => true,
             'showCreateButton' => true,
@@ -34,13 +41,20 @@ class InstrumentController extends AbstractController
     }
 
     #[Route('/watchlist', name: 'app_watchlist_index')]
-    public function watchlist(InstrumentRepository $instrumentRepository): Response
+    public function watchlist(InstrumentRepository $instrumentRepository, Request $request): Response
     {
+        $sort = (string) $request->query->get('sort', 'ticker');
+        $dir = (string) $request->query->get('dir', 'asc');
+
         return $this->render('instrument/index.html.twig', [
-            'instruments' => $instrumentRepository->findWatchlistInstruments(),
+            'instruments' => $instrumentRepository->findWatchlistInstruments($sort, $dir),
             'pageTitle' => 'Watchlist',
             'pageEyebrow' => 'Beobachtungsliste',
             'emptyMessage' => 'Noch keine Watchlist-Instrumente vorhanden.',
+            'signalColumn' => 'buy',
+            'sortableList' => true,
+            'currentSort' => $sort,
+            'currentDir' => strtolower($dir) === 'desc' ? 'desc' : 'asc',
             'showPortfolioColumn' => true,
             'showActiveColumn' => true,
             'showCreateButton' => true,
@@ -56,6 +70,10 @@ class InstrumentController extends AbstractController
             'pageTitle' => 'Inaktive Instrumente',
             'pageEyebrow' => 'Aus dem aktiven Universum entfernt',
             'emptyMessage' => 'Keine inaktiven Instrumente vorhanden.',
+            'signalColumn' => null,
+            'sortableList' => false,
+            'currentSort' => 'ticker',
+            'currentDir' => 'asc',
             'showPortfolioColumn' => true,
             'showActiveColumn' => true,
             'showCreateButton' => false,
