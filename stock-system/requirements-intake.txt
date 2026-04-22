@@ -1,5 +1,0 @@
-pandas
-PyYAML
-yfinance
-numpy
-PyMySQL

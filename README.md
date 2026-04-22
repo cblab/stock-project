@@ -89,10 +89,10 @@ Der Docker-Branch stellt einen reproduzierbaren lokalen Runtime-Pfad bereit:
 ~~~bash
 docker compose up -d db
 docker compose --profile setup run --rm migrate
-docker compose --profile jobs run --rm intake
-docker compose --profile jobs run --rm sepa
-docker compose --profile jobs run --rm epa
-docker compose --profile jobs run --rm pipeline
+docker compose --profile jobs run --rm job
+docker compose --profile jobs run --rm job python stock-system/scripts/run_sepa.py --mode=db --source=all
+docker compose --profile jobs run --rm job python stock-system/scripts/run_epa.py --mode=db --source=all
+docker compose --profile jobs run --rm job python stock-system/scripts/run_pipeline.py --mode=db --source=all
 ~~~
 
 Die optionale Weboberfläche startet mit:
@@ -120,6 +120,8 @@ Für den vollständigen Pipeline-Job müssen lokale Assets vorhanden sein:
 
 Details zu Profilen, Mounts, leerer DB und JSON-Output stehen in
 [`docs/docker-quickstart.md`](docs/docker-quickstart.md).
+Die produktive Migration von XAMPP/MariaDB nach Docker ist in
+[`docs/production-migration.md`](docs/production-migration.md) beschrieben.
 
 ---
 

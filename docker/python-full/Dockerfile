@@ -24,4 +24,4 @@ COPY stock-system ./stock-system
 
 RUN mkdir -p /app/models /app/repos/Kronos /app/repos/FinGPT /app/.hf-cache /app/var/cache/yfinance
 
-CMD ["python", "stock-system/scripts/run_pipeline.py", "--mode=db", "--source=all"]
+CMD ["python", "stock-system/scripts/run_watchlist_intake.py", "--mode=db"]

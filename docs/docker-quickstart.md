@@ -29,18 +29,18 @@ This starts MariaDB and applies the Symfony/Doctrine schema migrations.
 ## Run Jobs
 
 ```bash
-docker compose --profile jobs run --rm intake
-docker compose --profile jobs run --rm sepa
-docker compose --profile jobs run --rm epa
-docker compose --profile jobs run --rm pipeline
+docker compose --profile jobs run --rm job
+docker compose --profile jobs run --rm job python stock-system/scripts/run_sepa.py --mode=db --source=all
+docker compose --profile jobs run --rm job python stock-system/scripts/run_epa.py --mode=db --source=all
+docker compose --profile jobs run --rm job python stock-system/scripts/run_pipeline.py --mode=db --source=all
 ```
 
-The default job scopes are:
+There is one shared Docker job runtime:
 
-- `intake`: runs Watchlist Intake in DB mode
-- `sepa`: runs SEPA in DB mode with `--source=all`
-- `epa`: runs EPA in DB mode with `--source=all`
-- `pipeline`: runs the full Kronos/Sentiment pipeline in DB mode with `--source=all`
+- `docker compose --profile jobs run --rm job` runs Watchlist Intake in DB mode by default.
+- Pass a different Python command to run SEPA, EPA, or the full pipeline.
+- The shared job image includes the full pipeline dependencies, so no separate
+  long-term job containers are needed.
 
 ## Optional Web UI
 
@@ -100,7 +100,7 @@ Linux/macOS:
 STOCK_MODELS_DIR=/absolute/path/to/models \
 STOCK_KRONOS_DIR=/absolute/path/to/Kronos \
 STOCK_FINGPT_DIR=/absolute/path/to/FinGPT \
-docker compose --profile jobs run --rm pipeline
+docker compose --profile jobs run --rm job python stock-system/scripts/run_pipeline.py --mode=db --source=all
 ```
 
 Windows PowerShell:
@@ -109,7 +109,7 @@ Windows PowerShell:
 $env:STOCK_MODELS_DIR = "E:/stock-project/models"
 $env:STOCK_KRONOS_DIR = "E:/stock-project/repos/Kronos"
 $env:STOCK_FINGPT_DIR = "E:/stock-project/repos/FinGPT"
-docker compose --profile jobs run --rm pipeline
+docker compose --profile jobs run --rm job python stock-system/scripts/run_pipeline.py --mode=db --source=all
 ```
 
 If required assets are missing, the pipeline should fail with an explicit path
@@ -126,14 +126,14 @@ For machine callers, capture stdout and stderr separately.
 Linux/macOS:
 
 ```bash
-docker compose --profile jobs run --rm --no-TTY intake > intake.json 2> intake.log
+docker compose --profile jobs run --rm --no-TTY job > intake.json 2> intake.log
 python -m json.tool intake.json >/dev/null
 ```
 
 Windows `cmd.exe`:
 
 ```cmd
-docker compose --profile jobs run --rm --no-TTY intake > .tmp\intake.json 2> .tmp\intake.log
+docker compose --profile jobs run --rm --no-TTY job > .tmp\intake.json 2> .tmp\intake.log
 python -m json.tool .tmp\intake.json >NUL
 ```
 
@@ -161,3 +161,23 @@ docker compose down -v
 ```
 
 Use `down -v` only when you intentionally want a fresh empty DB.
+
+## Dev And Prod Separation
+
+For day-to-day development, the default Compose project name is `stock-project`.
+
+For production on the same machine, use a separate project name and env file:
+
+```bash
+cp docker/prod.env.example docker/prod.env
+docker compose --env-file docker/prod.env -p stock-project-prod up -d db web
+```
+
+This keeps development and production containers/volumes separate. See
+`docs/production-migration.md` before using Docker as the replacement runtime
+for an existing native XAMPP/MariaDB installation.
+
+The app images are explicitly named in `compose.yaml`, so dev and prod can share
+the same built images while still using separate DB/cache volumes. This avoids
+duplicating the large Python job image just because the Compose project name is
+different.

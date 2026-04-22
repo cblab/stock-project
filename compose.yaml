@@ -3,10 +3,10 @@ name: stock-project
 x-db-env: &db-env
   DB_HOST: db
   DB_PORT: "3306"
-  DB_NAME: stock_project
-  DB_USER: stock_app
-  DB_PASSWORD: stock_app
-  DATABASE_URL: "mysql://stock_app:stock_app@db:3306/stock_project?serverVersion=10.11.0-MariaDB&charset=utf8mb4"
+  DB_NAME: ${STOCK_DB_NAME:-stock_project}
+  DB_USER: ${STOCK_DB_USER:-stock_app}
+  DB_PASSWORD: ${STOCK_DB_PASSWORD:-stock_app}
+  DATABASE_URL: "mysql://${STOCK_DB_USER:-stock_app}:${STOCK_DB_PASSWORD:-stock_app}@db:3306/${STOCK_DB_NAME:-stock_project}?serverVersion=10.11.0-MariaDB&charset=utf8mb4"
 
 x-python-job-env: &python-job-env
   <<: *db-env
@@ -17,10 +17,10 @@ services:
   db:
     image: mariadb:10.11
     environment:
-      MARIADB_DATABASE: stock_project
-      MARIADB_USER: stock_app
-      MARIADB_PASSWORD: stock_app
-      MARIADB_ROOT_PASSWORD: stock_root
+      MARIADB_DATABASE: ${STOCK_DB_NAME:-stock_project}
+      MARIADB_USER: ${STOCK_DB_USER:-stock_app}
+      MARIADB_PASSWORD: ${STOCK_DB_PASSWORD:-stock_app}
+      MARIADB_ROOT_PASSWORD: ${STOCK_DB_ROOT_PASSWORD:-stock_root}
     healthcheck:
       test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 -uroot -p$${MARIADB_ROOT_PASSWORD} --silent"]
       interval: 5s
@@ -31,13 +31,14 @@ services:
       - db_data:/var/lib/mysql
 
   migrate:
+    image: ${STOCK_WEB_CLI_IMAGE:-stock-project-migrate:latest}
     build:
       context: .
       dockerfile: docker/web-cli/Dockerfile
     environment:
       <<: *db-env
       APP_ENV: prod
-      APP_SECRET: docker-local-change-me
+      APP_SECRET: ${STOCK_APP_SECRET:-docker-local-change-me}
       PROJECT_ROOT: /app
       PYTHON_BIN: python3
     depends_on:
@@ -46,13 +47,14 @@ services:
     profiles: ["setup"]
 
   web:
+    image: ${STOCK_WEB_IMAGE:-stock-project-web:latest}
     build:
       context: .
       dockerfile: docker/web/Dockerfile
     environment:
       <<: *db-env
       APP_ENV: prod
-      APP_SECRET: docker-local-change-me
+      APP_SECRET: ${STOCK_APP_SECRET:-docker-local-change-me}
       PROJECT_ROOT: /app
       PYTHON_BIN: python3
       STOCK_WEB_JOB_LAUNCH_ENABLED: "0"
@@ -60,56 +62,16 @@ services:
       db:
         condition: service_healthy
     ports:
-      - "8000:8000"
+      - "${STOCK_WEB_PORT:-8000}:8000"
     volumes:
       - web_var:/app/web/var
 
-  intake:
-    build:
-      context: .
-      dockerfile: docker/python/Dockerfile
-    environment:
-      <<: *python-job-env
-    depends_on:
-      db:
-        condition: service_healthy
-    volumes:
-      - yfinance_cache:/app/var/cache/yfinance
-    profiles: ["jobs"]
-
-  sepa:
-    build:
-      context: .
-      dockerfile: docker/python/Dockerfile
-    command: ["python", "stock-system/scripts/run_sepa.py", "--mode=db", "--source=all"]
-    environment:
-      <<: *python-job-env
-    depends_on:
-      db:
-        condition: service_healthy
-    volumes:
-      - yfinance_cache:/app/var/cache/yfinance
-    profiles: ["jobs"]
-
-  epa:
-    build:
-      context: .
-      dockerfile: docker/python/Dockerfile
-    command: ["python", "stock-system/scripts/run_epa.py", "--mode=db", "--source=all"]
-    environment:
-      <<: *python-job-env
-    depends_on:
-      db:
-        condition: service_healthy
-    volumes:
-      - yfinance_cache:/app/var/cache/yfinance
-    profiles: ["jobs"]
-
-  pipeline:
+  job:
+    image: ${STOCK_JOB_IMAGE:-stock-project-job:latest}
     build:
       context: .
       dockerfile: docker/python-full/Dockerfile
-    command: ["python", "stock-system/scripts/run_pipeline.py", "--mode=db", "--source=all"]
+    command: ["python", "stock-system/scripts/run_watchlist_intake.py", "--mode=db"]
     environment:
       <<: *python-job-env
       MODELS_DIR: /app/models

@@ -2,8 +2,10 @@
 
 This branch is a dedicated Dockerization track. It intentionally does not add product features.
 
-For local user-facing startup commands, see `docs/docker-quickstart.md`. This
-file keeps the assessment and implementation notes.
+For local user-facing startup commands, see `docs/docker-quickstart.md`. For
+native XAMPP/MariaDB to Docker production migration, see
+`docs/production-migration.md`. This file keeps the assessment and
+implementation notes.
 
 ## 1. Findings
 
@@ -55,7 +57,7 @@ file keeps the assessment and implementation notes.
   - `models/`
   - `repos/Kronos`
   - `repos/FinGPT`
-- The initial intake job does not need Kronos/FinGPT repos as a hard requirement, so it can use a smaller Python image.
+- Intake does not use Kronos/FinGPT directly, but the final Docker branch now uses one shared full job image for operational simplicity.
 - Existing cache/log directories are host-local and should become container volumes:
   - yfinance cache
   - future web logs/cache if/when web is containerized
@@ -70,7 +72,7 @@ file keeps the assessment and implementation notes.
 
 ## 2. Proposed Docker Architecture
 
-### Phase 1 required services
+### Required services
 
 - `db`
   - MariaDB service.
@@ -79,10 +81,11 @@ file keeps the assessment and implementation notes.
   - One-shot PHP CLI service.
   - Runs Doctrine migrations against `db`.
   - Not a web UI service.
-- `intake`
-  - Python job service.
-  - Runs `stock-system/scripts/run_watchlist_intake.py --mode=db`.
-  - Produces JSON on stdout for OpenClaw or any caller.
+- `job`
+  - Shared one-shot Python job service.
+  - Runs Watchlist Intake by default.
+  - Can run SEPA, EPA, or the full pipeline by passing a different command.
+  - Produces JSON on stdout for machine callers when the underlying script does.
 
 ### Phase 2 optional services
 
@@ -92,17 +95,14 @@ file keeps the assessment and implementation notes.
   - Boots Symfony with PHP's built-in server on port `8000`.
   - Connects to the Dockerized DB.
   - Uses `STOCK_WEB_JOB_LAUNCH_ENABLED=0`, so Docker web does not rely on Windows shell launchers.
-- `pipeline-job`
-  - Full Kronos/Sentiment pipeline image or profile.
-  - Needs mounted model/repo assets.
-- `sepa-job` / `epa-job`
-  - Can share the Python job image once command profiles are added.
 
 ### Separation of modes
 
 - Job mode:
-  - `docker compose run --rm intake`
-  - Primary integration path for OpenClaw.
+  - `docker compose --profile jobs run --rm job`
+  - `docker compose --profile jobs run --rm job python stock-system/scripts/run_sepa.py --mode=db --source=all`
+  - `docker compose --profile jobs run --rm job python stock-system/scripts/run_epa.py --mode=db --source=all`
+  - `docker compose --profile jobs run --rm job python stock-system/scripts/run_pipeline.py --mode=db --source=all`
 - Setup mode:
   - `docker compose run --rm migrate`
   - Applies schema.
@@ -119,7 +119,7 @@ Target:
 ```bash
 docker compose up -d db
 docker compose --profile setup run --rm migrate
-docker compose --profile jobs run --rm intake
+docker compose --profile jobs run --rm job
 ```
 
 Expected result:
@@ -152,15 +152,15 @@ http://127.0.0.1:8000/
 In Docker web mode, job launch buttons are disabled and the Watchlist Intake add path does not spawn SEPA/EPA refresh jobs. Jobs should still be run explicitly through Docker job services, for example:
 
 ```bash
-docker compose --profile jobs run --rm intake
+docker compose --profile jobs run --rm job
 ```
 
 ### Phase 3: Full job coverage
 
 Current branch state:
 
-- `sepa` and `epa` run through the same light Python job image as `intake`.
-- `pipeline` uses a separate full Python image because it needs Torch, Transformers, PEFT, Safetensors, Accelerate, and Einops.
+- `job` is the shared Python runtime for intake, SEPA, EPA, and full pipeline.
+- The job image includes Torch, Transformers, PEFT, Safetensors, Accelerate, and Einops because the full pipeline needs them.
 - The full Python image installs `torch==2.6.0+cpu` explicitly from the PyTorch CPU wheel index to avoid pulling GPU-heavy packages into the Linux container runtime.
 - Large model/repository assets are not baked into the image. They are provided as host bind mounts.
 
@@ -169,10 +169,10 @@ Required command flow:
 ```bash
 docker compose up -d db
 docker compose --profile setup run --rm migrate
-docker compose --profile jobs run --rm intake
-docker compose --profile jobs run --rm sepa
-docker compose --profile jobs run --rm epa
-docker compose --profile jobs run --rm pipeline
+docker compose --profile jobs run --rm job
+docker compose --profile jobs run --rm job python stock-system/scripts/run_sepa.py --mode=db --source=all
+docker compose --profile jobs run --rm job python stock-system/scripts/run_epa.py --mode=db --source=all
+docker compose --profile jobs run --rm job python stock-system/scripts/run_pipeline.py --mode=db --source=all
 ```
 
 Pipeline asset defaults:
@@ -189,7 +189,7 @@ Override the host-side asset locations when your checkout keeps these assets els
 STOCK_MODELS_DIR=/absolute/path/to/models \
 STOCK_KRONOS_DIR=/absolute/path/to/Kronos \
 STOCK_FINGPT_DIR=/absolute/path/to/FinGPT \
-docker compose --profile jobs run --rm pipeline
+docker compose --profile jobs run --rm job python stock-system/scripts/run_pipeline.py --mode=db --source=all
 ```
 
 On Windows PowerShell:
@@ -198,7 +198,7 @@ On Windows PowerShell:
 $env:STOCK_MODELS_DIR = "E:/stock-project/models"
 $env:STOCK_KRONOS_DIR = "E:/stock-project/repos/Kronos"
 $env:STOCK_FINGPT_DIR = "E:/stock-project/repos/FinGPT"
-docker compose --profile jobs run --rm pipeline
+docker compose --profile jobs run --rm job python stock-system/scripts/run_pipeline.py --mode=db --source=all
 ```
 
 Container-side runtime variables are fixed to Linux paths:
@@ -227,9 +227,9 @@ Implemented in the first slice:
 
 - Added root-level `compose.yaml`.
 - Added a Dockerized MariaDB service named `db`.
-- Added a Python intake job image under `docker/python/Dockerfile`.
+- Initially added a small Python intake job image. This was later replaced by the shared `job` runtime.
 - Added a PHP CLI migration image under `docker/web-cli/Dockerfile`.
-- Added `stock-system/requirements-intake.txt` so the first job image does not need Torch/Transformers/Kronos/FinGPT.
+- Initially added intake-only requirements. This was later removed when the branch converged on one shared full job image.
 - Added `.dockerignore` to avoid copying local caches, host `.env.local`, models, repos, logs, and vendor directories into images.
 
 This is intentionally not a full web-container implementation yet.
@@ -245,13 +245,21 @@ Implemented in the second slice:
 
 Implemented in the third slice:
 
-- Added Docker job services for `sepa`, `epa`, and `pipeline`.
-- Kept `intake`, `sepa`, and `epa` on the light Python image.
+- Added Docker job services for `sepa`, `epa`, and `pipeline` as an intermediate slice.
+- Kept `intake`, `sepa`, and `epa` on the light Python image during that intermediate slice.
 - Added `docker/python-full/Dockerfile` for full pipeline dependencies.
 - Added read-only host bind mounts for `models`, `repos/Kronos`, and `repos/FinGPT`.
 - Added `hf_cache` as a named volume for Hugging Face/runtime cache.
 - Redirected Kronos model-load chatter to stderr so `run_pipeline.py` can keep stdout machine-readable for JSON callers.
 - Preserved the optional Docker web runtime as launcher-safe; web-triggered Windows-native job launch remains disabled in Docker mode.
+
+Implemented in the fourth slice:
+
+- Converged the per-job Compose services into one shared `job` service.
+- Removed the unused light Python Dockerfile and intake-only requirements file.
+- Added env-driven DB credentials, app secret, and web port for dev/prod separation.
+- Added `docker/prod.env.example`.
+- Added a detailed production migration and recovery guide for native XAMPP/MariaDB to Docker.
 
 Validation performed on this branch:
 
@@ -262,11 +270,11 @@ docker compose build intake
 docker compose --profile setup build migrate
 docker compose up -d db
 docker compose --profile setup run --rm migrate
-docker compose --profile jobs run --rm intake
+docker compose --profile jobs run --rm job
 docker compose up -d db web
-docker compose --profile jobs run --rm sepa
-docker compose --profile jobs run --rm epa
-docker compose --profile jobs run --rm pipeline
+docker compose --profile jobs run --rm job python stock-system/scripts/run_sepa.py --mode=db --source=all
+docker compose --profile jobs run --rm job python stock-system/scripts/run_epa.py --mode=db --source=all
+docker compose --profile jobs run --rm job python stock-system/scripts/run_pipeline.py --mode=db --source=all
 docker compose up -d web
 ```
 
@@ -276,12 +284,13 @@ The intake, SEPA, EPA, and pipeline scripts emit their final JSON payload on std
 
 - `.dockerignore`
 - `compose.yaml`
-- `docker/python/Dockerfile`
 - `docker/python-full/Dockerfile`
+- `docker/prod.env.example`
 - `docker/web-cli/Dockerfile`
 - `docker/web/Dockerfile`
-- `stock-system/requirements-intake.txt`
 - `stock-system/src/kronos/wrapper.py`
+- `docs/docker-quickstart.md`
+- `docs/production-migration.md`
 - `docs/dockerization-plan.md`
 - `web/src/Service/RuntimePathConfig.php`
 - `web/src/Controller/DashboardController.php`
