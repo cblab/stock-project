@@ -21,7 +21,10 @@ RUN pip install --no-cache-dir --default-timeout=300 --index-url https://downloa
     && pip install --no-cache-dir -r /tmp/requirements-pipeline.txt
 
 COPY stock-system ./stock-system
+COPY docker/python-full/job-entrypoint.sh /usr/local/bin/stock-job
+RUN chmod +x /usr/local/bin/stock-job
 
 RUN mkdir -p /app/models /app/repos/Kronos /app/repos/FinGPT /app/.hf-cache /app/var/cache/yfinance
 
-CMD ["python", "stock-system/scripts/run_watchlist_intake.py", "--mode=db"]
+ENTRYPOINT ["stock-job"]
+CMD ["intake"]

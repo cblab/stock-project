@@ -320,28 +320,28 @@ The Docker runtime uses one shared `job` service.
 Intake:
 
 ```powershell
-cmd /c "docker compose --env-file $DockerEnvFile -p $DockerProject --profile jobs run --rm --no-TTY job > .tmp\prod-intake.json 2> .tmp\prod-intake.log"
+cmd /c "docker compose --env-file $DockerEnvFile -p $DockerProject --profile jobs run --rm --no-TTY job intake > .tmp\prod-intake.json 2> .tmp\prod-intake.log"
 python -m json.tool .tmp\prod-intake.json >NUL
 ```
 
 SEPA:
 
 ```powershell
-cmd /c "docker compose --env-file $DockerEnvFile -p $DockerProject --profile jobs run --rm --no-TTY job python stock-system/scripts/run_sepa.py --mode=db --source=all > .tmp\prod-sepa.json 2> .tmp\prod-sepa.log"
+cmd /c "docker compose --env-file $DockerEnvFile -p $DockerProject --profile jobs run --rm --no-TTY job sepa > .tmp\prod-sepa.json 2> .tmp\prod-sepa.log"
 python -m json.tool .tmp\prod-sepa.json >NUL
 ```
 
 EPA:
 
 ```powershell
-cmd /c "docker compose --env-file $DockerEnvFile -p $DockerProject --profile jobs run --rm --no-TTY job python stock-system/scripts/run_epa.py --mode=db --source=all > .tmp\prod-epa.json 2> .tmp\prod-epa.log"
+cmd /c "docker compose --env-file $DockerEnvFile -p $DockerProject --profile jobs run --rm --no-TTY job epa > .tmp\prod-epa.json 2> .tmp\prod-epa.log"
 python -m json.tool .tmp\prod-epa.json >NUL
 ```
 
 Full pipeline:
 
 ```powershell
-cmd /c "docker compose --env-file $DockerEnvFile -p $DockerProject --profile jobs run --rm --no-TTY job python stock-system/scripts/run_pipeline.py --mode=db --source=all > .tmp\prod-pipeline.json 2> .tmp\prod-pipeline.log"
+cmd /c "docker compose --env-file $DockerEnvFile -p $DockerProject --profile jobs run --rm --no-TTY job pipeline > .tmp\prod-pipeline.json 2> .tmp\prod-pipeline.log"
 python -m json.tool .tmp\prod-pipeline.json >NUL
 ```
 
@@ -371,25 +371,25 @@ docker compose --env-file $DockerEnvFile -p $DockerProject stop
 Run intake:
 
 ```powershell
-docker compose --env-file $DockerEnvFile -p $DockerProject --profile jobs run --rm job
+docker compose --env-file $DockerEnvFile -p $DockerProject --profile jobs run --rm job intake
 ```
 
 Run SEPA:
 
 ```powershell
-docker compose --env-file $DockerEnvFile -p $DockerProject --profile jobs run --rm job python stock-system/scripts/run_sepa.py --mode=db --source=all
+docker compose --env-file $DockerEnvFile -p $DockerProject --profile jobs run --rm job sepa
 ```
 
 Run EPA:
 
 ```powershell
-docker compose --env-file $DockerEnvFile -p $DockerProject --profile jobs run --rm job python stock-system/scripts/run_epa.py --mode=db --source=all
+docker compose --env-file $DockerEnvFile -p $DockerProject --profile jobs run --rm job epa
 ```
 
 Run full pipeline:
 
 ```powershell
-docker compose --env-file $DockerEnvFile -p $DockerProject --profile jobs run --rm job python stock-system/scripts/run_pipeline.py --mode=db --source=all
+docker compose --env-file $DockerEnvFile -p $DockerProject --profile jobs run --rm job pipeline
 ```
 
 ## 14. Recovery Playbook

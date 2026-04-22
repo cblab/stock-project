@@ -89,10 +89,10 @@ Der Docker-Branch stellt einen reproduzierbaren lokalen Runtime-Pfad bereit:
 ~~~bash
 docker compose up -d db
 docker compose --profile setup run --rm migrate
-docker compose --profile jobs run --rm job
-docker compose --profile jobs run --rm job python stock-system/scripts/run_sepa.py --mode=db --source=all
-docker compose --profile jobs run --rm job python stock-system/scripts/run_epa.py --mode=db --source=all
-docker compose --profile jobs run --rm job python stock-system/scripts/run_pipeline.py --mode=db --source=all
+docker compose --profile jobs run --rm job intake
+docker compose --profile jobs run --rm job sepa
+docker compose --profile jobs run --rm job epa
+docker compose --profile jobs run --rm job pipeline
 ~~~
 
 Die optionale Weboberfläche startet mit:

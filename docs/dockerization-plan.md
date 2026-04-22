@@ -99,10 +99,10 @@ implementation notes.
 ### Separation of modes
 
 - Job mode:
-  - `docker compose --profile jobs run --rm job`
-  - `docker compose --profile jobs run --rm job python stock-system/scripts/run_sepa.py --mode=db --source=all`
-  - `docker compose --profile jobs run --rm job python stock-system/scripts/run_epa.py --mode=db --source=all`
-  - `docker compose --profile jobs run --rm job python stock-system/scripts/run_pipeline.py --mode=db --source=all`
+  - `docker compose --profile jobs run --rm job intake`
+  - `docker compose --profile jobs run --rm job sepa`
+  - `docker compose --profile jobs run --rm job epa`
+  - `docker compose --profile jobs run --rm job pipeline`
 - Setup mode:
   - `docker compose run --rm migrate`
   - Applies schema.
@@ -169,10 +169,10 @@ Required command flow:
 ```bash
 docker compose up -d db
 docker compose --profile setup run --rm migrate
-docker compose --profile jobs run --rm job
-docker compose --profile jobs run --rm job python stock-system/scripts/run_sepa.py --mode=db --source=all
-docker compose --profile jobs run --rm job python stock-system/scripts/run_epa.py --mode=db --source=all
-docker compose --profile jobs run --rm job python stock-system/scripts/run_pipeline.py --mode=db --source=all
+docker compose --profile jobs run --rm job intake
+docker compose --profile jobs run --rm job sepa
+docker compose --profile jobs run --rm job epa
+docker compose --profile jobs run --rm job pipeline
 ```
 
 Pipeline asset defaults:
@@ -189,7 +189,7 @@ Override the host-side asset locations when your checkout keeps these assets els
 STOCK_MODELS_DIR=/absolute/path/to/models \
 STOCK_KRONOS_DIR=/absolute/path/to/Kronos \
 STOCK_FINGPT_DIR=/absolute/path/to/FinGPT \
-docker compose --profile jobs run --rm job python stock-system/scripts/run_pipeline.py --mode=db --source=all
+docker compose --profile jobs run --rm job pipeline
 ```
 
 On Windows PowerShell:
@@ -198,7 +198,7 @@ On Windows PowerShell:
 $env:STOCK_MODELS_DIR = "E:/stock-project/models"
 $env:STOCK_KRONOS_DIR = "E:/stock-project/repos/Kronos"
 $env:STOCK_FINGPT_DIR = "E:/stock-project/repos/FinGPT"
-docker compose --profile jobs run --rm job python stock-system/scripts/run_pipeline.py --mode=db --source=all
+docker compose --profile jobs run --rm job pipeline
 ```
 
 Container-side runtime variables are fixed to Linux paths:
@@ -266,15 +266,15 @@ Validation performed on this branch:
 ```bash
 docker compose config
 docker compose --profile setup --profile jobs config
-docker compose build intake
+docker compose --profile jobs build job
 docker compose --profile setup build migrate
 docker compose up -d db
 docker compose --profile setup run --rm migrate
-docker compose --profile jobs run --rm job
+docker compose --profile jobs run --rm job intake
 docker compose up -d db web
-docker compose --profile jobs run --rm job python stock-system/scripts/run_sepa.py --mode=db --source=all
-docker compose --profile jobs run --rm job python stock-system/scripts/run_epa.py --mode=db --source=all
-docker compose --profile jobs run --rm job python stock-system/scripts/run_pipeline.py --mode=db --source=all
+docker compose --profile jobs run --rm job sepa
+docker compose --profile jobs run --rm job epa
+docker compose --profile jobs run --rm job pipeline
 docker compose up -d web
 ```
 

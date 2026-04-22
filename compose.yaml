@@ -71,7 +71,7 @@ services:
     build:
       context: .
       dockerfile: docker/python-full/Dockerfile
-    command: ["python", "stock-system/scripts/run_watchlist_intake.py", "--mode=db"]
+    command: ["intake"]
     environment:
       <<: *python-job-env
       MODELS_DIR: /app/models

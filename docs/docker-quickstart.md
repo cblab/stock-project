@@ -29,16 +29,18 @@ This starts MariaDB and applies the Symfony/Doctrine schema migrations.
 ## Run Jobs
 
 ```bash
-docker compose --profile jobs run --rm job
-docker compose --profile jobs run --rm job python stock-system/scripts/run_sepa.py --mode=db --source=all
-docker compose --profile jobs run --rm job python stock-system/scripts/run_epa.py --mode=db --source=all
-docker compose --profile jobs run --rm job python stock-system/scripts/run_pipeline.py --mode=db --source=all
+docker compose --profile jobs run --rm job intake
+docker compose --profile jobs run --rm job sepa
+docker compose --profile jobs run --rm job epa
+docker compose --profile jobs run --rm job pipeline
 ```
 
 There is one shared Docker job runtime:
 
-- `docker compose --profile jobs run --rm job` runs Watchlist Intake in DB mode by default.
-- Pass a different Python command to run SEPA, EPA, or the full pipeline.
+- `docker compose --profile jobs run --rm job intake` runs Watchlist Intake in DB mode.
+- `docker compose --profile jobs run --rm job` is a shortcut for the same default intake job.
+- `intake`, `sepa`, `epa`, and `pipeline` are stable job aliases.
+- Pass an explicit `python ...` command only when you need an advanced script option not covered by an alias.
 - The shared job image includes the full pipeline dependencies, so no separate
   long-term job containers are needed.
 
@@ -100,7 +102,7 @@ Linux/macOS:
 STOCK_MODELS_DIR=/absolute/path/to/models \
 STOCK_KRONOS_DIR=/absolute/path/to/Kronos \
 STOCK_FINGPT_DIR=/absolute/path/to/FinGPT \
-docker compose --profile jobs run --rm job python stock-system/scripts/run_pipeline.py --mode=db --source=all
+docker compose --profile jobs run --rm job pipeline
 ```
 
 Windows PowerShell:
@@ -109,7 +111,7 @@ Windows PowerShell:
 $env:STOCK_MODELS_DIR = "E:/stock-project/models"
 $env:STOCK_KRONOS_DIR = "E:/stock-project/repos/Kronos"
 $env:STOCK_FINGPT_DIR = "E:/stock-project/repos/FinGPT"
-docker compose --profile jobs run --rm job python stock-system/scripts/run_pipeline.py --mode=db --source=all
+docker compose --profile jobs run --rm job pipeline
 ```
 
 If required assets are missing, the pipeline should fail with an explicit path
