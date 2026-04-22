@@ -16,6 +16,7 @@ COPY web/composer.json web/composer.lock web/symfony.lock ./
 RUN composer install --no-dev --no-interaction --prefer-dist --no-scripts --classmap-authoritative
 
 COPY web ./
+COPY docker/web/router.php ./docker-router.php
 RUN composer dump-autoload --classmap-authoritative --no-dev \
     && mkdir -p var/cache var/log var/share var/tailwind \
     && php bin/console tailwind:build --minify --env=prod \
@@ -24,4 +25,4 @@ RUN composer dump-autoload --classmap-authoritative --no-dev \
 
 EXPOSE 8000
 
-CMD ["php", "-S", "0.0.0.0:8000", "-t", "public", "public/index.php"]
+CMD ["php", "-S", "0.0.0.0:8000", "-t", "public", "docker-router.php"]
