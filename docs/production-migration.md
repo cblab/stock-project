@@ -106,6 +106,27 @@ Notes:
   Separate dev/prod volumes come from the Compose project name; duplicate images
   are usually wasted disk space on a single machine.
 
+For the remaining commands, set these PowerShell variables to match
+`docker/prod.env`:
+
+```powershell
+$DockerEnvFile = "docker\prod.env"
+$DockerProject = "stock-project-prod"
+$DockerDbName = "stock_project"
+$DockerDbUser = "stock_app"
+$DockerDbPassword = "change-me-before-prod"
+```
+
+If you changed `STOCK_DB_NAME`, `STOCK_DB_USER`, or `STOCK_DB_PASSWORD`, update
+the matching PowerShell variables before continuing.
+
+Build the Docker app images before stopping XAMPP, so image build/download
+problems are found while the old runtime is still available:
+
+```powershell
+docker compose --env-file $DockerEnvFile -p $DockerProject build web migrate job
+```
+
 ## 4. Confirm The Native DB Name And Credentials
 
 The expected native DB name is:
@@ -144,27 +165,21 @@ $Stamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $DumpFile = "E:\stock-project\db-dumps\$DbName-$Stamp.sql"
 ```
 
+Use `cmd /c` for the dump redirection. This avoids Windows PowerShell 5.x
+rewriting native command output as UTF-16 text.
+
 For an empty root password:
 
 ```powershell
-& "$XamppMysqlBin\mysqldump.exe" `
-  --host=127.0.0.1 `
-  --port=3306 `
-  --user=root `
-  --password= `
-  --single-transaction `
-  --quick `
-  --routines `
-  --triggers `
-  --events `
-  --default-character-set=utf8mb4 `
-  $DbName > $DumpFile
+$DumpCommand = "`"$XamppMysqlBin\mysqldump.exe`" --host=127.0.0.1 --port=3306 --user=root --password= --single-transaction --quick --routines --triggers --events --default-character-set=utf8mb4 $DbName > `"$DumpFile`""
+cmd /c $DumpCommand
 ```
 
-For a non-empty password, replace `--password=` with:
+For a non-empty password, set the password in the command string:
 
 ```powershell
---password=YOUR_PASSWORD
+$DumpCommand = "`"$XamppMysqlBin\mysqldump.exe`" --host=127.0.0.1 --port=3306 --user=root --password=YOUR_PASSWORD --single-transaction --quick --routines --triggers --events --default-character-set=utf8mb4 $DbName > `"$DumpFile`""
+cmd /c $DumpCommand
 ```
 
 Verify the dump exists and is not empty:
@@ -200,13 +215,13 @@ MySQL again and return to the old runtime.
 Start only the Docker DB first:
 
 ```powershell
-docker compose --env-file docker\prod.env -p stock-project-prod up -d db
+docker compose --env-file $DockerEnvFile -p $DockerProject up -d db
 ```
 
 Check that it is healthy:
 
 ```powershell
-docker compose --env-file docker\prod.env -p stock-project-prod ps
+docker compose --env-file $DockerEnvFile -p $DockerProject ps
 ```
 
 Expected:
@@ -225,7 +240,7 @@ $DumpFile = "E:\stock-project\db-dumps\stock_project-YYYYMMDD-HHMMSS.sql"
 Import into the Docker DB:
 
 ```powershell
-cmd /c "docker compose --env-file docker\prod.env -p stock-project-prod exec -T db mariadb -ustock_app -pchange-me-before-prod stock_project < `"$DumpFile`""
+cmd /c "docker compose --env-file $DockerEnvFile -p $DockerProject exec -T db mariadb -u$DockerDbUser -p$DockerDbPassword $DockerDbName < `"$DumpFile`""
 ```
 
 Replace:
@@ -238,8 +253,8 @@ If the import fails halfway, reset the Docker production volume and import
 again:
 
 ```powershell
-docker compose --env-file docker\prod.env -p stock-project-prod down -v
-docker compose --env-file docker\prod.env -p stock-project-prod up -d db
+docker compose --env-file $DockerEnvFile -p $DockerProject down -v
+docker compose --env-file $DockerEnvFile -p $DockerProject up -d db
 ```
 
 Then rerun the import command.
@@ -250,7 +265,7 @@ After importing the native dump, run migrations so the Docker branch schema is
 current:
 
 ```powershell
-docker compose --env-file docker\prod.env -p stock-project-prod --profile setup run --rm migrate
+docker compose --env-file $DockerEnvFile -p $DockerProject --profile setup run --rm migrate
 ```
 
 This is safe after import because Doctrine tracks applied migrations in the DB.
@@ -259,7 +274,7 @@ Any migrations already present in the dump are skipped.
 ## 10. Start The Docker Web Runtime
 
 ```powershell
-docker compose --env-file docker\prod.env -p stock-project-prod up -d web
+docker compose --env-file $DockerEnvFile -p $DockerProject up -d web
 ```
 
 Open:
@@ -281,7 +296,7 @@ Important:
 Check row counts:
 
 ```powershell
-docker compose --env-file docker\prod.env -p stock-project-prod exec -T db mariadb -ustock_app -pchange-me-before-prod stock_project -e "SELECT COUNT(*) AS instruments FROM instrument; SELECT COUNT(*) AS runs FROM pipeline_run; SELECT COUNT(*) AS registry_rows FROM watchlist_candidate_registry;"
+docker compose --env-file $DockerEnvFile -p $DockerProject exec -T db mariadb -u$DockerDbUser -p$DockerDbPassword $DockerDbName -e "SELECT COUNT(*) AS instruments FROM instrument; SELECT COUNT(*) AS runs FROM pipeline_run; SELECT COUNT(*) AS registry_rows FROM watchlist_candidate_registry;"
 ```
 
 Open these web pages:
@@ -305,28 +320,28 @@ The Docker runtime uses one shared `job` service.
 Intake:
 
 ```powershell
-cmd /c "docker compose --env-file docker\prod.env -p stock-project-prod --profile jobs run --rm --no-TTY job > .tmp\prod-intake.json 2> .tmp\prod-intake.log"
+cmd /c "docker compose --env-file $DockerEnvFile -p $DockerProject --profile jobs run --rm --no-TTY job > .tmp\prod-intake.json 2> .tmp\prod-intake.log"
 python -m json.tool .tmp\prod-intake.json >NUL
 ```
 
 SEPA:
 
 ```powershell
-cmd /c "docker compose --env-file docker\prod.env -p stock-project-prod --profile jobs run --rm --no-TTY job python stock-system/scripts/run_sepa.py --mode=db --source=all > .tmp\prod-sepa.json 2> .tmp\prod-sepa.log"
+cmd /c "docker compose --env-file $DockerEnvFile -p $DockerProject --profile jobs run --rm --no-TTY job python stock-system/scripts/run_sepa.py --mode=db --source=all > .tmp\prod-sepa.json 2> .tmp\prod-sepa.log"
 python -m json.tool .tmp\prod-sepa.json >NUL
 ```
 
 EPA:
 
 ```powershell
-cmd /c "docker compose --env-file docker\prod.env -p stock-project-prod --profile jobs run --rm --no-TTY job python stock-system/scripts/run_epa.py --mode=db --source=all > .tmp\prod-epa.json 2> .tmp\prod-epa.log"
+cmd /c "docker compose --env-file $DockerEnvFile -p $DockerProject --profile jobs run --rm --no-TTY job python stock-system/scripts/run_epa.py --mode=db --source=all > .tmp\prod-epa.json 2> .tmp\prod-epa.log"
 python -m json.tool .tmp\prod-epa.json >NUL
 ```
 
 Full pipeline:
 
 ```powershell
-cmd /c "docker compose --env-file docker\prod.env -p stock-project-prod --profile jobs run --rm --no-TTY job python stock-system/scripts/run_pipeline.py --mode=db --source=all > .tmp\prod-pipeline.json 2> .tmp\prod-pipeline.log"
+cmd /c "docker compose --env-file $DockerEnvFile -p $DockerProject --profile jobs run --rm --no-TTY job python stock-system/scripts/run_pipeline.py --mode=db --source=all > .tmp\prod-pipeline.json 2> .tmp\prod-pipeline.log"
 python -m json.tool .tmp\prod-pipeline.json >NUL
 ```
 
@@ -344,37 +359,37 @@ Get-Content .tmp\prod-pipeline.log -Tail 120
 Start production:
 
 ```powershell
-docker compose --env-file docker\prod.env -p stock-project-prod up -d db web
+docker compose --env-file $DockerEnvFile -p $DockerProject up -d db web
 ```
 
 Stop production without deleting data:
 
 ```powershell
-docker compose --env-file docker\prod.env -p stock-project-prod stop
+docker compose --env-file $DockerEnvFile -p $DockerProject stop
 ```
 
 Run intake:
 
 ```powershell
-docker compose --env-file docker\prod.env -p stock-project-prod --profile jobs run --rm job
+docker compose --env-file $DockerEnvFile -p $DockerProject --profile jobs run --rm job
 ```
 
 Run SEPA:
 
 ```powershell
-docker compose --env-file docker\prod.env -p stock-project-prod --profile jobs run --rm job python stock-system/scripts/run_sepa.py --mode=db --source=all
+docker compose --env-file $DockerEnvFile -p $DockerProject --profile jobs run --rm job python stock-system/scripts/run_sepa.py --mode=db --source=all
 ```
 
 Run EPA:
 
 ```powershell
-docker compose --env-file docker\prod.env -p stock-project-prod --profile jobs run --rm job python stock-system/scripts/run_epa.py --mode=db --source=all
+docker compose --env-file $DockerEnvFile -p $DockerProject --profile jobs run --rm job python stock-system/scripts/run_epa.py --mode=db --source=all
 ```
 
 Run full pipeline:
 
 ```powershell
-docker compose --env-file docker\prod.env -p stock-project-prod --profile jobs run --rm job python stock-system/scripts/run_pipeline.py --mode=db --source=all
+docker compose --env-file $DockerEnvFile -p $DockerProject --profile jobs run --rm job python stock-system/scripts/run_pipeline.py --mode=db --source=all
 ```
 
 ## 14. Recovery Playbook
@@ -384,13 +399,13 @@ docker compose --env-file docker\prod.env -p stock-project-prod --profile jobs r
 Check logs:
 
 ```powershell
-docker compose --env-file docker\prod.env -p stock-project-prod logs web --tail=120
+docker compose --env-file $DockerEnvFile -p $DockerProject logs web --tail=120
 ```
 
 Common fixes:
 
 - Port conflict: change `STOCK_WEB_PORT` in `docker/prod.env`.
-- DB not healthy: check `docker compose --env-file docker\prod.env -p stock-project-prod ps`.
+- DB not healthy: check `docker compose --env-file $DockerEnvFile -p $DockerProject ps`.
 - Bad app secret/env file: correct `docker/prod.env`, then restart web.
 
 ### Docker DB does not start
@@ -398,15 +413,15 @@ Common fixes:
 Check logs:
 
 ```powershell
-docker compose --env-file docker\prod.env -p stock-project-prod logs db --tail=120
+docker compose --env-file $DockerEnvFile -p $DockerProject logs db --tail=120
 ```
 
 If this was a failed first import attempt and the native dump is safe, reset the
 Docker production volume:
 
 ```powershell
-docker compose --env-file docker\prod.env -p stock-project-prod down -v
-docker compose --env-file docker\prod.env -p stock-project-prod up -d db
+docker compose --env-file $DockerEnvFile -p $DockerProject down -v
+docker compose --env-file $DockerEnvFile -p $DockerProject up -d db
 ```
 
 Then import again.
@@ -416,8 +431,8 @@ Then import again.
 Do not keep a half-imported DB. Reset the Docker production volume and repeat:
 
 ```powershell
-docker compose --env-file docker\prod.env -p stock-project-prod down -v
-docker compose --env-file docker\prod.env -p stock-project-prod up -d db
+docker compose --env-file $DockerEnvFile -p $DockerProject down -v
+docker compose --env-file $DockerEnvFile -p $DockerProject up -d db
 ```
 
 Then rerun the import command with the corrected password, DB name, or dump path.
@@ -451,7 +466,7 @@ If Docker cutover fails and you need the old runtime back:
 1. Stop Docker production:
 
    ```powershell
-   docker compose --env-file docker\prod.env -p stock-project-prod stop
+   docker compose --env-file $DockerEnvFile -p $DockerProject stop
    ```
 
 2. Open XAMPP Control Panel.
@@ -464,7 +479,7 @@ The old XAMPP database was not modified by the Docker import process.
 ### Need to inspect Docker DB manually
 
 ```powershell
-docker compose --env-file docker\prod.env -p stock-project-prod exec db mariadb -ustock_app -pchange-me-before-prod stock_project
+docker compose --env-file $DockerEnvFile -p $DockerProject exec db mariadb -u$DockerDbUser -p$DockerDbPassword $DockerDbName
 ```
 
 Use the values from `docker/prod.env`.
