@@ -8,6 +8,11 @@ x-db-env: &db-env
   DB_PASSWORD: stock_app
   DATABASE_URL: "mysql://stock_app:stock_app@db:3306/stock_project?serverVersion=10.11.0-MariaDB&charset=utf8mb4"
 
+x-python-job-env: &python-job-env
+  <<: *db-env
+  PROJECT_ROOT: /app
+  YFINANCE_CACHE_DIR: /app/var/cache/yfinance
+
 services:
   db:
     image: mariadb:10.11
@@ -64,9 +69,7 @@ services:
       context: .
       dockerfile: docker/python/Dockerfile
     environment:
-      <<: *db-env
-      PROJECT_ROOT: /app
-      YFINANCE_CACHE_DIR: /app/var/cache/yfinance
+      <<: *python-job-env
     depends_on:
       db:
         condition: service_healthy
@@ -74,7 +77,67 @@ services:
       - yfinance_cache:/app/var/cache/yfinance
     profiles: ["jobs"]
 
+  sepa:
+    build:
+      context: .
+      dockerfile: docker/python/Dockerfile
+    command: ["python", "stock-system/scripts/run_sepa.py", "--mode=db", "--source=all"]
+    environment:
+      <<: *python-job-env
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - yfinance_cache:/app/var/cache/yfinance
+    profiles: ["jobs"]
+
+  epa:
+    build:
+      context: .
+      dockerfile: docker/python/Dockerfile
+    command: ["python", "stock-system/scripts/run_epa.py", "--mode=db", "--source=all"]
+    environment:
+      <<: *python-job-env
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - yfinance_cache:/app/var/cache/yfinance
+    profiles: ["jobs"]
+
+  pipeline:
+    build:
+      context: .
+      dockerfile: docker/python-full/Dockerfile
+    command: ["python", "stock-system/scripts/run_pipeline.py", "--mode=db", "--source=all"]
+    environment:
+      <<: *python-job-env
+      MODELS_DIR: /app/models
+      KRONOS_DIR: /app/repos/Kronos
+      FINGPT_DIR: /app/repos/FinGPT
+      HF_HOME: /app/.hf-cache
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - type: bind
+        source: ${STOCK_MODELS_DIR:-./models}
+        target: /app/models
+        read_only: true
+      - type: bind
+        source: ${STOCK_KRONOS_DIR:-./repos/Kronos}
+        target: /app/repos/Kronos
+        read_only: true
+      - type: bind
+        source: ${STOCK_FINGPT_DIR:-./repos/FinGPT}
+        target: /app/repos/FinGPT
+        read_only: true
+      - yfinance_cache:/app/var/cache/yfinance
+      - hf_cache:/app/.hf-cache
+    profiles: ["jobs"]
+
 volumes:
   db_data:
+  hf_cache:
   yfinance_cache:
   web_var:

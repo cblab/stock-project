@@ -154,16 +154,60 @@ docker compose --profile jobs run --rm intake
 
 ### Phase 3: Full job coverage
 
-Target:
+Current branch state:
 
-- Add command/profile support for:
-  - pipeline
-  - SEPA
-  - EPA
-- Decide how large external assets are supplied:
-  - bind mounts
-  - named volumes
-  - separately built image layer
+- `sepa` and `epa` run through the same light Python job image as `intake`.
+- `pipeline` uses a separate full Python image because it needs Torch, Transformers, PEFT, Safetensors, Accelerate, and Einops.
+- The full Python image installs `torch==2.6.0+cpu` explicitly from the PyTorch CPU wheel index to avoid pulling GPU-heavy packages into the Linux container runtime.
+- Large model/repository assets are not baked into the image. They are provided as host bind mounts.
+
+Required command flow:
+
+```bash
+docker compose up -d db
+docker compose --profile setup run --rm migrate
+docker compose --profile jobs run --rm intake
+docker compose --profile jobs run --rm sepa
+docker compose --profile jobs run --rm epa
+docker compose --profile jobs run --rm pipeline
+```
+
+Pipeline asset defaults:
+
+- host `./models` is mounted read-only to container `/app/models`
+- host `./repos/Kronos` is mounted read-only to container `/app/repos/Kronos`
+- host `./repos/FinGPT` is mounted read-only to container `/app/repos/FinGPT`
+- Hugging Face runtime cache uses the named volume `hf_cache`
+- yfinance cache uses the named volume `yfinance_cache`
+
+Override the host-side asset locations when your checkout keeps these assets elsewhere:
+
+```bash
+STOCK_MODELS_DIR=/absolute/path/to/models \
+STOCK_KRONOS_DIR=/absolute/path/to/Kronos \
+STOCK_FINGPT_DIR=/absolute/path/to/FinGPT \
+docker compose --profile jobs run --rm pipeline
+```
+
+On Windows PowerShell:
+
+```powershell
+$env:STOCK_MODELS_DIR = "E:/stock-project/models"
+$env:STOCK_KRONOS_DIR = "E:/stock-project/repos/Kronos"
+$env:STOCK_FINGPT_DIR = "E:/stock-project/repos/FinGPT"
+docker compose --profile jobs run --rm pipeline
+```
+
+Container-side runtime variables are fixed to Linux paths:
+
+- `PROJECT_ROOT=/app`
+- `MODELS_DIR=/app/models`
+- `KRONOS_DIR=/app/repos/Kronos`
+- `FINGPT_DIR=/app/repos/FinGPT`
+- `HF_HOME=/app/.hf-cache`
+- `YFINANCE_CACHE_DIR=/app/var/cache/yfinance`
+
+If any required pipeline asset is missing, the pipeline should fail clearly during config/model validation rather than falling back to host-specific paths.
 
 ### Phase 4: Less-technical install flow
 
@@ -176,7 +220,7 @@ Target:
 
 ## 4. First Implementation Slice
 
-Implemented in this first slice:
+Implemented in the first slice:
 
 - Added root-level `compose.yaml`.
 - Added a Dockerized MariaDB service named `db`.
@@ -196,6 +240,16 @@ Implemented in the second slice:
 - Dashboard start buttons are disabled in Docker web mode.
 - Watchlist Intake manual add still updates DB state, but skips the automatic SEPA/EPA refresh launcher in Docker web mode.
 
+Implemented in the third slice:
+
+- Added Docker job services for `sepa`, `epa`, and `pipeline`.
+- Kept `intake`, `sepa`, and `epa` on the light Python image.
+- Added `docker/python-full/Dockerfile` for full pipeline dependencies.
+- Added read-only host bind mounts for `models`, `repos/Kronos`, and `repos/FinGPT`.
+- Added `hf_cache` as a named volume for Hugging Face/runtime cache.
+- Redirected Kronos model-load chatter to stderr so `run_pipeline.py` can keep stdout machine-readable for JSON callers.
+- Preserved the optional Docker web runtime as launcher-safe; web-triggered Windows-native job launch remains disabled in Docker mode.
+
 Validation performed on this branch:
 
 ```bash
@@ -207,18 +261,24 @@ docker compose up -d db
 docker compose --profile setup run --rm migrate
 docker compose --profile jobs run --rm intake
 docker compose up -d db web
+docker compose --profile jobs run --rm sepa
+docker compose --profile jobs run --rm epa
+docker compose --profile jobs run --rm pipeline
+docker compose up -d web
 ```
 
-The intake job exited successfully and emitted valid JSON on stdout. Docker Compose container-status messages appeared on stderr, so callers that need strict JSON should capture stdout separately from stderr.
+The intake, SEPA, EPA, and pipeline scripts emit their final JSON payload on stdout unless `--quiet` is used. Docker Compose container-status messages and third-party runtime/model-load warnings may appear on stderr, so machine callers that need strict JSON should capture stdout separately from stderr.
 
 ## 5. Exact Files Created Or Changed
 
 - `.dockerignore`
 - `compose.yaml`
 - `docker/python/Dockerfile`
+- `docker/python-full/Dockerfile`
 - `docker/web-cli/Dockerfile`
 - `docker/web/Dockerfile`
 - `stock-system/requirements-intake.txt`
+- `stock-system/src/kronos/wrapper.py`
 - `docs/dockerization-plan.md`
 - `web/src/Service/RuntimePathConfig.php`
 - `web/src/Controller/DashboardController.php`
@@ -229,9 +289,9 @@ The intake job exited successfully and emitted valid JSON on stdout. Docker Comp
 ## 6. Risks / Open Questions
 
 - A fresh DB will be schema-empty until `migrate` is run.
-- A schema-only DB may still have no instruments; intake can return an empty/low-signal result depending on configured sector candidates and data availability.
+- A schema-only DB may still have no instruments; SEPA/EPA/pipeline DB mode require active instruments.
 - `yfinance` can emit warnings/errors to stderr; successful JSON remains on stdout.
-- Full pipeline Docker support is blocked by model/repo asset strategy for Kronos and FinGPT.
+- Full pipeline Docker support requires host-mounted model/repo assets for Kronos and FinGPT. This branch intentionally does not download or bake those assets into the image.
 - Symfony web launch buttons are not Docker-native yet because the current launchers use Windows shell semantics.
 - Docker web intentionally disables web-triggered job starts; Docker-native job orchestration is deferred.
 - The existing `web/compose.yaml` is Symfony-generated DB scaffolding; the root `compose.yaml` is the Dockerization branch target for the full project.

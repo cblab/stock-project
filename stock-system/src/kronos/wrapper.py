@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from contextlib import redirect_stdout
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -42,8 +43,9 @@ class KronosForecaster:
                     "and make sure KRONOS_DIR points to the local Kronos repository."
                 ) from exc
 
-        tokenizer = KronosTokenizer.from_pretrained(self.config.tokenizer_path)
-        model = Kronos.from_pretrained(self.config.model_path)
+        with redirect_stdout(sys.stderr):
+            tokenizer = KronosTokenizer.from_pretrained(self.config.tokenizer_path)
+            model = Kronos.from_pretrained(self.config.model_path)
         tokenizer.eval()
         model.eval()
         self._torch = torch
