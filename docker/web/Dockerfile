@@ -17,7 +17,9 @@ RUN composer install --no-dev --no-interaction --prefer-dist --no-scripts --clas
 
 COPY web ./
 RUN composer dump-autoload --classmap-authoritative --no-dev \
-    && mkdir -p var/cache var/log var/share \
+    && mkdir -p var/cache var/log var/share var/tailwind \
+    && php bin/console tailwind:build --minify --env=prod \
+    && php bin/console asset-map:compile --env=prod \
     && chmod -R 0777 var
 
 EXPOSE 8000
