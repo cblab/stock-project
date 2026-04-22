@@ -9,6 +9,7 @@
 # Generated pipeline runs and local caches.
 /runs/
 /runs/**
+/backups/
 /.deps/
 /.tmp/
 /.pip-cache/
@@ -68,3 +69,4 @@ tmp/
 temp/
 *.tmp
 *.bak
+.aider*

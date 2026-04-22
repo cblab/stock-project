@@ -72,6 +72,16 @@ class RuntimePathConfig
         return $this->join($this->webProjectDir(), 'var', 'pipeline-cache', $name);
     }
 
+    public function webJobLaunchEnabled(): bool
+    {
+        $value = $this->env('STOCK_WEB_JOB_LAUNCH_ENABLED');
+        if ($value === null) {
+            return true;
+        }
+
+        return !in_array(strtolower($value), ['0', 'false', 'no', 'off'], true);
+    }
+
     public function pythonPath(): string
     {
         return implode(PATH_SEPARATOR, array_filter([

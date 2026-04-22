@@ -11,12 +11,12 @@
         </div>
         <div class="flex flex-wrap gap-2">
             <form method="post" action="{{ path('app_runs_start', {source: 'portfolio'}) }}">
-                <button class="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm ring-1 ring-emerald-700/20 hover:bg-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2" type="submit" title="Startet die Pipeline fuer aktive Portfolio-Instrumente.">
+                <button class="rounded-md px-4 py-2 text-sm font-semibold text-white shadow-sm ring-1 ring-emerald-700/20 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 {{ webJobLaunchEnabled ? 'bg-emerald-600 hover:bg-emerald-500' : 'cursor-not-allowed bg-slate-400' }}" type="submit" title="{{ webJobLaunchEnabled ? 'Startet die Pipeline fuer aktive Portfolio-Instrumente.' : 'In Docker-Webansicht deaktiviert. Nutze den Docker-Jobcontainer.' }}" {{ webJobLaunchEnabled ? '' : 'disabled' }}>
                     Portfolio-Run starten
                 </button>
             </form>
             <form method="post" action="{{ path('app_runs_start', {source: 'watchlist'}) }}">
-                <button class="rounded-md bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow-sm ring-1 ring-sky-700/20 hover:bg-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2" type="submit" title="Startet die Pipeline fuer aktive Watchlist-Instrumente.">
+                <button class="rounded-md px-4 py-2 text-sm font-semibold text-white shadow-sm ring-1 ring-sky-700/20 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 {{ webJobLaunchEnabled ? 'bg-sky-600 hover:bg-sky-500' : 'cursor-not-allowed bg-slate-400' }}" type="submit" title="{{ webJobLaunchEnabled ? 'Startet die Pipeline fuer aktive Watchlist-Instrumente.' : 'In Docker-Webansicht deaktiviert. Nutze den Docker-Jobcontainer.' }}" {{ webJobLaunchEnabled ? '' : 'disabled' }}>
                     Watchlist-Run starten
                 </button>
             </form>

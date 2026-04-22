@@ -1,0 +1,105 @@
+name: stock-project
+
+x-db-env: &db-env
+  DB_HOST: db
+  DB_PORT: "3306"
+  DB_NAME: ${STOCK_DB_NAME:-stock_project}
+  DB_USER: ${STOCK_DB_USER:-stock_app}
+  DB_PASSWORD: ${STOCK_DB_PASSWORD:-stock_app}
+  DATABASE_URL: "mysql://${STOCK_DB_USER:-stock_app}:${STOCK_DB_PASSWORD:-stock_app}@db:3306/${STOCK_DB_NAME:-stock_project}?serverVersion=10.11.0-MariaDB&charset=utf8mb4"
+
+x-python-job-env: &python-job-env
+  <<: *db-env
+  PROJECT_ROOT: /app
+  YFINANCE_CACHE_DIR: /app/var/cache/yfinance
+
+services:
+  db:
+    image: mariadb:10.11
+    environment:
+      MARIADB_DATABASE: ${STOCK_DB_NAME:-stock_project}
+      MARIADB_USER: ${STOCK_DB_USER:-stock_app}
+      MARIADB_PASSWORD: ${STOCK_DB_PASSWORD:-stock_app}
+      MARIADB_ROOT_PASSWORD: ${STOCK_DB_ROOT_PASSWORD:-stock_root}
+    healthcheck:
+      test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 -uroot -p$${MARIADB_ROOT_PASSWORD} --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    volumes:
+      - db_data:/var/lib/mysql
+
+  migrate:
+    image: ${STOCK_WEB_CLI_IMAGE:-stock-project-migrate:latest}
+    build:
+      context: .
+      dockerfile: docker/web-cli/Dockerfile
+    environment:
+      <<: *db-env
+      APP_ENV: prod
+      APP_SECRET: ${STOCK_APP_SECRET:-docker-local-change-me}
+      PROJECT_ROOT: /app
+      PYTHON_BIN: python3
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles: ["setup"]
+
+  web:
+    image: ${STOCK_WEB_IMAGE:-stock-project-web:latest}
+    build:
+      context: .
+      dockerfile: docker/web/Dockerfile
+    environment:
+      <<: *db-env
+      APP_ENV: prod
+      APP_SECRET: ${STOCK_APP_SECRET:-docker-local-change-me}
+      PROJECT_ROOT: /app
+      PYTHON_BIN: python3
+      STOCK_WEB_JOB_LAUNCH_ENABLED: "0"
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${STOCK_WEB_PORT:-8000}:8000"
+    volumes:
+      - web_var:/app/web/var
+
+  job:
+    image: ${STOCK_JOB_IMAGE:-stock-project-job:latest}
+    build:
+      context: .
+      dockerfile: docker/python-full/Dockerfile
+    command: ["intake"]
+    environment:
+      <<: *python-job-env
+      MODELS_DIR: /app/models
+      KRONOS_DIR: /app/repos/Kronos
+      FINGPT_DIR: /app/repos/FinGPT
+      HF_HOME: /app/.hf-cache
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - type: bind
+        source: ${STOCK_MODELS_DIR:-./models}
+        target: /app/models
+        read_only: true
+      - type: bind
+        source: ${STOCK_KRONOS_DIR:-./repos/Kronos}
+        target: /app/repos/Kronos
+        read_only: true
+      - type: bind
+        source: ${STOCK_FINGPT_DIR:-./repos/FinGPT}
+        target: /app/repos/FinGPT
+        read_only: true
+      - yfinance_cache:/app/var/cache/yfinance
+      - hf_cache:/app/.hf-cache
+    profiles: ["jobs"]
+
+volumes:
+  db_data:
+  hf_cache:
+  yfinance_cache:
+  web_var:

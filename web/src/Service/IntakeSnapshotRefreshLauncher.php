@@ -15,6 +15,10 @@ class IntakeSnapshotRefreshLauncher
 
     public function queueForTicker(string $ticker): void
     {
+        if (!$this->paths->webJobLaunchEnabled()) {
+            return;
+        }
+
         $ticker = trim($ticker);
         if ($ticker === '') {
             return;
