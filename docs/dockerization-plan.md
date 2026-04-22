@@ -2,6 +2,9 @@
 
 This branch is a dedicated Dockerization track. It intentionally does not add product features.
 
+For local user-facing startup commands, see `docs/docker-quickstart.md`. This
+file keeps the assessment and implementation notes.
+
 ## 1. Findings
 
 ### Python runtime entrypoints

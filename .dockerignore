@@ -1,6 +1,9 @@
 .git
+.aider*
 .cache
 .deps
+.env
+.env.*
 .hf-cache
 .pip-cache
 .tmp

@@ -82,6 +82,47 @@ Der einfachste sinnvolle Modus ist:
 
 ---
 
+## Docker-Quickstart
+
+Der Docker-Branch stellt einen reproduzierbaren lokalen Runtime-Pfad bereit:
+
+~~~bash
+docker compose up -d db
+docker compose --profile setup run --rm migrate
+docker compose --profile jobs run --rm intake
+docker compose --profile jobs run --rm sepa
+docker compose --profile jobs run --rm epa
+docker compose --profile jobs run --rm pipeline
+~~~
+
+Die optionale Weboberfläche startet mit:
+
+~~~bash
+docker compose up -d web
+~~~
+
+Dann öffnen:
+
+~~~text
+http://127.0.0.1:8000/
+~~~
+
+Eine frische Docker-DB enthält nach den Migrationen noch keine Instrumente.
+`SEPA`, `EPA` und `pipeline` brauchen mindestens ein aktives Instrument; lege es
+entweder über `/instrument/new` in der Weboberfläche an oder importiere bewusst
+eigene Daten. Der Branch importiert absichtlich keinen privaten Seed-Dump.
+
+Für den vollständigen Pipeline-Job müssen lokale Assets vorhanden sein:
+
+- `models/`
+- `repos/Kronos`
+- `repos/FinGPT`
+
+Details zu Profilen, Mounts, leerer DB und JSON-Output stehen in
+[`docs/docker-quickstart.md`](docs/docker-quickstart.md).
+
+---
+
 ## Voraussetzungen
 
 ### System
