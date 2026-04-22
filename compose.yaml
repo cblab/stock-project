@@ -40,6 +40,25 @@ services:
         condition: service_healthy
     profiles: ["setup"]
 
+  web:
+    build:
+      context: .
+      dockerfile: docker/web/Dockerfile
+    environment:
+      <<: *db-env
+      APP_ENV: prod
+      APP_SECRET: docker-local-change-me
+      PROJECT_ROOT: /app
+      PYTHON_BIN: python3
+      STOCK_WEB_JOB_LAUNCH_ENABLED: "0"
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    volumes:
+      - web_var:/app/web/var
+
   intake:
     build:
       context: .
@@ -58,3 +77,4 @@ services:
 volumes:
   db_data:
   yfinance_cache:
+  web_var:

@@ -85,8 +85,10 @@ This branch is a dedicated Dockerization track. It intentionally does not add pr
 
 - `web`
   - Symfony HTTP UI.
-  - Should be added after phase 1 is stable.
-  - Must not rely on Windows shell launchers inside Linux containers.
+  - Added as an optional Linux-container-safe service.
+  - Boots Symfony with PHP's built-in server on port `8000`.
+  - Connects to the Dockerized DB.
+  - Uses `STOCK_WEB_JOB_LAUNCH_ENABLED=0`, so Docker web does not rely on Windows shell launchers.
 - `pipeline-job`
   - Full Kronos/Sentiment pipeline image or profile.
   - Needs mounted model/repo assets.
@@ -132,6 +134,24 @@ Target:
 - Keep it secondary to the intake JSON job.
 - Make launcher behavior container-safe before exposing job buttons as Docker-native.
 
+Current branch state:
+
+```bash
+docker compose up -d db web
+```
+
+Open:
+
+```text
+http://127.0.0.1:8000/
+```
+
+In Docker web mode, job launch buttons are disabled and the Watchlist Intake add path does not spawn SEPA/EPA refresh jobs. Jobs should still be run explicitly through Docker job services, for example:
+
+```bash
+docker compose --profile jobs run --rm intake
+```
+
 ### Phase 3: Full job coverage
 
 Target:
@@ -167,6 +187,15 @@ Implemented in this first slice:
 
 This is intentionally not a full web-container implementation yet.
 
+Implemented in the second slice:
+
+- Added optional `web` service to the root `compose.yaml`.
+- Added `docker/web/Dockerfile`.
+- Added `STOCK_WEB_JOB_LAUNCH_ENABLED=0` to Docker web runtime.
+- Gated web-triggered job launch paths so Docker web does not call Windows-native launcher behavior.
+- Dashboard start buttons are disabled in Docker web mode.
+- Watchlist Intake manual add still updates DB state, but skips the automatic SEPA/EPA refresh launcher in Docker web mode.
+
 Validation performed on this branch:
 
 ```bash
@@ -177,6 +206,7 @@ docker compose --profile setup build migrate
 docker compose up -d db
 docker compose --profile setup run --rm migrate
 docker compose --profile jobs run --rm intake
+docker compose up -d db web
 ```
 
 The intake job exited successfully and emitted valid JSON on stdout. Docker Compose container-status messages appeared on stderr, so callers that need strict JSON should capture stdout separately from stderr.
@@ -187,8 +217,14 @@ The intake job exited successfully and emitted valid JSON on stdout. Docker Comp
 - `compose.yaml`
 - `docker/python/Dockerfile`
 - `docker/web-cli/Dockerfile`
+- `docker/web/Dockerfile`
 - `stock-system/requirements-intake.txt`
 - `docs/dockerization-plan.md`
+- `web/src/Service/RuntimePathConfig.php`
+- `web/src/Controller/DashboardController.php`
+- `web/src/Service/IntakeSnapshotRefreshLauncher.php`
+- `web/templates/base.html.twig`
+- `web/templates/dashboard/index.html.twig`
 
 ## 6. Risks / Open Questions
 
@@ -197,4 +233,5 @@ The intake job exited successfully and emitted valid JSON on stdout. Docker Comp
 - `yfinance` can emit warnings/errors to stderr; successful JSON remains on stdout.
 - Full pipeline Docker support is blocked by model/repo asset strategy for Kronos and FinGPT.
 - Symfony web launch buttons are not Docker-native yet because the current launchers use Windows shell semantics.
+- Docker web intentionally disables web-triggered job starts; Docker-native job orchestration is deferred.
 - The existing `web/compose.yaml` is Symfony-generated DB scaffolding; the root `compose.yaml` is the Dockerization branch target for the full project.

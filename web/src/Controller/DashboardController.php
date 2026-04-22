@@ -8,6 +8,7 @@ use App\Repository\PipelineRunRepository;
 use App\Repository\PipelineRunItemRepository;
 use App\Repository\InstrumentSepaSnapshotRepository;
 use App\Service\PipelineRunLauncher;
+use App\Service\RuntimePathConfig;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -18,16 +19,23 @@ class DashboardController extends AbstractController
 {
     #[Route('/', name: 'app_runs_index')]
     #[Route('/runs', name: 'app_runs_alias')]
-    public function index(PipelineRunRepository $pipelineRunRepository): Response
+    public function index(PipelineRunRepository $pipelineRunRepository, RuntimePathConfig $paths): Response
     {
         return $this->render('dashboard/index.html.twig', [
             'runs' => $pipelineRunRepository->findLatest(),
+            'webJobLaunchEnabled' => $paths->webJobLaunchEnabled(),
         ]);
     }
 
     #[Route('/runs/start/{source}', name: 'app_runs_start', methods: ['POST'], requirements: ['source' => 'portfolio|watchlist'])]
-    public function start(string $source, PipelineRunLauncher $launcher): Response
+    public function start(string $source, PipelineRunLauncher $launcher, RuntimePathConfig $paths): Response
     {
+        if (!$paths->webJobLaunchEnabled()) {
+            $this->addFlash('warning', 'Job-Starts aus der Weboberflaeche sind in der Docker-Webansicht deaktiviert. Nutze docker compose run --rm intake.');
+
+            return $this->redirectToRoute('app_runs_index');
+        }
+
         $run = $launcher->queueRun($source);
 
         return $this->redirectToRoute('app_run_show', ['id' => $run->getId()]);
