@@ -19,12 +19,12 @@ class InstrumentPriceHistory
     #[ORM\Column]
     private ?int $id = null;
 
-    #[ORM\ManyToOne(targetEntity: Instrument::class, fetch: 'EAGER')]
+    #[ORM\ManyToOne(targetEntity: Instrument::class)]
     #[ORM\JoinColumn(name: 'instrument_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
     private ?Instrument $instrument = null;
 
-    #[ORM\Column(name: 'price_date', type: Types::DATE_MUTABLE)]
-    private ?\DateTimeInterface $priceDate = null;
+    #[ORM\Column(name: 'price_date', type: Types::DATE_IMMUTABLE)]
+    private ?\DateTimeImmutable $priceDate = null;
 
     #[ORM\Column(name: 'open_price', type: Types::DECIMAL, precision: 15, scale: 4, nullable: true)]
     private ?string $open = null;
@@ -72,12 +72,12 @@ class InstrumentPriceHistory
         return $this;
     }
 
-    public function getPriceDate(): ?\DateTimeInterface
+    public function getPriceDate(): ?\DateTimeImmutable
     {
         return $this->priceDate;
     }
 
-    public function setPriceDate(\DateTimeInterface $priceDate): self
+    public function setPriceDate(\DateTimeImmutable $priceDate): self
     {
         $this->priceDate = $priceDate;
         return $this;
