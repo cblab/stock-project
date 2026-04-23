@@ -269,7 +269,6 @@ class PriceHistoryAdapter:
                 END AS source
             FROM instrument i
             WHERE i.active = 1
-              AND (i.is_portfolio = 1 OR i.is_portfolio = 0)
               AND i.provider_ticker IS NOT NULL
               AND i.provider_ticker != ''
             ORDER BY i.input_ticker ASC

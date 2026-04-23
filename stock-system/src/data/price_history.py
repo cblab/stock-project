@@ -2,6 +2,7 @@
 Price history data access layer for instrument_price_history table.
 
 Provides idempotent upsert operations for OHLCV data.
+Uses pymysql connection (consistent with rest of codebase).
 """
 from __future__ import annotations
 
@@ -11,8 +12,6 @@ from decimal import Decimal
 from typing import Dict, List, Optional, TypedDict
 
 import pandas as pd
-from sqlalchemy import text
-from sqlalchemy.engine import Engine
 
 logger = logging.getLogger(__name__)
 
@@ -30,10 +29,14 @@ class PriceHistoryRecord(TypedDict):
 
 
 class PriceHistoryDAO:
-    """Data access object for instrument_price_history table."""
+    """Data access object for instrument_price_history table.
 
-    def __init__(self, engine: Engine):
-        self.engine = engine
+    Uses pymysql connection (consistent with rest of codebase).
+    """
+
+    def __init__(self, connection):
+        """Initialize with pymysql connection."""
+        self.connection = connection
 
     def upsert_prices(self, records: List[PriceHistoryRecord]) -> int:
         """
@@ -50,13 +53,12 @@ class PriceHistoryDAO:
             return 0
 
         # Use INSERT ... ON DUPLICATE KEY UPDATE for MySQL/MariaDB
-        sql = text("""
+        sql = """
             INSERT INTO instrument_price_history
                 (instrument_id, price_date, open_price, high_price, low_price,
                  close_price, adj_close, volume, created_at, updated_at)
             VALUES
-                (:instrument_id, :price_date, :open_price, :high_price, :low_price,
-                 :close_price, :adj_close, :volume, NOW(), NOW())
+                (%s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
             ON DUPLICATE KEY UPDATE
                 open_price = VALUES(open_price),
                 high_price = VALUES(high_price),
@@ -65,11 +67,27 @@ class PriceHistoryDAO:
                 adj_close = VALUES(adj_close),
                 volume = VALUES(volume),
                 updated_at = NOW()
-        """)
+        """
 
-        with self.engine.begin() as conn:
-            result = conn.execute(sql, records)
-            return result.rowcount
+        # Convert records to tuples for pymysql
+        values = [
+            (
+                r["instrument_id"],
+                r["price_date"],
+                r["open_price"],
+                r["high_price"],
+                r["low_price"],
+                r["close_price"],
+                r["adj_close"],
+                r["volume"],
+            )
+            for r in records
+        ]
+
+        with self.connection.cursor() as cursor:
+            cursor.executemany(sql, values)
+            self.connection.commit()
+            return cursor.rowcount
 
     def get_existing_dates(self, instrument_id: int) -> set[date]:
         """
@@ -81,15 +99,16 @@ class PriceHistoryDAO:
         Returns:
             Set of dates that already exist
         """
-        sql = text("""
+        sql = """
             SELECT price_date
             FROM instrument_price_history
-            WHERE instrument_id = :instrument_id
-        """)
+            WHERE instrument_id = %s
+        """
 
-        with self.engine.connect() as conn:
-            result = conn.execute(sql, {"instrument_id": instrument_id})
-            return {row[0] for row in result}
+        with self.connection.cursor() as cursor:
+            cursor.execute(sql, (instrument_id,))
+            rows = cursor.fetchall()
+            return {row["price_date"] for row in rows}
 
     def get_price_range(self, instrument_id: int) -> tuple[Optional[date], Optional[date]]:
         """
@@ -101,16 +120,16 @@ class PriceHistoryDAO:
         Returns:
             Tuple of (min_date, max_date) or (None, None) if no data
         """
-        sql = text("""
+        sql = """
             SELECT MIN(price_date), MAX(price_date)
             FROM instrument_price_history
-            WHERE instrument_id = :instrument_id
-        """)
+            WHERE instrument_id = %s
+        """
 
-        with self.engine.connect() as conn:
-            result = conn.execute(sql, {"instrument_id": instrument_id})
-            row = result.fetchone()
-            return (row[0], row[1]) if row else (None, None)
+        with self.connection.cursor() as cursor:
+            cursor.execute(sql, (instrument_id,))
+            row = cursor.fetchone()
+            return (row["MIN(price_date)"], row["MAX(price_date)"]) if row else (None, None)
 
     def count_records(self, instrument_id: int) -> int:
         """
@@ -122,15 +141,16 @@ class PriceHistoryDAO:
         Returns:
             Number of records
         """
-        sql = text("""
+        sql = """
             SELECT COUNT(*)
             FROM instrument_price_history
-            WHERE instrument_id = :instrument_id
-        """)
+            WHERE instrument_id = %s
+        """
 
-        with self.engine.connect() as conn:
-            result = conn.execute(sql, {"instrument_id": instrument_id})
-            return result.scalar() or 0
+        with self.connection.cursor() as cursor:
+            cursor.execute(sql, (instrument_id,))
+            row = cursor.fetchone()
+            return row["COUNT(*)"] if row else 0
 
 
 def df_to_records(

@@ -35,9 +35,11 @@ import yfinance as yf
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from db.connection import get_db_connection
+from db.connection import connect
 from db.adapters import PriceHistoryAdapter
 from data.price_history import PriceHistoryDAO, df_to_records
+
+PROJECT_ROOT = Path(__file__).parent.parent
 
 logging.basicConfig(
     level=logging.INFO,
@@ -178,9 +180,9 @@ def backfill_all(
     Returns:
         List of result dicts
     """
-    conn = get_db_connection()
+    conn = connect(PROJECT_ROOT)
     adapter = PriceHistoryAdapter(conn)
-    dao = PriceHistoryDAO(conn.engine)
+    dao = PriceHistoryDAO(conn)
 
     # Load instruments
     instruments = adapter.load_active_instruments()
