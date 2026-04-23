@@ -238,3 +238,51 @@ def _db_datetime(value) -> str | None:
     if isinstance(value, str):
         return value.replace("T", " ").replace("Z", "")[:19]
     return str(value)
+
+
+class PriceHistoryAdapter:
+    """Adapter for loading instruments that need price history backfill.
+
+    Only loads instruments that are currently in portfolio or watchlist.
+    """
+
+    def __init__(self, connection) -> None:
+        self.connection = connection
+
+    def load_active_instruments(self) -> list[dict]:
+        """Load all instruments that are in portfolio or watchlist.
+
+        Returns list of dicts with keys:
+            - instrument_id: int
+            - input_ticker: str
+            - provider_ticker: str
+            - source: str ('portfolio' or 'watchlist')
+        """
+        sql = """
+            SELECT
+                i.id AS instrument_id,
+                i.input_ticker,
+                i.provider_ticker,
+                CASE
+                    WHEN i.is_portfolio = 1 THEN 'portfolio'
+                    ELSE 'watchlist'
+                END AS source
+            FROM instrument i
+            WHERE i.active = 1
+              AND i.provider_ticker IS NOT NULL
+              AND i.provider_ticker != ''
+            ORDER BY i.input_ticker ASC
+        """
+        with self.connection.cursor() as cursor:
+            cursor.execute(sql)
+            rows = cursor.fetchall()
+
+        return [
+            {
+                "instrument_id": int(row["instrument_id"]),
+                "input_ticker": str(row["input_ticker"]),
+                "provider_ticker": str(row["provider_ticker"]),
+                "source": str(row["source"]),
+            }
+            for row in rows
+        ]
