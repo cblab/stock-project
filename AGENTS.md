@@ -1,486 +1,183 @@
-# AGENTS.md
+# AGENTS.md — stock-project
 
 ## Zweck
 
-Diese Datei definiert die Arbeitsregeln für Beiträge in diesem Repository.
-
-Ziel:
-- stabile Zusammenarbeit zwischen Mensch und Codex
-- wenig unnötige Änderungen
-- wenig Tokenverbrauch
-- klare Priorität auf Robustheit, Lesbarkeit und Wartbarkeit
-- keine unnötige Architekturmagie
-
-Dieses Projekt ist **kein generischer Playground**, sondern eine produktive lokale Research- und Entscheidungsplattform für:
-- Intake / Candidate Discovery
-- Buy-Signale
-- Sell-Signale
-- Portfolio / Watchlist / Instrument-Workflows
-- Symfony-Weboberfläche
-- Python-Analysejobs
-
----
-
-## Grundprinzipien
-
-### 1. Kleine, gezielte Änderungen
-- Nur das ändern, was für die Aufgabe nötig ist.
-- Keine großflächigen Refactors ohne klaren Nutzen.
-- Bestehende funktionierende Architektur respektieren.
-
-### 2. Erst lesen, dann ändern
-Vor jeder Änderung:
-- betroffene Dateien lesen
-- bestehende Muster erkennen
-- denselben Stil fortführen
-- keine Parallelarchitektur erfinden
-
-### 3. Token sparen
-Codex soll sparsam arbeiten:
-- keine langen Wiederholungen
-- keine unnötigen Umschreibungen
-- keine großen Erklärblöcke im Code
-- nur relevante Dateien anfassen
-- keine Massenänderungen ohne Not
-
-### 4. Kein blindes Modernisieren
-Nicht automatisch:
-- Framework-Modewörter einbauen
-- neue Libraries hinzufügen
-- Architektur „verschönern“
-- unnötige Abstraktionsschichten bauen
-
-### 5. Debuggability vor Cleverness
-Bevorzugt werden:
-- einfache Datenflüsse
-- klare Status
-- nachvollziehbare Queries
-- logische Fehlerpfade
-- deterministisches Verhalten
-
----
-
-## Projektüberblick
-
-### Python (`stock-system/`)
-Verantwortlich für:
-- Intake
-- Hauptpipeline
-- SEPA
-- EPA
-- spätere Analyse- und Bewertungsjobs
-
-### PHP / Symfony (`web/`)
-Verantwortlich für:
-- UI
-- Instrumente
-- Portfolio / Watchlist
-- Candidate Registry
-- Run-Start
-- Tabellen / Detailseiten / Matrizen
-- Persistenznahe Weblogik
-
-### Twig
-Verantwortlich für:
-- Darstellung
-- kompakte, gut lesbare Oberflächen
-- Tabellen
-- Badges
-- Tooltips
-- Formulare
-
-### Tailwind
-Verantwortlich für:
-- nüchterne, funktionale Gestaltung
-- kompakte Tabellen
-- klare visuelle Hierarchie
-- kein UI-Spielzeug
-
----
-
-## Prioritäten im Zweifel
-
-Wenn Zielkonflikte entstehen, gilt diese Reihenfolge:
-
-1. **Korrekte Fachlogik**
-2. **Robuste Datenpersistenz**
-3. **Gute Fehlersichtbarkeit**
-4. **Wartbare Struktur**
-5. **UI-Klarheit**
-6. **Token- und Code-Minimalismus**
-7. **Schönheit**
-
----
-
-## Arbeitsstil für Codex
-
-### Immer zuerst
-1. Aufgabe präzise eingrenzen
-2. Relevante Dateien lesen
-3. Bestehendes Muster erkennen
-4. Minimal nötige Änderung planen
-5. Dann erst patchen
-
-### Nicht tun
-- nicht spekulativ 10 Dateien ändern
-- nicht ohne Not neue Services / Helpers / Traits / Utils anlegen
-- nicht gleichzeitig DB, Backend und UI komplett umwerfen, wenn nur eine kleine Änderung nötig ist
-- nicht bestehende Begriffe unnötig umbenennen
-- nicht „fixen“, was nicht kaputt ist
-
-### Bevorzugt
-- kleine, saubere Commits
-- lokal nachvollziehbare Änderungen
-- bestehende Benennungen respektieren
-- keine geheimen Nebenwirkungen
-
----
-
-## Regeln für Python
-
-### Stil
-- klar
-- deterministisch
-- pragmatisch
-- möglichst wenige magische Nebeneffekte
-
-### Bevorzugt
-- reine Funktionen für Berechnungslogik
-- klar getrennte Module
-- robuste Fehlerbehandlung
-- explizite Defaults
-- kleine Hilfsfunktionen statt unnötig tiefer Vererbung
-
-### Vermeiden
-- globale Side Effects ohne Not
-- implizite Pfadannahmen
-- schwer nachvollziehbare Datenflüsse
-- unnötig komplexe Klassenhierarchien
-- alles in eine Datei stopfen
-
-### Für Analyse- und Scoringlogik gilt
-- Scores müssen nachvollziehbar sein
-- Regeln müssen lesbar bleiben
-- harte Trigger und weiche Warnungen klar trennen
-- keine Blackbox-Logik ohne klare Dokumentation
-- keine stillen Fallbacks, die fachlich falsche Resultate erzeugen
-
-### Für Jobs / Scripts gilt
-- klare CLI-Argumente
-- vernünftige Fehlermeldungen
-- keine stillen Crashes
-- Status- und Fehlersichtbarkeit bevorzugen
-- vorhandene Konfigurationslogik respektieren
-
----
-
-## Regeln für PHP / Symfony
-
-### Stil
-- pragmatisch
-- service-orientiert, aber nicht überabstrahiert
-- Controller schlank halten
-- Query-/Builder-/Service-Logik klar trennen
-
-### Controller
-Controller sollen:
-- Requests entgegennehmen
-- delegieren
-- Render-Kontext bauen
-- Responses liefern
-
-Controller sollen nicht:
-- große Businesslogik enthalten
-- SQL zusammenstückeln, wenn dafür bereits Builder/Repository da sind
-- komplexe Seiteneffekte direkt steuern, wenn ein Service sinnvoller ist
-
-### Services
-Services sind sinnvoll für:
-- ViewBuilder
-- Launch-Logik
-- Candidate-/Run-Aktionen
-- Aggregationen
-- Status-/Lifecycle-Logik
-
-Services sind nicht dazu da:
-- künstlich jede triviale Logik auszulagern
-- drei Zeilen Code auf fünf Klassen zu verteilen
-
-### Repositories / DBAL / Doctrine
-- Hot Queries klar lesbar halten
-- unnötige `UPPER(...)`-Vergleiche auf case-insensitive Spalten vermeiden
-- Pagination, Filter und Counts konsistent behandeln
-- globale KPIs nie aus paginierten Seitenarrays berechnen
-- Deduplizierung bewusst und nachvollziehbar lösen
-
----
-
-## Regeln für Twig
-
-### Grundsatz
-Twig ist Darstellung, nicht Businesslogik.
-
-### Erlaubt
-- kleine Formatierungsentscheidungen
-- einfache Zustandsanzeige
-- Badges
-- Tooltips
-- kompakte UI-Helfer
-- sinnvolle Partials / Makros
-
-### Nicht erlaubt
-- große fachliche Logik
-- Query-artige Verschachtelung
-- komplexe Berechnungen
-- Zustandsmaschinen im Template
-
-### Tabellen
-Tabellen sollen:
-- kompakt
-- desktop-optimiert
-- fachlich sinnvoll verdichtet
-sein
-
-Nicht:
-- unnötig viele Einzelspalten
-- horizontale Scroll-Hölle
-- doppelte Informationen
-- Datenfriedhöfe
-
-### Tooltips
-Tooltips sollen:
-- kurz
-- klar
-- fachlich präzise
-sein
-
-Keine Romane.
-Keine Entwicklerdiskussionen im UI.
-
-### Texte
-UI-Texte sollen:
-- nüchtern
-- klar
-- nicht geschwätzig
-sein
-
-Keine internen Entwickler-Disclaimer im Frontend, wenn sie den Nutzer nicht weiterbringen.
-
----
-
-## Regeln für Tailwind
-
-### Zielbild
-- schlicht
-- klar
-- funktional
-- kompakt
-- professionell
-
-### Bevorzugt
-- konsistente Abstände
-- gute Lesbarkeit
-- kompakte Badges
-- sinnvolle visuelle Hierarchie
-- ruhige Farbgebung
-
-### Vermeiden
-- übertriebene visuelle Spielerei
-- zu große Cards
-- zu viel Leerraum
-- unnötig bunte Interfaces
-- generische Dashboard-Optik ohne Informationsdichte
-
-### Formulare
-- Labels oberhalb der Inputs
-- sauberer vertikaler Rhythmus
-- keine überlappenden Felder
-- primäre Buttons klar sichtbar
-- keine kaputten Inline-Flows
-
----
-
-## Regeln für Candidate Registry / Intake
-
-### Zentrales Objekt ist der Kandidat, nicht der Lauf
-- UI soll kandidat-zentriert sein
-- Läufe sind Hintergrundmechanik
-- Registry ist die Wahrheit für die Hauptansicht
-
-### Statuslogik
-- Standardzustand: sichtbar / aktiv
-- `Zur Watchlist` = übernehmen
-- `Ablehnen` = ausblenden, aber nicht als Leiche vernichten
-- Reaktivierung bei echter Verbesserung ermöglichen
-
-### Wichtig
-- keine run-zentrierte Regression
-- keine globale KPI aus Seiten-Arrays
-- `seen_count` ernst nehmen
-- Priorisierung nachvollziehbar halten
-
----
-
-## Regeln für SEPA / EPA
-
-### SEPA
-SEPA ist Buy-/Setup-Logik.
-Nicht mit Sell-Logik vermischen.
-
-### EPA
-EPA ist Exit-/Risk-Logik.
-Nicht als bloßer Sell-Score missverstehen.
-
-### UI-seitig
-- SEPA und EPA klar getrennt darstellen
-- keine Vermischung in einem einzigen unklaren Block
-- Tooltips kurz und präzise
-- keine unnötigen „bewusst noch nicht enthalten“-Texte im Frontend
-
-### Fachlogisch
-- harte Trigger vs. weiche Warnungen sauber trennen
-- Ampelgründe nachvollziehbar halten
-- Scores nicht als Orakel behandeln
-- Regime und Risiko ernst nehmen
-
----
-
-## Regeln für Datenbank und Migrationen
-
-### Allgemein
-- Schemaänderungen klein und zielgerichtet halten
-- keine unnötigen Tabellen einführen
-- FK-Logik bewusst wählen
-- wichtige Hot Queries indexieren
-- Konsistenz vor Bequemlichkeit
-
-### Migrations
-- jede Migration soll einen klaren Zweck haben
-- keine unnötigen Mehrfachumbauten in einer Migration
-- Legacy bewusst kennzeichnen
-- keine stillen Altlasten weiterziehen, wenn sie bereinigt werden können
-
-### Vor DB-Änderungen prüfen
-- wird das wirklich gebraucht?
-- reicht eine Erweiterung der bestehenden Struktur?
-- betrifft es Hot Paths?
-- braucht es Indexe?
-- wird etwas historisch oder aktuell benutzt?
-
----
-
-## Regeln für Logs, Runs und Fehlerpfade
-
-### Immer bevorzugen
-- klare Status
-- klare Fehlermeldungen
-- Exit-Code sichtbar
-- stdout/stderr zugänglich
-- keine Blackbox-Prozessstarts
-
-### Wenn Jobs aus dem Web gestartet werden
-- Status sauber persistieren
-- Fehlergrund sichtbar machen
-- keine stille Fire-and-Forget-Intransparenz
-
----
-
-## Regeln für Konfiguration
-
-### Harte Pfade vermeiden
-Diese Dinge gehören in Config / `.env.local` / zentrale Resolver:
-- `PYTHON_BIN`
-- `PROJECT_ROOT`
-- `MODELS_DIR`
-- `KRONOS_DIR`
-- `FINGPT_DIR`
-
-### Verhalten
-- sinnvolle projektrelative Defaults sind okay
-- aber überschreibbar
-- fehlende kritische Pfade klar melden
-- keine stillen kaputten Fallbacks
-
----
-
-## Wenn Codex neue Dateien anlegt
-
-Nur neue Dateien anlegen, wenn wirklich sinnvoll.
-
-Bevorzugte Gründe:
-- klar neuer Service mit wiederverwendbarer Verantwortung
-- neue Migration
-- neues klar abgegrenztes UI-Partial
-- neuer Analysejob
-
-Nicht neue Dateien anlegen für:
-- triviale Einmal-Helfer
-- unnötige Abstraktion
-- hypothetische spätere Eleganz
-
----
-
-## Commit- und Änderungsstrategie
-
-### Bevorzugt
-- logisch zusammenhängende Änderungen
-- keine Misch-Commits mit 5 Themen
-- ein Problem = ein klarer Patch
-- Doku aktualisieren, wenn Verhalten sich ändert
-
-### Für größere Aufgaben
-Wenn eine Aufgabe aus mehreren klaren Schritten besteht:
-1. Datenmodell / Backend
-2. Service / Query-Logik
-3. UI
-4. kurze Dokumentation
-
----
-
-## Was Codex bei jeder Aufgabe liefern soll
-
-Am Ende jeder Arbeit möglichst knapp und sauber:
-
-1. Welche Dateien wurden geändert?
-2. Was wurde fachlich geändert?
-3. Was wurde technisch geändert?
-4. Welche Einschränkungen / offenen Punkte bleiben?
-
-Keine langen Rechtfertigungen.
-Keine Marketing-Zusammenfassungen.
-Nur die relevante technische Einordnung.
-
----
-
-## Nicht-Ziele dieses Repos
-
-Dieses Repo ist nicht primär:
-- ein generischer ML-Spielplatz
-- ein UI-Showcase
-- ein Framework-Experiment
-- ein maximal abstraktes Architekturprojekt
-
-Es ist eine **konkrete lokale Analyse- und Entscheidungsplattform**.
-
-Daher gilt:
-- praktische Nützlichkeit vor theoretischer Schönheit
-- robuste Prozesse vor fancy Features
-- Messbarkeit vor Narrativ
-- Selektion vor Hype
-
----
-
-## Kurzfassung für Codex
-
-Wenn du unsicher bist, halte dich an diese Regeln:
-
-- **weniger ändern**
-- **bestehendes Muster respektieren**
-- **Ticker-/Score-/Run-Logik nicht verwässern**
-- **keine Run-zentrierte Regression**
-- **keine unnötigen Libraries**
-- **UI nüchtern und dicht halten**
-- **Queries indexfreundlich halten**
-- **Fehler sichtbar machen**
-- **keine Blackbox-Logik**
-- **keine Token verschwenden**
+Dieses Repository ist ein dockerisiertes Web-Projekt mit produktivem Compose-Stack.
+Arbeite konservativ, nachvollziehbar und mit minimalem Änderungsumfang.
+Bevorzuge kleine, überprüfbare Änderungen gegenüber großen Umbauten.
+
+## Arbeitsmodus
+
+1. Verstehe zuerst das Problem.
+2. Prüfe dann den vorhandenen Code, die Compose-Dateien und die relevante Laufzeitkonfiguration.
+3. Erstelle bei mittleren oder großen Änderungen zuerst einen kurzen Plan.
+4. Ändere nur die minimal nötigen Dateien.
+5. Führe passende Checks aus.
+6. Gib am Ende immer eine kurze Änderungszusammenfassung, betroffene Dateien und nächste Schritte aus.
+
+## Wann direkt ändern, wann erst planen
+
+Ändere direkt, wenn:
+- die Änderung klein ist
+- maximal 2–3 Dateien betrifft
+- keine Migrationslogik nötig ist
+- keine Architekturentscheidung betroffen ist
+
+Erstelle zuerst einen Plan, wenn:
+- mehrere Schichten betroffen sind (Web, DB, Pipeline, Docker, Config)
+- neue Abhängigkeiten nötig wären
+- Datenmodell, Persistenz oder Hintergrundjobs betroffen sind
+- Refactoring über mehrere Dateien nötig ist
+- unklare Seiteneffekte zu erwarten sind
+
+Wenn ein Plan nötig ist:
+- schreibe ihn zuerst als kurze Checkliste in die Antwort
+- beginne erst danach mit der Umsetzung
+
+## Repo- und Laufzeitkontext
+
+Gehe von diesem Zielbild aus, bis der Code etwas anderes belegt:
+- Web-Container für Anwendung / API / Tests
+- MariaDB-Container
+- optional phpMyAdmin-Container
+- optional Pipeline-/Worker-Container
+- Docker Compose ist zentrale Quelle für lokale Orchestrierung
+
+Behandle Compose-Dateien, Env-Dateien, Startskripte und README als Teil der Produktlogik, nicht als Nebensache.
+
+## Quellen der Wahrheit
+
+In dieser Reihenfolge prüfen:
+1. Code und Konfiguration im aktuellen Repository
+2. Compose-Dateien und Docker-bezogene Skripte
+3. README und projektspezifische Dokumentation
+4. Laufzeitbefehle und Logs
+5. Erst danach Annahmen
+
+Nie Verhalten erfinden, das du nicht aus dem Repo oder aus Laufzeitbelegen ableiten kannst.
+
+## Sicherheits- und Eingriffsgrenzen
+
+Ohne explizite Freigabe NICHT:
+- Secrets anzeigen, kopieren oder umbenennen
+- `.env`-Werte ausschreiben
+- produktive Daten löschen oder resetten
+- destruktive SQL-Befehle ausführen
+- Migrationsdaten oder DB-Inhalte verändern
+- Deployments auf `main`/`prod` automatisch auslösen
+- Docker-Volumes löschen
+- Container anderer Projekte verändern
+- Änderungen außerhalb dieses Repos durchführen
+
+Erlaubt ohne Rückfrage:
+- Dateien im Repo lesen
+- kleine, lokale Codeänderungen vornehmen
+- Tests, Lint, Typprüfungen und nicht-destruktive Inspektionen ausführen
+- Compose-Konfiguration analysieren
+- Logs lesen
+- Git-Diffs, Branches und Commits vorbereiten
+
+## Git-Regeln
+
+- Arbeite nie direkt blind auf `main`, wenn die Änderung mehr als trivial ist.
+- Bevorzuge für nicht-triviale Änderungen einen Feature-Branch.
+- Nutze kleine, logisch getrennte Commits.
+- Commit-Messages sollen knapp und technisch präzise sein.
+- Niemals eigenständig mergen oder pushen, außer der Benutzer verlangt es ausdrücklich.
+- Wenn uncommitted Änderungen vorhanden sind, zuerst Status prüfen und in der Antwort benennen.
+
+## Docker-Regeln
+
+- Betrachte Docker Compose als primäre lokale Orchestrierung.
+- Nutze vorhandene Service-Namen aus den Compose-Dateien, statt neue zu erfinden.
+- Bevorzuge `docker compose config`, `ps`, `logs`, `exec` und andere nicht-destruktive Prüfpfade.
+- Führe Container-Neustarts nur aus, wenn sie für die Aufgabe wirklich nötig sind und der Benutzer das erlaubt hat.
+- Niemals Docker-Socket-Freigaben oder privilegierte Container als schnelle Lösung einführen.
+- Wenn eine Änderung nur per Host-/Deploy-Schritt abschließbar ist, nenne den exakten Host-Befehl statt so zu tun, als sei die Aufgabe vollständig erledigt.
+
+## Datenbank-Regeln
+
+- Datenbankzugriffe sind standardmäßig read-only zu behandeln, solange nicht ausdrücklich etwas anderes verlangt wird.
+- Keine destruktiven DDL/DML-Befehle ohne explizite Freigabe.
+- Vor Änderungen am Schema immer zuerst:
+  - vorhandene Migrationen prüfen
+  - betroffene Tabellen/Entitäten benennen
+  - Rückwärtskompatibilität einschätzen
+- Wenn eine Migration nötig ist, benenne klar:
+  - warum
+  - Risiko
+  - Rollback-Idee
+  - welche Dienste danach neu gestartet werden müssen
+
+## Pipeline-/Worker-Regeln
+
+- Pipeline-/Job-Logik ist als produktionskritisch zu behandeln.
+- Änderungen an Worker-, Queue-, Cron- oder Job-Code immer separat benennen.
+- Bei Pipeline-Änderungen immer prüfen:
+  - Trigger
+  - Input/Output
+  - Fehlerverhalten
+  - Retry-/Idempotenzrisiken
+  - DB-Seiteneffekte
+
+## Test- und Review-Regeln
+
+Nach jeder relevanten Änderung:
+1. Führe die kleinsten sinnvollen Checks aus.
+2. Melde klar, was tatsächlich ausgeführt wurde.
+3. Melde klar, was NICHT ausgeführt wurde.
+4. Gib Restrisiken offen an.
+
+Wenn vorhanden, nutze projektspezifische:
+- Unit-Tests
+- Integrationstests
+- Linter
+- Typprüfungen
+- Container-/Health-Checks
+- Smoke-Tests gegen lokale HTTP-Endpunkte
+
+Keine falschen Erfolgsbehauptungen.
+Wenn etwas nicht getestet wurde, sag es direkt.
+
+## Erwartetes Antwortformat
+
+Am Ende jeder Umsetzung kurz und strukturiert ausgeben:
+
+1. **Geändert**
+   - Liste der geänderten Dateien
+
+2. **Warum**
+   - technische Begründung in 2–5 Punkten
+
+3. **Geprüft**
+   - exakt ausgeführte Befehle / Checks
+
+4. **Nicht geprüft**
+   - was offen blieb
+
+5. **Nächste Host-Schritte**
+   - nur falls nötig, mit genauen Befehlen
+
+## Lokale Optimierungsregeln
+
+- Bevorzuge kleine Diffs.
+- Bevorzuge bestehende Patterns im Repo vor schöneren neuen Strukturen.
+- Füge neue Dependencies nur hinzu, wenn der Nutzen klar den Wartungsaufwand übersteigt.
+- Wenn du ein Pattern im Repo mehrfach siehst, richte dich danach.
+- Wenn du absichtlich davon abweichst, begründe das.
+
+## ExecPlan-Regel
+
+Bei komplexen Features oder größeren Refactors:
+- erstelle einen kurzen ExecPlan
+- speichere ihn bei Bedarf in `PLANS.md`
+- setze die Arbeit erst danach um
+
+## Review-Regel
+
+Vor Abschluss immer eine kurze Selbstprüfung machen:
+- Ist die Änderung minimal?
+- Passt sie zu den bestehenden Patterns?
+- Gibt es versteckte Seiteneffekte auf DB, Pipeline oder Docker?
+- Wurde irgendetwas angenommen, das nicht belegt ist?
+- Fehlt ein Host-Schritt, den der Benutzer noch ausführen muss?
