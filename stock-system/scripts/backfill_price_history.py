@@ -39,7 +39,7 @@ from db.connection import connect
 from db.adapters import PriceHistoryAdapter
 from data.price_history import PriceHistoryDAO, df_to_records
 
-PROJECT_ROOT = Path(__file__).parent.parent
+PROJECT_ROOT = Path(__file__).parent.parent.parent  # Repo root (parent of stock-system/)
 
 logging.basicConfig(
     level=logging.INFO,
