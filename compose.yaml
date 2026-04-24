@@ -66,6 +66,19 @@ services:
     volumes:
       - web_var:/app/web/var
 
+  phpmyadmin:
+    image: phpmyadmin:5-apache
+    environment:
+      PMA_HOST: db
+      PMA_PORT: "3306"
+      PMA_USER: ${STOCK_DB_USER:-stock_app}
+      PMA_PASSWORD: ${STOCK_DB_PASSWORD:-stock_app}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${STOCK_PHPMYADMIN_PORT:-8081}:80"
+
   job:
     image: ${STOCK_JOB_IMAGE:-stock-project-job:latest}
     build:
