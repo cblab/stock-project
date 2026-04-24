@@ -5,32 +5,7 @@ Create historical buy signal snapshots (K, S, M) from pipeline_run_item data.
 This script populates instrument_buy_signal_snapshot with historical buy signals
 so they can later be evaluated against forward returns (like SEPA snapshots).
 
-Required table (create via migration or manually):
-
-    CREATE TABLE IF NOT EXISTS instrument_buy_signal_snapshot (
-        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-        instrument_id BIGINT UNSIGNED NOT NULL,
-        as_of_date DATE NOT NULL,
-        kronos_score DECIMAL(10,6) NULL,
-        sentiment_score DECIMAL(10,6) NULL,
-        merged_score DECIMAL(10,6) NULL,
-        decision VARCHAR(20) NULL,
-        sentiment_label VARCHAR(20) NULL,
-        kronos_raw_score DECIMAL(10,6) NULL,
-        sentiment_raw_score DECIMAL(10,6) NULL,
-        detail_json LONGTEXT NULL,
-        forward_return_5d DECIMAL(10,4) NULL,
-        forward_return_20d DECIMAL(10,4) NULL,
-        forward_return_60d DECIMAL(10,4) NULL,
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        UNIQUE KEY uk_instrument_date (instrument_id, as_of_date),
-        KEY idx_as_of_date (as_of_date),
-        KEY idx_merged_score (merged_score),
-        KEY idx_decision (decision),
-        CONSTRAINT fk_buy_signal_instrument 
-            FOREIGN KEY (instrument_id) REFERENCES instrument(id) ON DELETE CASCADE
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+Requires: Migration Version20260424161100 (creates instrument_buy_signal_snapshot table)
 
 Usage:
     # Snapshot latest pipeline run items for each instrument
@@ -93,6 +68,8 @@ def get_pipeline_items_for_date_range(
     """Get latest pipeline_run_item for each instrument within date range.
     
     Uses the finished_at timestamp of the pipeline_run to determine the date.
+    When multiple runs exist for the same instrument on the same day, the latest
+    run (by COALESCE(finished_at, started_at, created_at)) wins.
     """
     sql = """
         SELECT 
@@ -108,25 +85,27 @@ def get_pipeline_items_for_date_range(
             pri.explain_json,
             DATE(COALESCE(pr.finished_at, pr.started_at, pr.created_at)) AS as_of_date,
             pr.run_key,
-            pr.id AS pipeline_run_id
+            pr.id AS pipeline_run_id,
+            COALESCE(pr.finished_at, pr.started_at, pr.created_at) AS run_timestamp
         FROM pipeline_run_item pri
         INNER JOIN pipeline_run pr ON pr.id = pri.pipeline_run_id
         WHERE DATE(COALESCE(pr.finished_at, pr.started_at, pr.created_at)) BETWEEN %s AND %s
           AND pri.kronos_status = 'ok'
           AND pri.merged_score IS NOT NULL
-        ORDER BY pri.instrument_id, as_of_date DESC
+        ORDER BY pri.instrument_id ASC, as_of_date DESC, run_timestamp DESC
     """
     with connection.cursor() as cursor:
         cursor.execute(sql, (from_date, to_date))
         rows = cursor.fetchall()
     
-    # Deduplicate: keep only the latest entry per instrument per day
-    seen = {}
+    # Deduplicate: keep only the latest entry per instrument per day.
+    # Due to ORDER BY above, the first row per (instrument_id, as_of_date) is the latest run.
+    seen = set()
     unique_items = []
     for row in rows:
         key = (row["instrument_id"], row["as_of_date"])
         if key not in seen:
-            seen[key] = True
+            seen.add(key)
             unique_items.append(dict(row))
     
     return unique_items
