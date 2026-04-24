@@ -5,6 +5,7 @@ import json
 
 from bootstrap import PROJECT_ROOT
 
+from data.price_history import PriceHistoryDAO
 from db.adapters import DBInputAdapter
 from db.connection import connect
 from db.run_tracking import mark_pipeline_run_failed, mark_pipeline_run_running, mark_pipeline_run_success
@@ -38,9 +39,17 @@ def run(args: argparse.Namespace) -> int:
 
         engine = SepaEngine(period=args.period, interval=args.interval)
         writer = SepaSnapshotWriter(connection)
+        price_dao = PriceHistoryDAO(connection)
         snapshots = []
         for mapping in mappings:
             snapshot = engine.analyze(mapping)
+            # Calculate forward returns from price history
+            from datetime import date
+            as_of = date.fromisoformat(snapshot.as_of_date)
+            forward_returns = price_dao.get_forward_returns(mapping.instrument_id, as_of, [5, 20, 60])
+            snapshot.forward_return_5d = forward_returns.get(5)
+            snapshot.forward_return_20d = forward_returns.get(20)
+            snapshot.forward_return_60d = forward_returns.get(60)
             writer.write(snapshot)
             snapshots.append(snapshot)
 

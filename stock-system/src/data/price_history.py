@@ -11,7 +11,10 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Dict, List, Optional, TypedDict
 
-import pandas as pd
+try:
+    import pandas as pd
+except ImportError:
+    pd = None
 
 logger = logging.getLogger(__name__)
 
@@ -151,6 +154,91 @@ class PriceHistoryDAO:
             cursor.execute(sql, (instrument_id,))
             row = cursor.fetchone()
             return row["COUNT(*)"] if row else 0
+
+    @staticmethod
+    def _calc_forward_returns(
+        rows: list[dict],
+        horizons: list[int]
+    ) -> dict[int, float | None]:
+        """
+        Calculate forward returns from price rows (testable core logic).
+
+        Args:
+            rows: List of price rows with 'adj_close' and 'close_price' keys,
+                  ordered by price_date ascending
+            horizons: List of trading day horizons
+
+        Returns:
+            Dict mapping horizon to forward return as percentage (e.g., 5.0 for 5%)
+            or None if data is insufficient
+        """
+        if not rows:
+            return {h: None for h in horizons}
+
+        start_row = rows[0]
+        start_price = start_row.get("adj_close") or start_row.get("close_price")
+        if start_price is None:
+            return {h: None for h in horizons}
+
+        start_price = float(start_price)
+
+        results: dict[int, float | None] = {}
+        for horizon in horizons:
+            target_idx = horizon
+            if target_idx >= len(rows):
+                results[horizon] = None
+                continue
+
+            future_row = rows[target_idx]
+            future_price = future_row.get("adj_close") or future_row.get("close_price")
+            if future_price is None:
+                results[horizon] = None
+                continue
+
+            future_price = float(future_price)
+            if start_price == 0:
+                results[horizon] = None
+            else:
+                results[horizon] = round((future_price / start_price - 1) * 100, 4)
+
+        return results
+
+    def get_forward_returns(
+        self,
+        instrument_id: int,
+        as_of_date: date,
+        horizons: list[int] = None
+    ) -> dict[int, float | None]:
+        """
+        Calculate forward returns for given horizons based on available trading days.
+
+        Uses the next available trading day on or after as_of_date as start reference,
+        then finds the next available trading day for each horizon.
+
+        Args:
+            instrument_id: The instrument ID
+            as_of_date: The reference date (typically snapshot date)
+            horizons: List of trading day horizons (default: [5, 20, 60])
+
+        Returns:
+            Dict mapping horizon to forward return as percentage (e.g., 5.0 for 5%)
+            or None if future data is insufficient
+        """
+        if horizons is None:
+            horizons = [5, 20, 60]
+
+        sql = """
+            SELECT price_date, adj_close, close_price
+            FROM instrument_price_history
+            WHERE instrument_id = %s AND price_date >= %s
+            ORDER BY price_date ASC
+        """
+
+        with self.connection.cursor() as cursor:
+            cursor.execute(sql, (instrument_id, as_of_date))
+            rows = cursor.fetchall()
+
+        return self._calc_forward_returns(rows, horizons)
 
 
 def df_to_records(

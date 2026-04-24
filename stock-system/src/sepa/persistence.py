@@ -19,8 +19,9 @@ class SepaSnapshotWriter:
                 (instrument_id, as_of_date, market_score, stage_score, relative_strength_score, base_quality_score,
                  volume_score, momentum_score, risk_score, superperformance_score, vcp_score, microstructure_score,
                  breakout_readiness_score, structure_score, execution_score, total_score, traffic_light,
-                 kill_triggers_json, detail_json, created_at, updated_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                 kill_triggers_json, detail_json, forward_return_5d, forward_return_20d, forward_return_60d,
+                 created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON DUPLICATE KEY UPDATE
                     market_score = VALUES(market_score),
                     stage_score = VALUES(stage_score),
@@ -39,6 +40,9 @@ class SepaSnapshotWriter:
                     traffic_light = VALUES(traffic_light),
                     kill_triggers_json = VALUES(kill_triggers_json),
                     detail_json = VALUES(detail_json),
+                    forward_return_5d = VALUES(forward_return_5d),
+                    forward_return_20d = VALUES(forward_return_20d),
+                    forward_return_60d = VALUES(forward_return_60d),
                     updated_at = VALUES(updated_at)
                 """,
                 (
@@ -61,6 +65,9 @@ class SepaSnapshotWriter:
                     snapshot.traffic_light,
                     json.dumps(snapshot.kill_triggers, ensure_ascii=False),
                     json.dumps(snapshot.detail, ensure_ascii=False, default=str),
+                    snapshot.forward_return_5d,
+                    snapshot.forward_return_20d,
+                    snapshot.forward_return_60d,
                     now,
                     now,
                 ),
