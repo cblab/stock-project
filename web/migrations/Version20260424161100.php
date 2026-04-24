@@ -19,7 +19,7 @@ final class Version20260424161100 extends AbstractMigration
         $this->addSql(<<<'SQL'
             CREATE TABLE instrument_buy_signal_snapshot (
                 id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-                instrument_id BIGINT UNSIGNED NOT NULL,
+                instrument_id INT NOT NULL,
                 as_of_date DATE NOT NULL,
                 kronos_score DECIMAL(10,6) NULL,
                 sentiment_score DECIMAL(10,6) NULL,
