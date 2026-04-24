@@ -168,19 +168,15 @@ class SepaForwardReturnBackfill:
         set_clauses.append("updated_at = NOW()")
 
         # Build WHERE clause to protect existing values
-        # Only update if the field is currently NULL (or we don't have a new value for it)
-        null_checks = []
-        if forward_return_5d is not None:
-            null_checks.append("forward_return_5d IS NULL")
-        if forward_return_20d is not None:
-            null_checks.append("forward_return_20d IS NULL")
-        if forward_return_60d is not None:
-            null_checks.append("forward_return_60d IS NULL")
-
-        # Combine conditions: must match PK AND have at least one target field NULL
+        # Each field we want to update must be NULL in the database
+        # Use individual AND conditions to ensure we only write to NULL fields
         where_conditions = ["instrument_id = %s", "as_of_date = %s"]
-        if null_checks:
-            where_conditions.append(f"({' OR '.join(null_checks)})")
+        if forward_return_5d is not None:
+            where_conditions.append("forward_return_5d IS NULL")
+        if forward_return_20d is not None:
+            where_conditions.append("forward_return_20d IS NULL")
+        if forward_return_60d is not None:
+            where_conditions.append("forward_return_60d IS NULL")
 
         sql = f"""
             UPDATE instrument_sepa_snapshot
