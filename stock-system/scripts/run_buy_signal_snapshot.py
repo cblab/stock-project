@@ -70,6 +70,7 @@ def get_pipeline_items_for_date_range(
     Uses the finished_at timestamp of the pipeline_run to determine the date.
     When multiple runs exist for the same instrument on the same day, the latest
     run (by COALESCE(finished_at, started_at, created_at)) wins.
+    Tie-breaker: pri.id DESC ensures deterministic selection if timestamps are equal.
     """
     sql = """
         SELECT 
@@ -92,14 +93,15 @@ def get_pipeline_items_for_date_range(
         WHERE DATE(COALESCE(pr.finished_at, pr.started_at, pr.created_at)) BETWEEN %s AND %s
           AND pri.kronos_status = 'ok'
           AND pri.merged_score IS NOT NULL
-        ORDER BY pri.instrument_id ASC, as_of_date DESC, run_timestamp DESC
+        ORDER BY pri.instrument_id ASC, as_of_date DESC, run_timestamp DESC, pri.id DESC
     """
     with connection.cursor() as cursor:
         cursor.execute(sql, (from_date, to_date))
         rows = cursor.fetchall()
     
     # Deduplicate: keep only the latest entry per instrument per day.
-    # Due to ORDER BY above, the first row per (instrument_id, as_of_date) is the latest run.
+    # Due to ORDER BY above (run_timestamp DESC, pri.id DESC), the first row per
+    # (instrument_id, as_of_date) is deterministically the latest run.
     seen = set()
     unique_items = []
     for row in rows:
