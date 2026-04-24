@@ -91,7 +91,6 @@ def get_pipeline_items_for_date_range(
         FROM pipeline_run_item pri
         INNER JOIN pipeline_run pr ON pr.id = pri.pipeline_run_id
         WHERE DATE(COALESCE(pr.finished_at, pr.started_at, pr.created_at)) BETWEEN %s AND %s
-          AND pri.kronos_status = 'ok'
           AND pri.merged_score IS NOT NULL
         ORDER BY pri.instrument_id ASC, as_of_date DESC, run_timestamp DESC, pri.id DESC
     """
