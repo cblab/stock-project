@@ -75,6 +75,15 @@ class InstrumentSepaSnapshot
     #[ORM\Column(type: Types::JSON)]
     private array $detailJson = [];
 
+    #[ORM\Column(type: Types::FLOAT, nullable: true)]
+    private ?float $forwardReturn5d = null;
+
+    #[ORM\Column(type: Types::FLOAT, nullable: true)]
+    private ?float $forwardReturn20d = null;
+
+    #[ORM\Column(type: Types::FLOAT, nullable: true)]
+    private ?float $forwardReturn60d = null;
+
     #[ORM\Column]
     private \DateTimeImmutable $createdAt;
 
@@ -127,6 +136,12 @@ class InstrumentSepaSnapshot
     public function setKillTriggersJson(array $value): self { $this->killTriggersJson = $value; return $this; }
     public function getDetailJson(): array { return $this->detailJson; }
     public function setDetailJson(array $value): self { $this->detailJson = $value; return $this; }
+    public function getForwardReturn5d(): ?float { return $this->forwardReturn5d; }
+    public function setForwardReturn5d(?float $value): self { $this->forwardReturn5d = $value; return $this; }
+    public function getForwardReturn20d(): ?float { return $this->forwardReturn20d; }
+    public function setForwardReturn20d(?float $value): self { $this->forwardReturn20d = $value; return $this; }
+    public function getForwardReturn60d(): ?float { return $this->forwardReturn60d; }
+    public function setForwardReturn60d(?float $value): self { $this->forwardReturn60d = $value; return $this; }
     public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
     public function getUpdatedAt(): \DateTimeImmutable { return $this->updatedAt; }
     public function touch(): self { $this->updatedAt = new \DateTimeImmutable(); return $this; }

@@ -11,7 +11,7 @@ class ScoreResult:
     kill_triggers: list[str] = field(default_factory=list)
 
 
-@dataclass(frozen=True)
+@dataclass
 class SepaSnapshot:
     instrument_id: int
     input_ticker: str
@@ -36,6 +36,9 @@ class SepaSnapshot:
     detail: dict[str, Any]
     hard_triggers: list[str] = field(default_factory=list)
     soft_warnings: list[str] = field(default_factory=list)
+    forward_return_5d: float | None = None
+    forward_return_20d: float | None = None
+    forward_return_60d: float | None = None
 
 
 def clamp(value: float, low: float = 0.0, high: float = 100.0) -> float:
