@@ -135,8 +135,8 @@ class SepaForwardReturnBackfill:
     ) -> bool:
         """Update forward return fields for a specific snapshot.
 
-        Only updates fields that are provided (non-None). Fields that are
-        still None due to insufficient future data remain NULL in DB.
+        Only updates fields that are provided (non-None) AND currently NULL
+        in the database. Already set values are never overwritten.
 
         Args:
             instrument_id: The instrument ID
@@ -149,28 +149,43 @@ class SepaForwardReturnBackfill:
             True if a row was updated, False otherwise
         """
         # Build dynamic SET clause - only update fields we have values for
-        updates = []
+        set_clauses = []
         params = []
 
         if forward_return_5d is not None:
-            updates.append("forward_return_5d = %s")
+            set_clauses.append("forward_return_5d = %s")
             params.append(forward_return_5d)
         if forward_return_20d is not None:
-            updates.append("forward_return_20d = %s")
+            set_clauses.append("forward_return_20d = %s")
             params.append(forward_return_20d)
         if forward_return_60d is not None:
-            updates.append("forward_return_60d = %s")
+            set_clauses.append("forward_return_60d = %s")
             params.append(forward_return_60d)
 
-        if not updates:
+        if not set_clauses:
             return False  # Nothing to update
 
-        updates.append("updated_at = NOW()")
+        set_clauses.append("updated_at = NOW()")
+
+        # Build WHERE clause to protect existing values
+        # Only update if the field is currently NULL (or we don't have a new value for it)
+        null_checks = []
+        if forward_return_5d is not None:
+            null_checks.append("forward_return_5d IS NULL")
+        if forward_return_20d is not None:
+            null_checks.append("forward_return_20d IS NULL")
+        if forward_return_60d is not None:
+            null_checks.append("forward_return_60d IS NULL")
+
+        # Combine conditions: must match PK AND have at least one target field NULL
+        where_conditions = ["instrument_id = %s", "as_of_date = %s"]
+        if null_checks:
+            where_conditions.append(f"({' OR '.join(null_checks)})")
 
         sql = f"""
             UPDATE instrument_sepa_snapshot
-            SET {', '.join(updates)}
-            WHERE instrument_id = %s AND as_of_date = %s
+            SET {', '.join(set_clauses)}
+            WHERE {' AND '.join(where_conditions)}
         """
         params.extend([instrument_id, as_of_date])
 
