@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
+from typing import Optional
 
 from sepa.signals import SepaSnapshot
 
@@ -73,3 +74,107 @@ class SepaSnapshotWriter:
                 ),
             )
         self.connection.commit()
+
+
+class SepaForwardReturnBackfill:
+    """Backfill missing forward returns for existing SEPA snapshots.
+
+    Maintenance utility to populate forward_return_5d, forward_return_20d,
+    and forward_return_60d for existing snapshot rows that have NULL values.
+    Uses instrument_price_history as the sole data source.
+    """
+
+    def __init__(self, connection) -> None:
+        self.connection = connection
+
+    def find_snapshots_needing_backfill(
+        self,
+        limit: Optional[int] = None
+    ) -> list[dict]:
+        """Find snapshots with at least one NULL forward return field.
+
+        Args:
+            limit: Optional maximum number of rows to return
+
+        Returns:
+            List of dicts with instrument_id, as_of_date, and current values
+        """
+        sql = """
+            SELECT instrument_id, as_of_date,
+                   forward_return_5d, forward_return_20d, forward_return_60d
+            FROM instrument_sepa_snapshot
+            WHERE forward_return_5d IS NULL
+               OR forward_return_20d IS NULL
+               OR forward_return_60d IS NULL
+            ORDER BY instrument_id, as_of_date
+        """
+        if limit:
+            sql += f" LIMIT {int(limit)}"
+
+        with self.connection.cursor() as cursor:
+            cursor.execute(sql)
+            rows = cursor.fetchall()
+            return [
+                {
+                    "instrument_id": row["instrument_id"],
+                    "as_of_date": row["as_of_date"],
+                    "forward_return_5d": row["forward_return_5d"],
+                    "forward_return_20d": row["forward_return_20d"],
+                    "forward_return_60d": row["forward_return_60d"],
+                }
+                for row in rows
+            ]
+
+    def update_forward_returns(
+        self,
+        instrument_id: int,
+        as_of_date: date,
+        forward_return_5d: Optional[float],
+        forward_return_20d: Optional[float],
+        forward_return_60d: Optional[float],
+    ) -> bool:
+        """Update forward return fields for a specific snapshot.
+
+        Only updates fields that are provided (non-None). Fields that are
+        still None due to insufficient future data remain NULL in DB.
+
+        Args:
+            instrument_id: The instrument ID
+            as_of_date: The snapshot date
+            forward_return_5d: 5-day forward return or None
+            forward_return_20d: 20-day forward return or None
+            forward_return_60d: 60-day forward return or None
+
+        Returns:
+            True if a row was updated, False otherwise
+        """
+        # Build dynamic SET clause - only update fields we have values for
+        updates = []
+        params = []
+
+        if forward_return_5d is not None:
+            updates.append("forward_return_5d = %s")
+            params.append(forward_return_5d)
+        if forward_return_20d is not None:
+            updates.append("forward_return_20d = %s")
+            params.append(forward_return_20d)
+        if forward_return_60d is not None:
+            updates.append("forward_return_60d = %s")
+            params.append(forward_return_60d)
+
+        if not updates:
+            return False  # Nothing to update
+
+        updates.append("updated_at = NOW()")
+
+        sql = f"""
+            UPDATE instrument_sepa_snapshot
+            SET {', '.join(updates)}
+            WHERE instrument_id = %s AND as_of_date = %s
+        """
+        params.extend([instrument_id, as_of_date])
+
+        with self.connection.cursor() as cursor:
+            cursor.execute(sql, params)
+            self.connection.commit()
+            return cursor.rowcount > 0
