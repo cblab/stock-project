@@ -13,6 +13,15 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 logger = logging.getLogger(__name__)
 
 
+def _trusted_identifier(value: str | None, source: str | None) -> str | None:
+    if source != "vistafetch" or value is None:
+        return None
+    text = str(value).strip()
+    if not text or text == "-":
+        return None
+    return text
+
+
 def backfill_instruments(
     connection,
     resolver: InstrumentMasterResolver,
@@ -140,10 +149,12 @@ def backfill_instruments(
         updates = {}
         if not row.get("name") and master_data.get("name"):
             updates["name"] = master_data["name"]
-        if not row.get("wkn") and master_data.get("wkn"):
-            updates["wkn"] = master_data["wkn"]
-        if not row.get("isin") and master_data.get("isin"):
-            updates["isin"] = master_data["isin"]
+        trusted_wkn = _trusted_identifier(master_data.get("wkn"), master_data.get("source"))
+        trusted_isin = _trusted_identifier(master_data.get("isin"), master_data.get("source"))
+        if not row.get("wkn") and trusted_wkn:
+            updates["wkn"] = trusted_wkn
+        if not row.get("isin") and trusted_isin:
+            updates["isin"] = trusted_isin
         if not row.get("region") and master_data.get("region"):
             updates["region"] = master_data["region"]
 

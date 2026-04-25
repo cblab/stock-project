@@ -99,7 +99,23 @@ class InstrumentMasterResolver:
             from vistafetch import VistaFetchClient
 
             client = VistaFetchClient()
-            result = client.search_asset(search_term=ticker, max_candidates=5)
+            try:
+                result = client.search_asset(search_term=ticker, max_candidates=5)
+            except Exception as exc:
+                if not self._is_vistafetch_validation_error(exc):
+                    raise
+
+                logger.warning(f"vistafetch validation error for {ticker}; retrying with single candidate: {exc}")
+                retry_result = self._try_vistafetch_single_candidate(client, ticker, region_hint)
+                if retry_result is not None:
+                    return retry_result
+
+                return MasterDataResult(
+                    ticker=ticker,
+                    status="error",
+                    source="vistafetch",
+                    note=f"Error: {exc}",
+                )
 
             # result.get() returns the first match - this is dangerous for ticker searches
             # We need to check all candidates for exact ticker match
@@ -137,8 +153,8 @@ class InstrumentMasterResolver:
                         continue
 
                     # Require ISIN and/or WKN for any match
-                    isin = data.get("isin")
-                    wkn = data.get("wkn")
+                    isin = self._clean_identifier(data.get("isin"), kind="isin")
+                    wkn = self._clean_identifier(data.get("wkn"), kind="wkn")
                     if not isin and not wkn:
                         continue
 
@@ -174,8 +190,8 @@ class InstrumentMasterResolver:
             match = stock_matches[0]["data"]
 
             name = match.get("name") or match.get("tiny_name")
-            wkn = match.get("wkn")
-            isin = match.get("isin")
+            wkn = self._clean_identifier(match.get("wkn"), kind="wkn")
+            isin = self._clean_identifier(match.get("isin"), kind="isin")
             region = self._derive_region_from_isin(isin) or region_hint
 
             # Determine if this is a ticker-only search (no ISIN/WKN provided)
@@ -246,49 +262,29 @@ class InstrumentMasterResolver:
 
             name = info.get("longName") or info.get("shortName")
 
-            # Try to get ISIN - use get_isin() method or isin property if available
-            isin = None
-            try:
-                if hasattr(t, "get_isin"):
-                    isin = t.get_isin()
-                elif hasattr(t, "isin"):
-                    isin = t.isin
-                if not isin:
-                    isin = info.get("isin")
-            except Exception:
-                isin = info.get("isin")
-
             # Derive region: hint -> ISIN -> country -> exchange
             # Exchange is last because a Canadian company can list on NASDAQ
             exchange = info.get("exchange", "")
             country = info.get("country", "")
             region = (
                 region_hint
-                or self._derive_region_from_isin(isin)
                 or self._derive_region_from_country(country)
                 or self._derive_region_from_exchange(exchange)
             )
 
             # yfinance doesn't provide WKN - this is expected
-            # yfinance can NEVER be "resolved" because WKN is missing
-            # If we have name and ISIN, status is "partial"
-            # If we only have name, status is also "partial"
-            if name and isin:
-                status = "partial"
-            elif name:
-                status = "partial"
-            else:
-                status = "unresolved"
+            # Hard identifiers from yfinance are not trusted here.
+            status = "partial" if (name or region) else "unresolved"
 
             return MasterDataResult(
                 ticker=ticker,
                 name=name,
                 wkn=None,  # yfinance doesn't have WKN
-                isin=isin,
+                isin=None,
                 region=region,
                 status=status,
                 source="yfinance",
-                note="Partial resolution - no WKN from yfinance",
+                note="Partial resolution from yfinance; identifiers not trusted / WKN unavailable",
             )
 
         except Exception as exc:
@@ -338,3 +334,74 @@ class InstrumentMasterResolver:
         if country in uk_countries:
             return "UK"
         return None
+
+    def _is_vistafetch_validation_error(self, exc: Exception) -> bool:
+        message = str(exc)
+        return (
+            exc.__class__.__name__ == "ValidationError"
+            or "union_tag_invalid" in message
+            or "validation error" in message.lower()
+            or "Field required" in message
+        )
+
+    def _try_vistafetch_single_candidate(
+        self,
+        client,
+        ticker: str,
+        region_hint: str | None = None,
+    ) -> MasterDataResult | None:
+        try:
+            result = client.search_asset(search_term=ticker, max_candidates=1)
+        except Exception as retry_exc:
+            logger.warning(f"vistafetch single-candidate retry failed for {ticker}: {retry_exc}")
+            return None
+
+        try:
+            assets = result.assets if hasattr(result, "assets") else []
+            if not assets and hasattr(result, "get"):
+                single = result.get()
+                if single:
+                    assets = [single]
+        except Exception:
+            assets = []
+
+        for asset in assets:
+            try:
+                data = asset.as_json() if hasattr(asset, "as_json") else {}
+                if not data:
+                    continue
+
+                entity_type = (data.get("entity_type") or "").upper()
+                wkn = self._clean_identifier(data.get("wkn"), kind="wkn")
+                isin = self._clean_identifier(data.get("isin"), kind="isin")
+                if entity_type != "STOCK" or not wkn or not isin:
+                    continue
+
+                name = data.get("name") or data.get("tiny_name")
+                region = self._derive_region_from_isin(isin) or region_hint
+                return MasterDataResult(
+                    ticker=ticker,
+                    name=name,
+                    wkn=wkn,
+                    isin=isin,
+                    region=region,
+                    status="partial",
+                    source="vistafetch",
+                    note="single-candidate retry after vistafetch validation error; ticker-only match; verify identifiers",
+                )
+            except Exception:
+                continue
+
+        return None
+
+    def _clean_identifier(self, value: str | None, *, kind: str) -> str | None:
+        if value is None:
+            return None
+        text = str(value).strip()
+        if not text or text == "-":
+            return None
+        if kind == "isin":
+            return text if self._looks_like_isin(text) else None
+        if kind == "wkn":
+            return text if self._looks_like_wkn(text) else None
+        return text
