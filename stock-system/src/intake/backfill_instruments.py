@@ -102,6 +102,8 @@ def backfill_instruments(
             )
             registry_row = cursor.fetchone()
 
+        used_resolver = False
+
         if registry_row and (registry_row.get("name") or registry_row.get("isin")):
             master_data = {
                 "name": registry_row.get("name"),
@@ -116,6 +118,7 @@ def backfill_instruments(
             logger.info(f"{ticker}: Using data from candidate registry")
         else:
             # Fall back to resolver
+            used_resolver = True
             try:
                 result = resolver.resolve(ticker)
                 master_data = {
@@ -127,10 +130,6 @@ def backfill_instruments(
                     "source": result.source,
                     "note": result.note,
                 }
-                if result.status == "resolved":
-                    stats["from_resolver"] += 1
-                else:
-                    stats["unresolved"] += 1
                 logger.info(f"{ticker}: Resolved via {result.source} -> {result.status}")
             except Exception as exc:
                 logger.warning(f"Resolver failed for {ticker}: {exc}")
@@ -179,6 +178,16 @@ def backfill_instruments(
 
         # Count actual field updates (excluding metadata fields)
         field_updates = [k for k in updates.keys() if k not in ("mapping_note", "updated_at")]
+
+        if used_resolver:
+            status = master_data.get("status")
+            if status in {"resolved", "partial"}:
+                if field_updates:
+                    stats["from_resolver"] += 1
+                else:
+                    stats["skipped_filled"] += 1
+            elif status == "unresolved" and not field_updates:
+                stats["unresolved"] += 1
 
         if dry_run:
             logger.info(f"[DRY-RUN] {ticker}: would fill {len(field_updates)} fields: {field_updates}")
