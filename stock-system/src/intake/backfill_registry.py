@@ -41,7 +41,7 @@ def backfill_candidate_registry(
             placeholders = ", ".join(["%s"] * len(ticker_filter))
             cursor.execute(
                 f"""
-                SELECT id, ticker, name, wkn, isin, region, master_data_status
+                SELECT id, ticker, name, wkn, isin, region, master_data_status, master_data_source
                 FROM watchlist_candidate_registry
                 WHERE ticker IN ({placeholders})
                 ORDER BY id
@@ -51,13 +51,23 @@ def backfill_candidate_registry(
         else:
             cursor.execute(
                 """
-                SELECT id, ticker, name, wkn, isin, region, master_data_status
+                SELECT id, ticker, name, wkn, isin, region, master_data_status, master_data_source
                 FROM watchlist_candidate_registry
-                WHERE master_data_status IS NULL
-                   OR name IS NULL OR name = ''
-                   OR wkn IS NULL OR wkn = ''
-                   OR isin IS NULL OR isin = ''
-                   OR region IS NULL OR region = ''
+                WHERE (
+                    master_data_status IS NULL
+                    OR name IS NULL OR name = ''
+                    OR region IS NULL OR region = ''
+                    OR master_data_source IS NULL
+                )
+                OR (
+                    (wkn IS NULL OR wkn = '' OR isin IS NULL OR isin = '')
+                    AND NOT (
+                        master_data_status = 'partial'
+                        AND master_data_source = 'yfinance'
+                        AND name IS NOT NULL AND name != ''
+                        AND region IS NOT NULL AND region != ''
+                    )
+                )
                 ORDER BY id
                 LIMIT %s
                 """,
