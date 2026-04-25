@@ -155,6 +155,16 @@ class OnvistaRawInstrumentResolver:
                 note="No STOCK instruments with valid WKN/ISIN found"
             )
 
+        # Apply region_hint filter if provided
+        if region_hint:
+            normalized_hint = region_hint.upper()
+            filtered_matches = [
+                m for m in stock_matches
+                if self._derive_region_from_isin(m.get("isin")) == normalized_hint
+            ]
+            if filtered_matches:
+                stock_matches = filtered_matches
+
         # Check for ambiguity: multiple different ISINs or WKNs
         unique_isins = {m["isin"] for m in stock_matches if m["isin"]}
         unique_wkns = {m["wkn"] for m in stock_matches if m["wkn"]}
@@ -171,7 +181,6 @@ class OnvistaRawInstrumentResolver:
         name = match["name"]
         wkn = match["wkn"]
         isin = match["isin"]
-        region = self._derive_region_from_isin(isin) or region_hint
 
         # Determine if search term is ticker-only (not ISIN or WKN)
         is_ticker_only = not self._looks_like_isin(ticker) and not self._looks_like_wkn(ticker)
