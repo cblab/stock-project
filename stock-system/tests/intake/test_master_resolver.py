@@ -16,20 +16,22 @@ from intake.master_resolver import InstrumentMasterResolver, MasterDataResult
 
 
 class TestVistafetchResolution:
-    """Tests for vistafetch-based resolution."""
+    """Tests for vistafetch-based resolution with official API structure."""
 
     def test_unique_stock_match_with_wkn_isin_returns_resolved(self):
         """Single exact ticker match with WKN and ISIN -> resolved."""
         resolver = InstrumentMasterResolver()
 
-        # Mock vistafetch result
+        # Mock vistafetch result with OFFICIAL fields only
+        # No 'symbol' - that's not in the official API!
         mock_asset = MagicMock()
-        mock_asset.symbol = "AAPL"
         mock_asset.as_json.return_value = {
+            "entity_type": "STOCK",
+            "display_type": "Equity",
             "name": "Apple Inc.",
+            "tiny_name": "AAPL",
             "isin": "US0378331005",
             "wkn": "865985",
-            "display_type": "STOCK",
         }
 
         mock_result = MagicMock()
@@ -49,22 +51,25 @@ class TestVistafetchResolution:
         """Multiple matches with different ISINs -> ambiguous."""
         resolver = InstrumentMasterResolver()
 
+        # Use official fields: entity_type, isin, wkn, name, tiny_name
         mock_asset1 = MagicMock()
-        mock_asset1.symbol = "XYZ"
         mock_asset1.as_json.return_value = {
+            "entity_type": "STOCK",
+            "display_type": "Equity",
             "name": "XYZ Corp",
+            "tiny_name": "XYZ",
             "isin": "US1234567890",
             "wkn": "123456",
-            "display_type": "STOCK",
         }
 
         mock_asset2 = MagicMock()
-        mock_asset2.symbol = "XYZ"
         mock_asset2.as_json.return_value = {
+            "entity_type": "STOCK",
+            "display_type": "Equity",
             "name": "XYZ Ltd",
+            "tiny_name": "XYZ",
             "isin": "GB0987654321",
             "wkn": "987654",
-            "display_type": "STOCK",
         }
 
         mock_result = MagicMock()
@@ -77,14 +82,15 @@ class TestVistafetchResolution:
         assert result.status == "ambiguous"
         assert "Multiple instruments" in result.note
 
-    def test_no_exact_ticker_match_returns_unresolved(self):
-        """No exact ticker symbol match -> unresolved."""
+    def test_no_stock_entity_type_filtered_out(self):
+        """Non-STOCK entity types are filtered out."""
         resolver = InstrumentMasterResolver()
 
         mock_asset = MagicMock()
-        mock_asset.symbol = "OTHER"
         mock_asset.as_json.return_value = {
-            "name": "Other Company",
+            "entity_type": "FUND",  # Not STOCK
+            "display_type": "Fund",
+            "name": "Some Fund",
             "isin": "US1234567890",
             "wkn": "123456",
         }
@@ -104,9 +110,11 @@ class TestVistafetchResolution:
         resolver = InstrumentMasterResolver()
 
         mock_asset = MagicMock()
-        mock_asset.symbol = "AAPL"
         mock_asset.as_json.return_value = {
+            "entity_type": "STOCK",
+            "display_type": "Equity",
             "name": "Apple Inc.",
+            "tiny_name": "AAPL",
             # No isin, no wkn
         }
 
@@ -118,6 +126,51 @@ class TestVistafetchResolution:
             result = resolver._try_vistafetch("AAPL")
 
         assert result.status == "unresolved"
+
+    def test_tiny_name_used_for_ticker_matching(self):
+        """tiny_name field is used for ticker matching (not symbol)."""
+        resolver = InstrumentMasterResolver()
+
+        mock_asset = MagicMock()
+        mock_asset.as_json.return_value = {
+            "entity_type": "STOCK",
+            "name": "Apple Inc.",
+            "tiny_name": "AAPL",  # This is the ticker
+            "isin": "US0378331005",
+            "wkn": "865985",
+        }
+
+        mock_result = MagicMock()
+        mock_result.assets = [mock_asset]
+
+        with patch("vistafetch.VistaFetchClient") as mock_client:
+            mock_client.return_value.search_asset.return_value = mock_result
+            result = resolver._try_vistafetch("AAPL")
+
+        assert result.status == "resolved"
+
+    def test_note_contains_search_method(self):
+        """Master data note should contain search method and confidence."""
+        resolver = InstrumentMasterResolver()
+
+        mock_asset = MagicMock()
+        mock_asset.as_json.return_value = {
+            "entity_type": "STOCK",
+            "name": "Apple Inc.",
+            "tiny_name": "AAPL",
+            "isin": "US0378331005",
+            "wkn": "865985",
+        }
+
+        mock_result = MagicMock()
+        mock_result.assets = [mock_asset]
+
+        with patch("vistafetch.VistaFetchClient") as mock_client:
+            mock_client.return_value.search_asset.return_value = mock_result
+            result = resolver._try_vistafetch("AAPL")
+
+        # Note should indicate this was a ticker-only search
+        assert "ticker search" in result.note.lower() or "vistafetch" in result.note.lower()
 
 
 class TestYfinanceResolution:
@@ -185,31 +238,6 @@ class TestErrorHandling:
         assert "Network Error" in result.note
 
 
-class TestStatusPreservation:
-    """Tests for status preservation in backfill/registry."""
-
-    def test_none_master_data_does_not_degrade_existing_status(self):
-        """When master_data=None is passed, existing status should not be changed."""
-        # This is tested at the repository level - the SQL uses
-        # CASE WHEN %s IS NOT NULL to conditionally update
-        # Here we just verify the contract at the resolver level
-        resolver = InstrumentMasterResolver()
-
-        # A None result from resolver should not force "unresolved"
-        # The repository should check if master_data is None before setting status
-        assert True  # Repository test would need DB setup
-
-
-class TestBackfillIdempotency:
-    """Tests for backfill idempotency."""
-
-    def test_existing_values_not_overwritten(self):
-        """Backfill should only fill NULL/empty fields, never overwrite."""
-        # This would be tested at the repository/integration level
-        # The COALESCE pattern ensures this: COALESCE(new, existing)
-        assert True  # Repository test would need DB setup
-
-
 class TestAmbiguousHandling:
     """Tests for ambiguous match handling."""
 
@@ -218,23 +246,23 @@ class TestAmbiguousHandling:
         resolver = InstrumentMasterResolver()
         resolver._vistafetch_available = True
 
-        # Mock ambiguous result
+        # Mock ambiguous result using official fields only
         mock_asset1 = MagicMock()
-        mock_asset1.symbol = "XYZ"
         mock_asset1.as_json.return_value = {
+            "entity_type": "STOCK",
             "name": "XYZ Corp",
+            "tiny_name": "XYZ",
             "isin": "US1234567890",
             "wkn": "123456",
-            "display_type": "STOCK",
         }
 
         mock_asset2 = MagicMock()
-        mock_asset2.symbol = "XYZ"
         mock_asset2.as_json.return_value = {
+            "entity_type": "STOCK",
             "name": "XYZ Ltd",
+            "tiny_name": "XYZ",
             "isin": "GB0987654321",
             "wkn": "987654",
-            "display_type": "STOCK",
         }
 
         mock_result = MagicMock()
@@ -258,3 +286,30 @@ class TestMasterDataResult:
 
         with pytest.raises(Exception):
             result.status = "error"
+
+
+# Placeholder classes for DB-level tests that would need actual DB setup
+class TestStatusPreservation:
+    """Tests for status preservation in backfill/registry.
+
+    These would need DB setup to test properly:
+    - master_data=None does not degrade existing status
+    - SQL CASE WHEN %s IS NOTNULL pattern works correctly
+    """
+
+    def test_placeholder(self):
+        """Placeholder for DB-level status preservation tests."""
+        pytest.skip("Requires DB setup - implement as integration test")
+
+
+class TestBackfillIdempotency:
+    """Tests for backfill idempotency.
+
+    These would need DB setup to test properly:
+    - COALESCE pattern preserves existing values
+    - mapping_note only written on actual changes
+    """
+
+    def test_placeholder(self):
+        """Placeholder for DB-level idempotency tests."""
+        pytest.skip("Requires DB setup - implement as integration test")

@@ -68,7 +68,7 @@ class WatchlistIntakeActionService
                 [
                     'status' => $status,
                     'manual_action' => $action,
-                    'added_to_watchlist' => $added ? 1 : 0,
+                    'added_to_watchlist' => ($added || ($wasAlreadyActive && !$isPortfolio)) ? 1 : 0,
                     'reason' => $reason,
                     'updated_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
                 ],

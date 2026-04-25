@@ -164,6 +164,24 @@ class InstrumentMasterResolver:
 
             status = "resolved" if (wkn and isin and name) else "partial"
 
+            # Build informative note about search method and confidence
+            confidence_info = f"Ticker search matched {len(stock_matches)} result(s)"
+            if len(stock_matches) > 1:
+                confidence_info += f" with same ISIN/WKN"
+            confidence_info += f"; {len(isins)} unique ISIN(s), {len(wkns)} unique WKN(s)"
+
+            if status == "resolved":
+                note = confidence_info
+            else:
+                missing = []
+                if not wkn:
+                    missing.append("WKN")
+                if not isin:
+                    missing.append("ISIN")
+                if not name:
+                    missing.append("name")
+                note = f"{confidence_info}. Partial: missing {', '.join(missing)}"
+
             return MasterDataResult(
                 ticker=ticker,
                 name=name,
@@ -172,7 +190,7 @@ class InstrumentMasterResolver:
                 region=region,
                 status=status,
                 source="vistafetch",
-                note=None if status == "resolved" else "Partial resolution",
+                note=note,
             )
 
         except Exception as exc:
