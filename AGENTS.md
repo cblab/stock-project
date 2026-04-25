@@ -3,14 +3,106 @@
 ## Zweck
 
 Dieses Repository ist ein dockerisiertes Web-Projekt mit produktivem Compose-Stack.
+
 Arbeite konservativ, nachvollziehbar und mit minimalem Änderungsumfang.
+
 Bevorzuge kleine, überprüfbare Änderungen gegenüber großen Umbauten.
+
+Ziel ist nicht maximale Autonomie, sondern kontrollierte, überprüfbare Unterstützung bei Entwicklung, Debugging, Dokumentation und Review.
+
+---
+
+## Grundprinzip
+
+Erst verstehen, dann lesen, dann ändern.
+
+Arbeite nach diesem Ablauf:
+
+1. Problem verstehen.
+2. Relevanten Scope bestimmen.
+3. Nur die kleinste plausible Dateimenge prüfen.
+4. Bestehende Patterns im Repo beachten.
+5. Minimal nötige Änderung umsetzen.
+6. Kleinsten sinnvollen Check ausführen.
+7. Ergebnis, Grenzen und nächste Schritte klar ausgeben.
+
+Keine breiten Scans.
+
+Keine stillen Annahmen.
+
+Keine falschen Erfolgsmeldungen.
+
+---
+
+## OpenClaw Skills
+
+OpenClaw agents may use project-local skills when available.
+
+Project-local skills are expected at:
+
+```text
+/work/stock-project/skills/
+```
+
+The skills directory is local/non-public and may be gitignored.
+
+Do not assume the skills are present in every checkout.
+
+Rules:
+
+* Use project-local skills as operational guidance when available.
+* Do not copy private skill contents into public repository files.
+* Do not expose private agent names, private memory, credentials, tokens, or local-only private setup details.
+* If a skill conflicts with the current repository state, the current code and configuration win.
+* If a skill conflicts with this `AGENTS.md`, this `AGENTS.md` wins for public repository behavior.
+* Skills may guide workflow, verification, safety checks, and project conventions.
+* Skills must not be treated as permission to bypass review, tests, Git rules, or safety boundaries.
+
+Public repository files should use neutral terms such as:
+
+* Agent
+* OpenClaw agent
+* coding agent
+* assistant
+* worker
+
+Do not include private agent names in public project files.
+
+---
+
+## Projektkarte
+
+Die bevorzugte Orientierungsdatei für Projektstruktur ist:
+
+```text
+/work/stock-project/stock-project-project-map.md
+```
+
+Nutze diese Datei, wenn die Aufgabe eines dieser Themen betrifft:
+
+* Projektstruktur
+* Modulübersicht
+* relevante Dateien
+* Architektur
+* Navigation im Repository
+* Agentenübergabe
+* DeepWiki
+* Dokumentationsarbeit
+* größere Planungsaufgaben
+
+Die Projektkarte ist ein Navigationsanker, aber nicht die letzte Wahrheit über tatsächliches Laufzeitverhalten.
+
+Wenn Projektkarte, Dokumentation und Code widersprechen:
+
+```text
+aktueller Code > aktuelle Konfiguration > Logs > Projektkarte > Dokumentation > alte Notizen > Annahmen
+```
 
 ---
 
 ## Session-Management
 
-**Gilt nur für OpenClaw, nicht für Codex.**
+Gilt für OpenClaw-Sessions, nicht für Codex.
 
 Ziel: Kontextverlust vermeiden und stabile Arbeitsabläufe sicherstellen.
 
@@ -51,44 +143,95 @@ Hinweis:
 
 * `/compact` nur kurz vor dem Limit verwenden
 * grundsätzlich `/new` bevorzugen
+
 ---
 
 ## Arbeitsmodus
 
 1. Verstehe zuerst das Problem.
 2. Prüfe dann nur den dafür relevanten Code und die dafür relevante Konfiguration.
-3. Erstelle bei mittleren oder großen Änderungen zuerst einen kurzen Plan.
-4. Ändere nur die minimal nötigen Dateien.
-5. Führe passende, kleine Checks aus.
-6. Gib am Ende immer eine kurze Änderungszusammenfassung, betroffene Dateien und nächste Schritte aus.
+3. Nutze bei Strukturfragen zuerst die Projektkarte.
+4. Erstelle bei mittleren oder großen Änderungen zuerst einen kurzen Plan.
+5. Ändere nur die minimal nötigen Dateien.
+6. Führe passende, kleine Checks aus.
+7. Gib am Ende immer eine kurze Änderungszusammenfassung, betroffene Dateien und nächste Schritte aus.
 
 ---
 
 ## Globale Scan-Regeln
 
-**Scanne niemals breit das gesamte Repository.**
+Scanne niemals breit das gesamte Repository.
 
 Grundregel:
 
-* Lies nur Quellcode-Pfade, die direkt für die aktuelle Aufgabe nötig sind.
+* Lies nur Quellcode-, Konfigurations- oder Dokumentationspfade, die direkt für die aktuelle Aufgabe nötig sind.
 * Starte immer mit der kleinsten plausiblen Dateimenge.
 * Erweitere den Scope nur, wenn die Aufgabe anders nicht lösbar ist.
+* Dokumentation darf gezielt gelesen werden, aber nicht breit.
 
-### Standardmäßig relevante Hauptbereiche
+Breites Repo-Browsing ist ein Fehler.
 
-Diese beiden Bereiche sind standardmäßig die einzigen sinnvollen Startpunkte:
+---
+
+## Standardmäßig relevante Hauptbereiche
+
+Für normale Coding-Aufgaben sind die primären Startpunkte:
 
 * `stock-system/`
 * `web/`
 
-Auch innerhalb dieser Verzeichnisse gilt:
+Für Struktur-, Architektur-, Planungs-, Dokumentations- oder Agentenaufgaben sind zusätzlich gezielt relevant:
+
+* `stock-project-project-map.md`
+* `docs/`
+* `AGENTS.md`
+* `PLANS.md`, aber nur bei aktiven oder ausdrücklich erwähnten Plänen
+
+Auch innerhalb dieser Bereiche gilt:
 
 * beginne mit der kleinsten plausiblen Teilmenge
 * lies nicht „zur Sicherheit“ weitere Dateien
+* scanne `docs/` niemals breit
 
-### Standardmäßig irrelevante Bereiche
+---
 
-Diese Pfade sind für normale Coding-Aufgaben **standardmäßig tabu** und dürfen nicht gescannt, indiziert oder zur Orientierung gelesen werden:
+## Dokumentationszugriff
+
+`docs/` ist nicht pauschal tabu.
+
+Agenten dürfen `docs/` gezielt lesen, wenn die Aufgabe eines dieser Themen betrifft:
+
+* Architektur
+* Projektstruktur
+* Modulübersicht
+* Entscheidungen
+* Pläne
+* Setup
+* Troubleshooting
+* DeepWiki
+* Agentenregeln
+* Projektkarte
+* Dokumentation selbst
+
+Trotzdem gilt:
+
+* `docs/` niemals breit scannen
+* nur den kleinsten plausiblen Dokumentationspfad lesen
+* Dokumentation nicht als Ersatz für Codeprüfung verwenden
+* bei Widerspruch gewinnt aktueller Code
+* alte oder offensichtlich überholte Dokumente als unsicher markieren
+
+Die bevorzugte erste Orientierungsdatei ist:
+
+```text
+/work/stock-project/stock-project-project-map.md
+```
+
+---
+
+## Standardmäßig irrelevante Bereiche
+
+Diese Pfade sind für normale Coding-Aufgaben standardmäßig tabu und dürfen nicht gescannt, indiziert oder zur Orientierung gelesen werden:
 
 * `.aider.tags.cache.v4/`
 * `.cache/`
@@ -99,23 +242,29 @@ Diese Pfade sind für normale Coding-Aufgaben **standardmäßig tabu** und dürf
 * `.tools/`
 * `backups/`
 * `docker/`
-* `docs/`
 * `models/`
 * `repos/`
 * `runs/`
 
-Diese Dateien ebenfalls nicht lesen, außer die Aufgabe verlangt es ausdrücklich:
+Diese Dateien nicht lesen, außer die Aufgabe verlangt es ausdrücklich oder sie sind direkt relevant:
 
 * `.aider.chat.history.md`
 * `.aider.input.history`
 * `.env`
 * `LICENSE.md`
-* `PLANS.md`
+
+Diese Dateien dürfen gezielt gelesen werden, wenn es um Setup, Projektstruktur, Planung, Dokumentation oder Agentenübergabe geht:
+
 * `README.md`
+* `PLANS.md`
+* `AGENTS.md`
+* `stock-project-project-map.md`
 
-### Begründung
+---
 
-Diese Pfade enthalten meist:
+## Begründung der Scan-Regeln
+
+Irrelevante Pfade enthalten meist:
 
 * Caches
 * lokale Artefakte
@@ -123,19 +272,27 @@ Diese Pfade enthalten meist:
 * externe Abhängigkeiten
 * Notizen
 * Infrastrukturkontext
+* alte Runs
+* Modell- oder Tooling-Dateien
 
 Das Lesen dieser Inhalte verbraucht Kontext, erhöht das Fehlerrisiko und lenkt von der eigentlichen Code-Stelle ab.
 
-### Verbindliche Regeln
+---
 
-* Alles außerhalb von `stock-system/` und `web/` ist standardmäßig irrelevant.
+## Verbindliche Scan-Regeln
+
+* Alles außerhalb von `stock-system/`, `web/`, `docs/` und den explizit relevanten Root-Dateien ist standardmäßig irrelevant.
 * Cache-Verzeichnisse niemals lesen.
 * Hugging-Face-Caches niemals lesen.
 * Generierte Run-Artefakte niemals zur Code-Analyse verwenden.
 * Backups, Tooling-Verzeichnisse und lokale Hilfsordner nicht scannen.
-* Dokumentation nicht „für mehr Kontext“ lesen, wenn der Codepfad direkt auffindbar ist.
+* Dokumentation nicht „für mehr Kontext“ breit lesen.
+* Die Projektkarte gezielt für Orientierung nutzen.
+* Danach den tatsächlich betroffenen Code prüfen.
 
-### Eskalationsregel
+---
+
+## Eskalationsregel
 
 Erweitere den Scope nur, wenn:
 
@@ -144,10 +301,9 @@ Erweitere den Scope nur, wenn:
 
 Wenn eine Erweiterung nötig ist:
 
-* lies nur den **nächstkleineren plausiblen Pfad**
+* lies nur den nächstkleineren plausiblen Pfad
 * nicht gleich ein ganzes Subsystem
-
-**Breites Repo-Browsing ist ein Fehler.**
+* begründe kurz, warum der Scope erweitert wurde
 
 ---
 
@@ -158,8 +314,13 @@ Die folgenden Verhaltensweisen gelten als Fehler:
 * Cache-Verzeichnisse nach Kontext durchsuchen
 * Hugging-Face-Cache-Inhalte lesen
 * generierte Run-Artefakte lesen, um Quellcode zu verstehen
-* zuerst Doku, Pläne oder Notizen lesen statt den eigentlichen Codepfad
 * das ganze Repository indexieren, bevor die Zieldateien identifiziert wurden
+* breit Doku, Pläne oder Notizen lesen, obwohl der relevante Codepfad bereits eindeutig ist
+* Dokumentation als Wahrheit behandeln, ohne den betroffenen Code zu prüfen
+* alte Pläne als aktuellen Projektstand verwenden
+* neue Architektur erfinden, bevor bestehende Patterns geprüft wurden
+* mehrere Subsysteme ändern, wenn eine lokale Änderung reicht
+* line-ending-only Änderungen außerhalb des funktionalen Scopes erzeugen
 
 ---
 
@@ -171,6 +332,8 @@ Die folgenden Verhaltensweisen gelten als Fehler:
 * maximal 2–3 Dateien betroffen sind
 * keine Migration nötig ist
 * keine Architekturentscheidung betroffen ist
+* keine produktionskritische Pipeline betroffen ist
+* der relevante Codepfad eindeutig ist
 
 ### Erst planen, wenn:
 
@@ -179,10 +342,14 @@ Die folgenden Verhaltensweisen gelten als Fehler:
 * Datenmodell, Persistenz oder Hintergrundjobs betroffen sind
 * Refactoring über mehrere Dateien nötig ist
 * unklare Seiteneffekte zu erwarten sind
+* Docker-/Compose-Änderungen nötig sind
+* produktionskritische Pipeline- oder Worker-Logik betroffen ist
 
 Wenn ein Plan nötig ist:
 
-* schreibe zuerst eine kurze Checkliste in die Antwort
+* schreibe zuerst eine kurze Checkliste
+* benenne betroffene Bereiche
+* benenne Nicht-Ziele
 * beginne erst danach mit der Umsetzung
 
 ---
@@ -195,7 +362,7 @@ Gehe von diesem Zielbild aus, bis der Code etwas anderes zeigt:
 * MariaDB-Container
 * optional phpMyAdmin-Container
 * optional Pipeline- oder Worker-Container
-* Docker Compose ist die zentrale Quelle für lokale Orchestrierung
+* Docker Compose als zentrale lokale Orchestrierung
 
 Behandle Compose-Dateien, Env-Dateien, Startskripte und README nur dann als relevant, wenn die Aufgabe diese Ebenen wirklich betrifft.
 
@@ -205,14 +372,32 @@ Behandle Compose-Dateien, Env-Dateien, Startskripte und README nur dann als rele
 
 Prüfe in dieser Reihenfolge:
 
-1. Code und Konfiguration im aktuellen Repository
-2. direkt betroffene Laufzeitkonfiguration
-3. direkt betroffene Compose-Dateien oder Startskripte
-4. Logs und ausgeführte Befehle
-5. erst danach Dokumentation
-6. erst ganz am Ende Annahmen
+1. explizite aktuelle Benutzeranweisung
+2. `stock-project-project-map.md`, wenn die Aufgabe Projektstruktur, Navigation, Architektur oder relevante Dateien betrifft
+3. Code und Konfiguration im aktuellen Repository
+4. direkt betroffene Laufzeitkonfiguration
+5. direkt betroffene Compose-Dateien oder Startskripte
+6. Logs und ausgeführte Befehle
+7. direkt relevante Dokumentation unter `docs/`
+8. erst ganz am Ende Annahmen
 
-Erfinde kein Verhalten, das nicht durch Code oder Laufzeitbelege gestützt ist.
+Die kanonische Projektkarte liegt unter:
+
+```text
+/work/stock-project/stock-project-project-map.md
+```
+
+Die Projektkarte dient zur Navigation und Orientierung.
+
+Der aktuelle Code bleibt maßgeblich für tatsächliches Verhalten.
+
+Wenn Projektkarte, Dokumentation und Code widersprechen:
+
+```text
+aktueller Code > aktuelle Konfiguration > Logs > Projektkarte > Dokumentation > alte Notizen > Annahmen
+```
+
+Erfinde kein Verhalten, das nicht durch Code, Konfiguration, Logs oder gepflegte Projektdokumente gestützt ist.
 
 ---
 
@@ -229,15 +414,45 @@ Ohne ausdrückliche Freigabe nicht:
 * Docker-Volumes löschen
 * Container anderer Projekte verändern
 * Änderungen außerhalb dieses Repos durchführen
+* private Skill-Inhalte in öffentliche Dateien kopieren
+* private Agentennamen in öffentliche Dateien schreiben
 
 Ohne Rückfrage erlaubt:
 
-* Dateien im Repo lesen
+* Dateien im Repo lesen, wenn sie direkt relevant sind
+* die Projektkarte lesen, wenn Struktur oder Navigation relevant ist
+* relevante Dokumentation unter `docs/` gezielt lesen
 * kleine lokale Codeänderungen vornehmen
 * Tests, Lint, Typprüfungen und nicht-destruktive Inspektionen ausführen
 * Compose-Konfiguration analysieren
-* Logs lesen
+* bereitgestellte Logs analysieren
 * Git-Diffs, Branches und Commits vorbereiten
+
+---
+
+## Secrets-Regeln
+
+Niemals ausgeben oder speichern:
+
+* API Keys
+* OpenAI Keys
+* OpenRouter Keys
+* GitHub Tokens
+* Datenbankpasswörter
+* `.env`-Werte
+* Cookies
+* OAuth Tokens
+* SSH Private Keys
+* Broker-Zugangsdaten
+* Wallet Seeds
+
+Wenn ein Secret in Datei, Diff, Log oder Output auftaucht:
+
+1. nicht wiederholen
+2. klar sagen, dass ein Secret sichtbar ist
+3. Änderung stoppen, falls Commit/Push betroffen wäre
+4. Rotation empfehlen, wenn das Secret das lokale System verlassen haben könnte
+5. Secret aus dem Diff entfernen, falls relevant
 
 ---
 
@@ -250,29 +465,81 @@ Ohne Rückfrage erlaubt:
 * Niemals eigenständig mergen oder pushen, außer der Benutzer verlangt es ausdrücklich.
 * Wenn uncommitted Änderungen vorhanden sind, prüfe zuerst den Status und benenne ihn in der Antwort.
 * Keine line-ending-only Änderungen außerhalb des funktionalen Scopes.
+* Kein `git add .`, bevor der Diff geprüft wurde.
+* Keine History-Rewrites ohne ausdrückliche Freigabe.
+
+Vor Commit:
+
+```text
+git status geprüft
+git diff geprüft
+keine Secrets
+keine irrelevanten Dateien
+kleinster sinnvoller Check ausgeführt oder begründet nicht ausgeführt
+```
 
 ---
 
 ## Docker-Regeln
 
-* Betrachte Docker Compose als primäre lokale Orchestrierung.
-* Nutze vorhandene Service-Namen aus den Compose-Dateien statt neue zu erfinden.
-* Bevorzuge `docker compose config`, `ps`, `logs`, `exec` und andere nicht-destruktive Prüfpfade.
-* Führe Container-Neustarts nur aus, wenn sie für die Aufgabe wirklich nötig sind und der Benutzer das erlaubt.
-* Führe keine privilegierten Container oder Docker-Socket-Freigaben als schnelle Lösung ein.
-* Wenn eine Änderung nur per Host- oder Deploy-Schritt abgeschlossen werden kann, nenne den exakten Host-Befehl statt so zu tun, als sei die Aufgabe vollständig erledigt.
+Docker Compose ist die zentrale lokale Orchestrierung.
+
+Wichtig:
+
+* Manche Agenten laufen innerhalb eines Containers.
+* Ein Agent hat möglicherweise keinen Zugriff auf Docker-Binary oder Docker-Daemon.
+* Docker-Kommandos dürfen nicht als selbst ausgeführt behauptet werden, wenn kein Docker-Zugriff besteht.
+* Wenn Docker-Ausgabe nötig ist, nenne den exakten Host-Befehl für den Benutzer.
+
+Erlaubt:
+
+* Compose-Dateien analysieren, wenn sie für die Aufgabe relevant sind
+* Service-Namen aus Compose-Dateien ableiten
+* Logs analysieren, wenn der Benutzer sie bereitstellt
+* Host-Befehle exakt vorschlagen
+* nicht-destruktive Diagnosepfade empfehlen
+
+Nicht erlaubt ohne ausdrückliche Freigabe:
+
+* Container-Neustarts als erledigt behaupten
+* Docker-Volumes löschen
+* Docker-Prune-Befehle empfehlen
+* Docker-Socket-Freigaben als schnelle Lösung einführen
+* Container anderer Projekte verändern
+
+Wenn Docker-Ausgabe nötig ist, nenne den Host-Befehl exakt:
+
+```bash
+docker ps
+docker compose ps
+docker compose logs --tail=200 <service>
+docker logs --tail=200 <container>
+docker compose config
+```
+
+Kennzeichne solche Befehle immer als:
+
+```text
+Auf dem Host ausführen:
+```
+
+Wenn eine Änderung nur per Host- oder Deploy-Schritt abgeschlossen werden kann, nenne den exakten Host-Befehl und behaupte nicht, die Aufgabe sei vollständig erledigt.
 
 ---
 
 ## Datenbank-Regeln
 
-* Datenbankzugriffe sind standardmäßig read-only zu behandeln, solange nicht ausdrücklich etwas anderes verlangt wird.
-* Keine destruktiven DDL- oder DML-Befehle ohne ausdrückliche Freigabe.
-* Vor Änderungen am Schema immer zuerst:
+Datenbankzugriffe sind standardmäßig read-only zu behandeln, solange nicht ausdrücklich etwas anderes verlangt wird.
 
-  * vorhandene Migrationen prüfen
-  * betroffene Tabellen und Entitäten benennen
-  * Rückwärtskompatibilität einschätzen
+Keine destruktiven DDL- oder DML-Befehle ohne ausdrückliche Freigabe.
+
+Vor Änderungen am Schema immer zuerst:
+
+* vorhandene Migrationen prüfen
+* betroffene Tabellen und Entitäten benennen
+* Rückwärtskompatibilität einschätzen
+* Datenwirkung benennen
+* Rollback grob einschätzen
 
 Wenn eine Migration nötig ist, benenne klar:
 
@@ -281,19 +548,95 @@ Wenn eine Migration nötig ist, benenne klar:
 * wie ein Rollback grob aussehen würde
 * welche Dienste danach eventuell neu gestartet werden müssen
 
+Keine Befehle wie diese ohne explizite Freigabe:
+
+```sql
+DROP TABLE
+TRUNCATE TABLE
+DELETE FROM ...
+UPDATE ... ohne WHERE
+ALTER TABLE ... DROP COLUMN
+```
+
+Keine Befehle wie diese als schnelle Lösung verwenden:
+
+```bash
+doctrine:schema:update --force
+```
+
 ---
 
 ## Pipeline- und Worker-Regeln
 
-* Pipeline- und Job-Logik ist als produktionskritisch zu behandeln.
-* Änderungen an Worker-, Queue-, Cron- oder Job-Code immer separat benennen.
-* Bei Pipeline-Änderungen immer prüfen:
+Pipeline- und Job-Logik ist als produktionskritisch zu behandeln.
 
-  * Trigger
-  * Input und Output
-  * Fehlerverhalten
-  * Retry- und Idempotenzrisiken
-  * Datenbankseiteneffekte
+Änderungen an Worker-, Queue-, Cron- oder Job-Code immer separat benennen.
+
+Bei Pipeline-Änderungen immer prüfen:
+
+* Trigger
+* Input
+* Output
+* Fehlerverhalten
+* Retry-Verhalten
+* Idempotenzrisiken
+* Datenbankseiteneffekte
+* Laufzeitkosten
+* Seiteneffekte auf bestehende Runs
+
+Generierte Run-Artefakte nicht verwenden, um Quellcode zu verstehen.
+
+---
+
+## Web- und UI-Regeln
+
+Bei UI-Änderungen immer prüfen:
+
+* welche Route betroffen ist
+* welcher Controller betroffen ist
+* welches Template betroffen ist
+* welche Daten an das Template übergeben werden
+* welche User-Aktion ausgelöst wird
+* ob die Aktion State verändert
+* ob Labels und Tooltips eindeutig sind
+
+Für Finance-/Watchlist-UI gilt:
+
+* Research-Kandidat ist nicht Watchlist-Eintrag
+* Watchlist-Eintrag ist nicht Position
+* Signal ist nicht ausgeführter Trade
+* Score ist nicht Sicherheit
+* manuelle Review bleibt manuell
+
+Keine UI-Begriffe verwenden, die Ausführung suggerieren, wenn nur Research gemeint ist.
+
+---
+
+## Finance- und Watchlist-Grenzen
+
+Dieses Projekt ist ein Research-, Analyse- und Watchlist-System.
+
+Es ist kein autonomes Trading-System.
+
+Nicht einführen ohne ausdrückliche Freigabe:
+
+* automatische Käufe
+* automatische Verkäufe
+* Broker-Integration
+* Order-Ausführung
+* Speicherung von Broker-Zugangsdaten
+* Wallet- oder Exchange-Zugriff
+* automatische Watchlist-Aufnahme ohne explizite Benutzeraktion
+
+Immer unterscheiden:
+
+* Research-Kandidat
+* evaluierter Kandidat
+* Watchlist-Eintrag
+* Kaufkandidat
+* tatsächliche Position
+* Verkaufssignal
+* ausgeführte Transaktion
 
 ---
 
@@ -303,7 +646,7 @@ Nach jeder relevanten Änderung:
 
 1. Führe die kleinsten sinnvollen Checks aus.
 2. Melde klar, was tatsächlich ausgeführt wurde.
-3. Melde klar, was **nicht** ausgeführt wurde.
+3. Melde klar, was nicht ausgeführt wurde.
 4. Benenne Restrisiken offen.
 
 Wenn vorhanden, nutze projektspezifisch:
@@ -316,7 +659,12 @@ Wenn vorhanden, nutze projektspezifisch:
 * Smoke-Tests gegen lokale HTTP-Endpunkte
 
 Keine falschen Erfolgsbehauptungen.
+
 Wenn etwas nicht getestet wurde, sag es direkt.
+
+Eine Aufgabe ist nicht fertig, nur weil Code geändert wurde.
+
+Eine Aufgabe ist erst fertig, wenn der relevante Effekt geprüft wurde oder die Prüflücke offen benannt ist.
 
 ---
 
@@ -353,6 +701,9 @@ Am Ende jeder Umsetzung kurz und strukturiert ausgeben:
 * Füge neue Dependencies nur hinzu, wenn der Nutzen klar größer ist als der Wartungsaufwand.
 * Wenn du ein Pattern im Repo mehrfach siehst, richte dich danach.
 * Wenn du bewusst davon abweichst, begründe das.
+* Trenne Refactoring von Feature-Arbeit.
+* Trenne Bugfixes von Formatierungsänderungen.
+* Verändere keine unbeteiligten Dateien.
 
 ---
 
@@ -363,6 +714,18 @@ Bei komplexen Features oder größeren Refactors:
 * erstelle einen kurzen ExecPlan
 * speichere ihn bei Bedarf in `PLANS.md`
 * beginne die Umsetzung erst danach
+
+Ein ExecPlan sollte enthalten:
+
+* Ziel
+* Nicht-Ziele
+* betroffene Bereiche
+* geplante Schritte
+* Verifikation
+* Risiken
+* Rollback-Idee
+
+`PLANS.md` nicht als allgemeinen Kontextspeicher missbrauchen.
 
 ---
 
@@ -375,3 +738,14 @@ Vor Abschluss immer kurz selbst prüfen:
 * Gibt es versteckte Seiteneffekte auf DB, Pipeline oder Docker?
 * Wurde etwas angenommen, das nicht belegt ist?
 * Fehlt ein Host-Schritt, den der Benutzer noch ausführen muss?
+* Wurden private Skill-Inhalte oder private Agentennamen vermieden?
+* Wurde die Projektkarte genutzt, wenn Struktur relevant war?
+* Wurde Dokumentation nur gezielt und nicht breit gelesen?
+
+---
+
+## Schlussregel
+
+Dieses Repository soll durch Agentenarbeit nicht magisch, sondern kontrollierbarer werden.
+
+Kleine Änderungen, klare Belege, schmale Scans, überprüfbare Ergebnisse.

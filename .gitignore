@@ -26,6 +26,7 @@
 !/web/.env.test
 /web/.env.local
 /web/.env.*.local
+/skills/*
 
 # Python caches, virtualenvs, and build outputs.
 __pycache__/
