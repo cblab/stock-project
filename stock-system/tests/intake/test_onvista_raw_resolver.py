@@ -442,3 +442,215 @@ class TestExactIdentifierFiltering:
             assert result.status == "resolved"
             assert result.name == "Correct Corp"
             assert result.wkn == "862485"
+
+
+class TestNameHintFallback:
+    """Tests for name_hint fallback mechanism (e.g., MU -> Micron Technology)."""
+
+    # Fixture: MU search returns only wrong matches (no Micron)
+    MU_WRONG_FIXTURE = {
+        "expires": 1234567890,
+        "list": [
+            {
+                "entityType": "STOCK",
+                "name": "Muenchener Rueckversicherungs-Gesellschaft AG",
+                "isin": "DE0008430026",
+                "wkn": "843002",
+                "symbol": "MUV2",
+                "homeSymbol": "MUV2",
+                "entityValue": "1391001",
+                "urlName": "muenchener-rueck-aktie",
+            },
+            {
+                "entityType": "STOCK",
+                "name": "Mutares SE & Co KGaA",
+                "isin": "DE000A2NB650",
+                "wkn": "A2NB65",
+                "symbol": "MUX",
+                "homeSymbol": "MUX",
+                "entityValue": "1391002",
+                "urlName": "mutares-aktie",
+            },
+            {
+                "entityType": "STOCK",
+                "name": "Universal Music Group NV",
+                "isin": "NL0015000IY2",
+                "wkn": "A2T9VC",
+                "symbol": "UMG",
+                "homeSymbol": "UMG",
+                "entityValue": "1391003",
+                "urlName": "universal-music-group-aktie",
+            },
+        ]
+    }
+
+    # Fixture: Micron Technology search returns correct match
+    MICRON_FIXTURE = {
+        "expires": 1234567890,
+        "list": [
+            {
+                "entityType": "STOCK",
+                "name": "Micron Technology Inc.",
+                "isin": "US5951121038",
+                "wkn": "869020",
+                "symbol": "MTE",
+                "homeSymbol": "MU",
+                "entityValue": "1392001",
+                "urlName": "micron-technology-aktie",
+            },
+        ]
+    }
+
+    def test_mu_without_name_hint_remains_ambiguous_or_unresolved(self):
+        """MU without name_hint stays unresolved when Micron not in ticker results."""
+        resolver = OnvistaRawInstrumentResolver()
+
+        with patch.object(resolver, '_make_request', return_value=self.MU_WRONG_FIXTURE):
+            result = resolver.resolve("MU", region_hint="US")
+
+            # Should be ambiguous or unresolved because no match with home_symbol/symbol = MU
+            # (actual result depends on whether any matches remain after filtering)
+            assert result.status in ("ambiguous", "unresolved")
+
+    def test_mu_with_name_hint_finds_micron(self):
+        """MU with name_hint finds Micron Technology via fallback."""
+        resolver = OnvistaRawInstrumentResolver()
+
+        calls = []
+
+        def mock_request(url):
+            calls.append(url)
+            # First call is with ticker "MU", second with name_hint
+            if "searchValue=MU" in url:
+                return self.MU_WRONG_FIXTURE
+            return self.MICRON_FIXTURE
+
+        with patch.object(resolver, '_make_request', side_effect=mock_request):
+            result = resolver.resolve("MU", region_hint="US", name_hint="Micron Technology")
+
+            assert result.status == "partial", f"Expected partial, got {result.status} with note: {result.note}"
+            assert result.name == "Micron Technology Inc."
+            assert result.isin == "US5951121038"
+            assert result.wkn == "869020"
+            assert "name_hint" in result.note.lower() or "via" in result.note.lower()
+            assert len(calls) == 2, f"Expected 2 API calls, got {len(calls)}: {calls}"
+
+    def test_name_hint_fallback_checks_exact_ticker(self):
+        """name_hint fallback still applies exact ticker matching on results."""
+        resolver = OnvistaRawInstrumentResolver()
+
+        # Fixture with multiple results for name search, only one matches MU
+        multi_result_fixture = {
+            "expires": 1234567890,
+            "list": [
+                {
+                    "entityType": "STOCK",
+                    "name": "Micron Technology Inc.",
+                    "isin": "US5951121038",
+                    "wkn": "869020",
+                    "symbol": "MTE",
+                    "homeSymbol": "MU",
+                    "entityValue": "1392001",
+                    "urlName": "micron-technology-aktie",
+                },
+                {
+                    "entityType": "STOCK",
+                    "name": "Micron Solutions Inc.",
+                    "isin": "US5959999999",
+                    "wkn": "869021",
+                    "symbol": "MICR",
+                    "homeSymbol": "MICR",
+                    "entityValue": "1392002",
+                    "urlName": "micron-solutions-aktie",
+                },
+            ]
+        }
+
+        with patch.object(resolver, '_make_request', return_value=multi_result_fixture):
+            result = resolver.resolve("MU", region_hint="US", name_hint="Micron")
+
+            # Should filter to MU homeSymbol match
+            assert result.status == "partial"
+            assert result.isin == "US5951121038"
+
+    def test_name_hint_ambiguity_when_multiple_matches(self):
+        """name_hint fallback returns ambiguous if multiple different instruments match."""
+        resolver = OnvistaRawInstrumentResolver()
+
+        # Two different companies with homeSymbol=TEST after name search
+        ambiguous_fixture = {
+            "expires": 1234567890,
+            "list": [
+                {
+                    "entityType": "STOCK",
+                    "name": "Test Corp A",
+                    "isin": "US1111111111",
+                    "wkn": "A1B2C3",
+                    "symbol": "TEST",
+                    "homeSymbol": "TEST",
+                    "entityValue": "1",
+                    "urlName": "test-a",
+                },
+                {
+                    "entityType": "STOCK",
+                    "name": "Test Corp B",
+                    "isin": "US2222222222",
+                    "wkn": "D4E5F6",
+                    "symbol": "TEST",
+                    "homeSymbol": "TEST",
+                    "entityValue": "2",
+                    "urlName": "test-b",
+                },
+            ]
+        }
+
+        with patch.object(resolver, '_make_request', return_value=ambiguous_fixture):
+            result = resolver.resolve("TEST", region_hint="US", name_hint="Test Corp")
+
+            assert result.status == "ambiguous"
+            assert "US1111111111" in result.note
+            assert "US2222222222" in result.note
+
+    def test_empty_name_hint_ignored(self):
+        """Empty or whitespace name_hint is ignored."""
+        resolver = OnvistaRawInstrumentResolver()
+
+        with patch.object(resolver, '_make_request', return_value=self.MU_WRONG_FIXTURE) as mock:
+            # Empty string
+            result = resolver.resolve("MU", region_hint="US", name_hint="")
+            # Should not trigger fallback, only one API call
+            assert mock.call_count == 1
+
+        with patch.object(resolver, '_make_request', return_value=self.MU_WRONG_FIXTURE) as mock:
+            # Whitespace only
+            result = resolver.resolve("MU", region_hint="US", name_hint="   ")
+            # Should not trigger fallback, only one API call
+            assert mock.call_count == 1
+
+    def test_name_hint_not_used_for_isin_search(self):
+        """name_hint is not used when search is ISIN-based."""
+        resolver = OnvistaRawInstrumentResolver()
+
+        fixture = {
+            "expires": 1234567890,
+            "list": [
+                {
+                    "entityType": "STOCK",
+                    "name": "Test Corp",
+                    "isin": "US0326541051",
+                    "wkn": "862485",
+                    "symbol": "TEST",
+                    "homeSymbol": "TEST",
+                    "entityValue": "1",
+                    "urlName": "test",
+                },
+            ]
+        }
+
+        with patch.object(resolver, '_make_request', return_value=fixture) as mock:
+            result = resolver.resolve("US0326541051", name_hint="Some Other Name")
+
+            # Should resolve via ISIN, no fallback needed
+            assert result.status == "resolved"
+            # Only one API call (no fallback)
+            assert mock.call_count == 1
