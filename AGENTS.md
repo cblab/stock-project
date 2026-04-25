@@ -307,6 +307,18 @@ Wenn eine Erweiterung nötig ist:
 
 ---
 
+## Edit discipline
+
+Prefer minimal patch edits over rewriting entire files.
+
+Do not rewrite a full file unless:
+- the whole file is intentionally generated, or
+- the user explicitly asks for a full replacement.
+
+After editing, check: bash git diff --stat origin/main...HEAD
+
+---
+
 ## Anti-Patterns
 
 Die folgenden Verhaltensweisen gelten als Fehler:
