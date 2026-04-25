@@ -126,7 +126,7 @@ class OnvistaRawInstrumentResolver:
         ticker: str,
     ) -> list[dict]:
         """Filter matches by exact home_symbol or symbol match."""
-        normalized_ticker = ticker.upper()
+        normalized_ticker = ticker.strip().upper()
 
         home_symbol_matches = [
             m for m in stock_matches
@@ -336,7 +336,7 @@ class OnvistaRawInstrumentResolver:
                 name_search = name_hint.strip()
                 if name_search:
                     fallback_matches, api_error = self._search_and_filter(
-                        name_search, region_hint, ticker=original_ticker, is_ticker_only=False
+                        name_search, region_hint, ticker=search_value, is_ticker_only=False
                     )
                     if not api_error and fallback_matches:
                         fallback_result = self._resolve_from_matches(
@@ -352,7 +352,7 @@ class OnvistaRawInstrumentResolver:
             name_search = name_hint.strip()
             if name_search:
                 stock_matches, api_error = self._search_and_filter(
-                    name_search, region_hint, ticker=original_ticker, is_ticker_only=False
+                    name_search, region_hint, ticker=search_value, is_ticker_only=False
                 )
                 if not api_error and stock_matches:
                     return self._resolve_from_matches(
