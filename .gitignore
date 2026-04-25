@@ -71,3 +71,11 @@ temp/
 *.tmp
 *.bak
 .aider*
+.gitnexus
+
+# GitNexus generated code graph / local index
+.gitnexus/
+
+# Claude Code local/generated agent context
+.claude/
+CLAUDE.md
