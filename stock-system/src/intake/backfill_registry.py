@@ -6,7 +6,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from db.connection import get_connection
+from db.connection import connect
 from intake.master_resolver import InstrumentMasterResolver, MasterDataResult
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -149,20 +149,23 @@ def main():
     parser.add_argument("--project-root", type=Path, default=Path("/app"), help="Project root path")
     args = parser.parse_args()
 
-    connection = get_connection(project_root=args.project_root)
-    resolver = InstrumentMasterResolver()
+    connection = connect(args.project_root)
+    try:
+        resolver = InstrumentMasterResolver()
 
-    logger.info(f"Starting backfill (dry_run={args.dry_run}, batch_size={args.batch_size})")
-    stats = backfill_candidate_registry(
-        connection,
-        resolver,
-        batch_size=args.batch_size,
-        dry_run=args.dry_run,
-        ticker_filter=args.ticker or None,
-    )
-    logger.info(f"Backfill complete: {stats}")
+        logger.info(f"Starting backfill (dry_run={args.dry_run}, batch_size={args.batch_size})")
+        stats = backfill_candidate_registry(
+            connection,
+            resolver,
+            batch_size=args.batch_size,
+            dry_run=args.dry_run,
+            ticker_filter=args.ticker or None,
+        )
+        logger.info(f"Backfill complete: {stats}")
 
-    return 0 if stats.get("error", 0) == 0 else 1
+        return 0 if stats.get("error", 0) == 0 else 1
+    finally:
+        connection.close()
 
 
 if __name__ == "__main__":
