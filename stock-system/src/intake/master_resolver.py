@@ -77,6 +77,22 @@ class InstrumentMasterResolver:
         result = self._try_yfinance(ticker, region_hint)
         return result
 
+    def _looks_like_isin(self, term: str) -> bool:
+        """Check if term looks like an ISIN (2 letters + 10 alphanumeric)."""
+        if not term or len(term) != 12:
+            return False
+        return term[:2].isalpha() and term[2:].isalnum()
+
+    def _looks_like_wkn(self, term: str) -> bool:
+        """Check if term looks like a WKN (6 alphanumeric, typically uppercase)."""
+        if not term or len(term) != 6:
+            return False
+        return term.isalnum() and term.isupper()
+
+    def _is_ticker_only_search(self, search_term: str) -> bool:
+        """Determine if search term is just a ticker (not ISIN or WKN)."""
+        return not self._looks_like_isin(search_term) and not self._looks_like_wkn(search_term)
+
     def _try_vistafetch(self, ticker: str, region_hint: str | None = None) -> MasterDataResult:
         """Try to resolve via vistafetch/Onvista."""
         try:
@@ -162,25 +178,35 @@ class InstrumentMasterResolver:
             isin = match.get("isin")
             region = self._derive_region_from_isin(isin) or region_hint
 
-            status = "resolved" if (wkn and isin and name) else "partial"
+            # Determine if this is a ticker-only search (no ISIN/WKN provided)
+            is_ticker_only = self._is_ticker_only_search(ticker)
 
-            # Build informative note about search method and confidence
-            confidence_info = f"Ticker search matched {len(stock_matches)} result(s)"
-            if len(stock_matches) > 1:
-                confidence_info += f" with same ISIN/WKN"
-            confidence_info += f"; {len(isins)} unique ISIN(s), {len(wkns)} unique WKN(s)"
-
-            if status == "resolved":
-                note = confidence_info
+            if is_ticker_only:
+                # Ticker-only searches: never resolved, max partial
+                # Multiple listings with same ISIN/WKN is still just ticker-only
+                status = "partial"  # ticker-only match; cannot be resolved
+                note = f"ticker-only match; verify identifiers. Matched {len(stock_matches)} result(s) with same ISIN/WKN"
             else:
-                missing = []
-                if not wkn:
-                    missing.append("WKN")
-                if not isin:
-                    missing.append("ISIN")
-                if not name:
-                    missing.append("name")
-                note = f"{confidence_info}. Partial: missing {', '.join(missing)}"
+                # ISIN or WKN search: can be resolved if all fields present
+                status = "resolved" if (wkn and isin and name) else "partial"
+
+                # Build informative note about search method and confidence
+                confidence_info = f"Search matched {len(stock_matches)} result(s)"
+                if len(stock_matches) > 1:
+                    confidence_info += f" with same ISIN/WKN"
+                confidence_info += f"; {len(isins)} unique ISIN(s), {len(wkns)} unique WKN(s)"
+
+                if status == "resolved":
+                    note = confidence_info
+                else:
+                    missing = []
+                    if not wkn:
+                        missing.append("WKN")
+                    if not isin:
+                        missing.append("ISIN")
+                    if not name:
+                        missing.append("name")
+                    note = f"{confidence_info}. Partial: missing {', '.join(missing)}"
 
             return MasterDataResult(
                 ticker=ticker,
@@ -232,13 +258,16 @@ class InstrumentMasterResolver:
             except Exception:
                 isin = info.get("isin")
 
-            # Derive region from exchange or country
+            # Derive region: hint -> ISIN -> country -> exchange
+            # Exchange is last because a Canadian company can list on NASDAQ
             exchange = info.get("exchange", "")
             country = info.get("country", "")
-            region = region_hint
-
-            if not region:
-                region = self._derive_region_from_exchange(exchange) or self._derive_region_from_country(country)
+            region = (
+                region_hint
+                or self._derive_region_from_isin(isin)
+                or self._derive_region_from_country(country)
+                or self._derive_region_from_exchange(exchange)
+            )
 
             # yfinance doesn't provide WKN - this is expected
             # yfinance can NEVER be "resolved" because WKN is missing
@@ -259,7 +288,7 @@ class InstrumentMasterResolver:
                 region=region,
                 status=status,
                 source="yfinance",
-                note=None if status == "resolved" else "Partial resolution - no WKN from yfinance",
+                note="Partial resolution - no WKN from yfinance",
             )
 
         except Exception as exc:
@@ -297,12 +326,13 @@ class InstrumentMasterResolver:
 
     def _derive_region_from_country(self, country: str) -> str | None:
         """Derive region from country name."""
-        us_countries = {"United States", "USA", "US"}
+        if country in {"United States", "USA", "US"}:
+            return "US"
+        if country in {"Canada", "CA"}:
+            return "CA"
         eu_countries = {"Germany", "France", "Netherlands", "Belgium", "Austria", "Switzerland",
                        "Spain", "Italy", "Portugal", "Ireland", "Denmark", "Sweden", "Norway", "Finland"}
         uk_countries = {"United Kingdom", "UK", "Great Britain", "England", "Scotland", "Wales", "Northern Ireland"}
-        if country in us_countries:
-            return "US"
         if country in eu_countries:
             return "EU"
         if country in uk_countries:

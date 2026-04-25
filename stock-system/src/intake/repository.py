@@ -331,7 +331,7 @@ class IntakeRepository:
         if manual_state == "REJECTED" and self._should_reactivate_rejected(existing, candidate, latest_sepa):
             manual_state = None
             reason = "reactivated_quality_improved"
-        active_candidate = 0 if manual_state in {"ADDED_TO_WATCHLIST", "REJECTED"} else 1
+        active_candidate = 0 if manual_state in {"ADDED_TO_WATCHLIST", "REJECTED", "ALREADY_IN_PORTFOLIO"} else 1
         best_score = max(float(existing.get("best_intake_score") or 0.0), float(candidate.intake_score))
         with self.connection.cursor() as cursor:
             cursor.execute(
@@ -482,6 +482,7 @@ class IntakeRepository:
         if action not in status_by_action:
             raise ValueError("Manual action must be one of: add, dismiss.")
         added = False
+        is_portfolio = False
         if action == "add":
             signals = self.latest_signals(ticker)
             # Fetch master data from registry if available
@@ -501,7 +502,12 @@ class IntakeRepository:
                 note += " Master data partial - some fields may be missing."
 
             if signals and signals.get("id"):
-                if not bool(signals.get("is_portfolio")):
+                is_portfolio = bool(signals.get("is_portfolio"))
+                if is_portfolio:
+                    # Portfolio instruments are tracked separately, don't treat as watchlist add
+                    # Don't modify existing instrument fields
+                    added = False
+                else:
                     self.promote_existing_to_watchlist(
                         int(signals["id"]),
                         note,
@@ -510,7 +516,7 @@ class IntakeRepository:
                         master_isin=master_isin,
                         master_region=master_region,
                     )
-                added = True
+                    added = True
             else:
                 self.add_to_watchlist(
                     ticker,
@@ -521,6 +527,14 @@ class IntakeRepository:
                     isin=master_isin,
                 )
                 added = True
+        # Determine final status and reason
+        if action == "add" and is_portfolio:
+            final_status = "ALREADY_IN_PORTFOLIO"
+            final_reason = "already_in_portfolio"
+        else:
+            final_status = status_by_action[action]
+            final_reason = reason_by_action[action]
+
         now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
         with self.connection.cursor() as cursor:
             cursor.execute(
@@ -530,16 +544,16 @@ class IntakeRepository:
                 WHERE id = %s
                 """,
                 (
-                    status_by_action[action],
+                    final_status,
                     action,
                     1 if added else 0,
-                    reason_by_action[action],
+                    final_reason,
                     now,
                     candidate_id,
                 ),
             )
         self.connection.commit()
-        return {"ticker": ticker, "status": status_by_action[action], "added_to_watchlist": added}
+        return {"ticker": ticker, "status": final_status, "added_to_watchlist": added}
 
     def finish_run(self, run_id: int, *, status: str, summary: dict, exit_code: int | None = None, error_summary: str | None = None) -> None:
         now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")

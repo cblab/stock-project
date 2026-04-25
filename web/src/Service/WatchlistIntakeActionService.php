@@ -136,28 +136,44 @@ class WatchlistIntakeActionService
         if ($instrument) {
             // For existing non-portfolio instrument: always fill NULL fields, never overwrite existing values
             $updateData = [
-                'mapping_note' => trim(((string) ($instrument['mapping_note'] ?? ''))."\n".$note),
                 'updated_at' => $now,
             ];
+
+            $wasReactivated = false;
+            $hasMasterDataUpdate = false;
 
             // Only change active if not already active
             if (!(bool) $instrument['active']) {
                 $updateData['active'] = 1;
                 $updateData['is_portfolio'] = 0;
+                $wasReactivated = true;
             }
 
             // Only update NULL/empty fields - never overwrite existing values
             if (empty($instrument['name']) && $masterName !== null) {
                 $updateData['name'] = $masterName;
+                $hasMasterDataUpdate = true;
             }
             if (empty($instrument['wkn']) && $masterWkn !== null) {
                 $updateData['wkn'] = $masterWkn;
+                $hasMasterDataUpdate = true;
             }
             if (empty($instrument['isin']) && $masterIsin !== null) {
                 $updateData['isin'] = $masterIsin;
+                $hasMasterDataUpdate = true;
             }
             if (empty($instrument['region']) && $masterRegion !== null) {
                 $updateData['region'] = $masterRegion;
+                $hasMasterDataUpdate = true;
+            }
+
+            // Only update mapping_note if:
+            // - instrument was reactivated, OR
+            // - master data fields were added, OR
+            // - same note not already present
+            $existingNote = (string) ($instrument['mapping_note'] ?? '');
+            if ($wasReactivated || $hasMasterDataUpdate || strpos($existingNote, $note) === false) {
+                $updateData['mapping_note'] = trim($existingNote . "\n" . $note);
             }
 
             $this->connection->update('instrument', $updateData, ['id' => $instrument['id']]);

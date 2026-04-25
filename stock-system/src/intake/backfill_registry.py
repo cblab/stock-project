@@ -114,6 +114,11 @@ def backfill_candidate_registry(
         # If status would degrade (e.g., resolved -> error), preserve existing status
         # but still allow field updates if resolver found useful data
 
+        # Skip if no actual updates (idempotent: repeated runs without changes don't touch DB)
+        if not updates:
+            stats["skipped"] += 1
+            continue
+
         updates["updated_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
         stats[result.status] = stats.get(result.status, 0) + 1
