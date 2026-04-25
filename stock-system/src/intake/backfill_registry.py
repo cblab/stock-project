@@ -92,10 +92,28 @@ def backfill_candidate_registry(
         if not row.get("region") and result.region:
             updates["region"] = result.region
 
-        # Always set master data tracking fields
-        updates["master_data_status"] = result.status
-        updates["master_data_source"] = result.source
-        updates["master_data_note"] = result.note
+        # Status hierarchy: resolved > partial > ambiguous > unresolved > error
+        # Only update status if new status is better or equal, never degrade
+        STATUS_RANK = {"resolved": 5, "partial": 4, "ambiguous": 3, "unresolved": 2, "error": 1}
+        existing_status = row.get("master_data_status") or "unresolved"
+        existing_rank = STATUS_RANK.get(existing_status, 0)
+        new_rank = STATUS_RANK.get(result.status, 0)
+
+        # Update status only if:
+        # 1. New status is strictly better (higher rank), OR
+        # 2. We're filling actual data fields (not just status tracking)
+        field_updates = [k for k in updates.keys() if k in ("name", "wkn", "isin", "region")]
+        status_improved = new_rank > existing_rank
+        status_same = new_rank == existing_rank
+        has_field_updates = len(field_updates) > 0
+
+        if status_improved or (status_same and has_field_updates) or not existing_status:
+            updates["master_data_status"] = result.status
+            updates["master_data_source"] = result.source
+            updates["master_data_note"] = result.note
+        # If status would degrade (e.g., resolved -> error), preserve existing status
+        # but still allow field updates if resolver found useful data
+
         updates["updated_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
         stats[result.status] = stats.get(result.status, 0) + 1

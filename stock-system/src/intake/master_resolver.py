@@ -297,7 +297,7 @@ class InstrumentMasterResolver:
 
     def _derive_region_from_country(self, country: str) -> str | None:
         """Derive region from country name."""
-        us_countries = {"United States", "USA", "US", "Canada", "CA"}
+        us_countries = {"United States", "USA", "US"}
         eu_countries = {"Germany", "France", "Netherlands", "Belgium", "Austria", "Switzerland",
                        "Spain", "Italy", "Portugal", "Ireland", "Denmark", "Sweden", "Norway", "Finland"}
         uk_countries = {"United Kingdom", "UK", "Great Britain", "England", "Scotland", "Wales", "Northern Ireland"}
