@@ -30,13 +30,13 @@ class OnvistaRawResult:
 
 class OnvistaRawInstrumentResolver:
     """Resolves instrument data via direct Onvista API calls.
-    
+
     Bypasses vistafetch validation issues by handling raw JSON directly.
     Filters for STOCK type only, requires WKN and ISIN.
     Never guesses on ambiguity.
     """
 
-    SEARCH_URL = "https://api.onvista.de/api/v1/instruments/search"
+    SEARCH_URL = "https://api.onvista.de/api/v1/instruments/query"
     TIMEOUT = 10
 
     def __init__(self) -> None:
@@ -79,16 +79,16 @@ class OnvistaRawInstrumentResolver:
 
     def resolve(self, ticker: str, region_hint: str | None = None) -> OnvistaRawResult:
         """Resolve instrument data via Onvista API.
-        
+
         Args:
             ticker: Ticker symbol to search
             region_hint: Optional region hint (e.g., 'US', 'DE')
-            
+
         Returns:
             OnvistaRawResult with resolved data or status indicating result
         """
         try:
-            url = f"{self.SEARCH_URL}?q={urllib.parse.quote(ticker)}"
+            url = f"{self.SEARCH_URL}?limit=5&searchValue={urllib.parse.quote(ticker)}"
             data = self._make_request(url)
         except urllib.error.URLError as exc:
             logger.warning(f"Onvista API request failed for {ticker}: {exc}")
@@ -108,7 +108,7 @@ class OnvistaRawInstrumentResolver:
         # Extract instruments from response
         # Onvista API returns: {"expires": ..., "list": [{...}, ...]}
         instruments = data.get("list", []) if isinstance(data, dict) else []
-        
+
         if not instruments:
             return OnvistaRawResult(
                 ticker=ticker,
@@ -173,8 +173,16 @@ class OnvistaRawInstrumentResolver:
         isin = match["isin"]
         region = self._derive_region_from_isin(isin) or region_hint
 
-        # Determine status based on completeness
-        if wkn and isin and name:
+        # Determine if search term is ticker-only (not ISIN or WKN)
+        is_ticker_only = not self._looks_like_isin(ticker) and not self._looks_like_wkn(ticker)
+
+        # Determine status based on completeness and search type
+        if is_ticker_only:
+            # Ticker-only searches: never resolved, max partial
+            status = "partial"
+            note = "ticker-only raw Onvista match; verify identifiers"
+        elif wkn and isin and name:
+            # ISIN/WKN search with complete data: resolved
             status = "resolved"
             note = f"Unique STOCK match: {len(stock_matches)} listing(s) with same ISIN/WKN"
         elif wkn or isin:
