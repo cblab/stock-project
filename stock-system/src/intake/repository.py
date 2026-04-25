@@ -383,12 +383,12 @@ class IntakeRepository:
                     master_wkn,
                     master_isin,
                     master_region,
-                    master_status,  -- for WHEN check
-                    master_status,  -- for THEN value
-                    master_source,  -- for WHEN check
-                    master_source,  -- for THEN value
-                    master_note,    -- for WHEN check
-                    master_note,    -- for THEN value
+                    master_status,  # for WHEN check
+                    master_status,  # for THEN value
+                    master_source,  # for WHEN check
+                    master_source,  # for THEN value
+                    master_note,    # for WHEN check
+                    master_note,    # for THEN value
                     now,
                     existing["id"],
                 ),

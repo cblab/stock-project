@@ -147,27 +147,37 @@ def backfill_instruments(
         if not row.get("region") and master_data.get("region"):
             updates["region"] = master_data["region"]
 
-        # Update mapping note with source info
-        current_note = row.get("mapping_note") or ""
-        source_info = f"[Backfill {datetime.now(timezone.utc).strftime('%Y-%m-%d')}]"
-        if master_data.get("status") == "resolved":
-            source_info += f" Master data resolved via {master_data.get('source')}."
-        elif master_data.get("status") == "partial":
-            source_info += f" Partial master data from {master_data.get('source')}."
-        elif master_data.get("status") == "ambiguous":
-            source_info += " Master data ambiguous - manual verification needed."
-        else:
-            source_info += f" Master data unresolved: {master_data.get('note', 'Unknown')}."
+        # Only update mapping_note if we actually changed something
+        field_updates = [k for k in updates.keys() if k not in ("mapping_note", "updated_at")]
+        if field_updates:
+            current_note = row.get("mapping_note") or ""
+            source_info = f"[Backfill {datetime.now(timezone.utc).strftime('%Y-%m-%d')}]"
+            if master_data.get("status") == "resolved":
+                source_info += f" Master data resolved via {master_data.get('source')}."
+            elif master_data.get("status") == "partial":
+                source_info += f" Partial master data from {master_data.get('source')}."
+            elif master_data.get("status") == "ambiguous":
+                source_info += " Master data ambiguous - manual verification needed."
+            else:
+                source_info += f" Master data unresolved: {master_data.get('note', 'Unknown')}."
 
-        new_note = (current_note + "\n" + source_info).strip()
-        updates["mapping_note"] = new_note
+            new_note = (current_note + "\n" + source_info).strip()
+            updates["mapping_note"] = new_note
+
         updates["updated_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
+        # Count actual field updates (excluding metadata fields)
+        field_updates = [k for k in updates.keys() if k not in ("mapping_note", "updated_at")]
+
         if dry_run:
-            logger.info(f"[DRY-RUN] {ticker}: updates={updates}")
+            logger.info(f"[DRY-RUN] {ticker}: would fill {len(field_updates)} fields: {field_updates}")
             continue
 
-        # Execute update
+        # Execute update only if we have actual changes
+        if not field_updates:
+            logger.info(f"{ticker}: No empty fields to fill, skipping")
+            continue
+
         with connection.cursor() as cursor:
             set_clause = ", ".join([f"{k} = %s" for k in updates.keys()])
             values = list(updates.values()) + [inst_id]
@@ -176,7 +186,7 @@ def backfill_instruments(
                 tuple(values),
             )
         connection.commit()
-        logger.info(f"Updated {ticker}: filled {len([k for k in updates if k not in ('mapping_note', 'updated_at')])} fields")
+        logger.info(f"Updated {ticker}: filled {len(field_updates)} fields")
 
     return stats
 

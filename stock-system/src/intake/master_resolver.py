@@ -105,35 +105,20 @@ class InstrumentMasterResolver:
                     note="No results from vistafetch search",
                 )
 
-            # Strict matching: only accept exact ticker matches with valid ISIN/WKN
-            # No "ticker in name" or "any asset with ISIN" fallbacks - too risky for false positives
+            # vistafetch matching: use ONLY documented fields from as_json():
+            # entity_type, isin, name, tiny_name, wkn (no symbol/ticker attribute)
+            # Filter for STOCK entity_type, require ISIN and/or WKN
             stock_matches = []
             for asset in assets:
                 try:
-                    # Get symbol from asset attributes (not from as_json)
-                    asset_symbol = None
-                    if hasattr(asset, "symbol"):
-                        asset_symbol = asset.symbol
-                    elif hasattr(asset, "ticker"):
-                        asset_symbol = asset.ticker
-
-                    # Must have exact ticker match
-                    if not asset_symbol or asset_symbol.upper() != ticker.upper():
-                        continue
-
-                    # Get structured data
                     data = asset.as_json() if hasattr(asset, "as_json") else {}
                     if not data:
                         continue
 
-                    # Check for display_type if available - prefer STOCK/Equity
-                    display_type = data.get("display_type", "")
+                    # Only accept STOCK entity_type (documented field)
                     entity_type = data.get("entity_type", "")
-
-                    is_stock = (
-                        display_type.upper() in {"STOCK", "EQUITY", "SHARE"} or
-                        entity_type.upper() in {"STOCK", "EQUITY", "SHARE"}
-                    )
+                    if entity_type.upper() != "STOCK":
+                        continue
 
                     # Require ISIN and/or WKN for any match
                     isin = data.get("isin")
@@ -143,7 +128,6 @@ class InstrumentMasterResolver:
 
                     stock_matches.append({
                         "data": data,
-                        "is_stock": is_stock,
                         "isin": isin,
                         "wkn": wkn,
                     })
@@ -155,7 +139,7 @@ class InstrumentMasterResolver:
                     ticker=ticker,
                     status="unresolved",
                     source="vistafetch",
-                    note="No exact ticker match with ISIN/WKN found",
+                    note="No STOCK match with ISIN/WKN found",
                 )
 
             # Check for ambiguity: multiple different ISINs or WKNs
@@ -167,15 +151,11 @@ class InstrumentMasterResolver:
                     ticker=ticker,
                     status="ambiguous",
                     source="vistafetch",
-                    note=f"Multiple instruments with same ticker: {len(isins)} different ISINs, {len(wkns)} different WKNs",
+                    note=f"Multiple STOCK instruments: {len(isins)} different ISINs, {len(wkns)} different WKNs",
                 )
 
-            # Single unique instrument - take first stock match, or first match if no stocks
-            stock_candidates = [m for m in stock_matches if m["is_stock"]]
-            if stock_candidates:
-                match = stock_candidates[0]["data"]
-            else:
-                match = stock_matches[0]["data"]
+            # Single unique instrument (same ISIN/WKN across multiple listings)
+            match = stock_matches[0]["data"]
 
             name = match.get("name") or match.get("tiny_name")
             wkn = match.get("wkn")
@@ -274,20 +254,17 @@ class InstrumentMasterResolver:
             )
 
     def _derive_region_from_isin(self, isin: str | None) -> str | None:
-        """Derive region from ISIN prefix."""
+        """Derive region from ISIN prefix (country code, not bucket).
+
+        Returns the actual country code (US, CA, DE, etc.) not a bucket.
+        CA is preserved separately, not grouped under US.
+        """
         if not isin or len(isin) < 2:
             return None
         prefix = isin[:2].upper()
-        us_codes = {"US", "CA"}
-        eu_codes = {"DE", "FR", "NL", "BE", "AT", "CH", "ES", "IT", "PT", "IE", "DK", "SE", "NO", "FI"}
-        uk_codes = {"GB", "JE", "GG", "IM"}
-        if prefix in us_codes:
-            return "US"
-        if prefix in eu_codes:
-            return "EU"
-        if prefix in uk_codes:
-            return "UK"
-        return None
+        # Return the actual country code, not a bucket
+        # This preserves CA (Canada) separately from US
+        return prefix
 
     def _derive_region_from_exchange(self, exchange: str) -> str | None:
         """Derive region from exchange code."""
