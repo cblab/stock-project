@@ -5,6 +5,7 @@ from pathlib import Path
 from intake.candidates import evaluate_candidates
 from intake.config import load_intake_config
 from intake.market import CachedMarketClient
+from intake.master_resolver import InstrumentMasterResolver
 from intake.repository import IntakeRepository, summarize_error
 from intake.sector_discovery import discover_top_sectors
 
@@ -21,6 +22,7 @@ class SectorWatchlistIntakeEngine:
             ttl_hours=int(settings.get("cache_ttl_hours", 12)),
         )
         self.repository = IntakeRepository(connection)
+        self.master_resolver = InstrumentMasterResolver()
 
     def run(self, *, mode: str = "db", dry_run: bool = True) -> dict:
         run_id = self.repository.create_run(mode=mode, dry_run=True, config=self.config)
@@ -38,7 +40,17 @@ class SectorWatchlistIntakeEngine:
             diagnostics = {**diagnostics, **sector_diagnostics}
             for candidate in candidates:
                 candidate_id = self.repository.write_candidate(run_id, candidate)
-                self.repository.upsert_registry(run_id=run_id, candidate_id=candidate_id, candidate=candidate)
+                # Resolve master data for top/strong candidates only to save API calls
+                master_data = None
+                if candidate.status in {"TOP_CANDIDATE", "STRONG_CANDIDATE"}:
+                    try:
+                        region_hint = candidate.detail.get("signals", {}).get("region") if candidate.detail.get("signals") else None
+                        master_result = self.master_resolver.resolve(candidate.ticker, region_hint=region_hint)
+                        master_data = master_result.to_dict()
+                    except Exception:
+                        # Never block intake on master data resolution failure
+                        master_data = {"ticker": candidate.ticker, "status": "error", "source": None, "note": "Resolution failed"}
+                self.repository.upsert_registry(run_id=run_id, candidate_id=candidate_id, candidate=candidate, master_data=master_data)
             summary = {
                 "run_id": run_id,
                 "proposal_only": True,
