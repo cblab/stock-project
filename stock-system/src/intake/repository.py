@@ -71,33 +71,55 @@ class IntakeRepository:
             cursor.execute("SELECT id FROM instrument WHERE input_ticker = %s LIMIT 1", (ticker,))
             return cursor.fetchone() is not None
 
-    def add_to_watchlist(self, ticker: str, *, name: str | None, region: str, note: str) -> int:
+    def add_to_watchlist(self, ticker: str, *, name: str | None, region: str, note: str, wkn: str | None = None, isin: str | None = None) -> int:
         now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
         with self.connection.cursor() as cursor:
             cursor.execute(
                 """
                 INSERT INTO instrument
-                (input_ticker, provider_ticker, display_ticker, name, asset_class, region, active, is_portfolio,
+                (input_ticker, provider_ticker, display_ticker, name, wkn, isin, asset_class, region, active, is_portfolio,
                  mapping_status, mapping_note, region_exposure, sector_profile, top_holdings_profile, macro_profile,
                  direct_news_weight, context_news_weight, created_at, updated_at)
-                VALUES (%s, %s, %s, %s, 'Equity', %s, 1, 0, 'sector_intake', %s, JSON_ARRAY(), JSON_ARRAY(), JSON_ARRAY(), JSON_ARRAY(), 1.0, 0.0, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, 'Equity', %s, 1, 0, 'sector_intake', %s, JSON_ARRAY(), JSON_ARRAY(), JSON_ARRAY(), JSON_ARRAY(), 1.0, 0.0, %s, %s)
                 """,
-                (ticker, ticker, ticker, name, region, note, now, now),
+                (ticker, ticker, ticker, name, wkn, isin, region, note, now, now),
             )
             instrument_id = int(cursor.lastrowid)
         self.connection.commit()
         return instrument_id
 
-    def promote_existing_to_watchlist(self, instrument_id: int, note: str) -> None:
+    def promote_existing_to_watchlist(self, instrument_id: int, note: str, *, master_name: str | None = None, master_wkn: str | None = None, master_isin: str | None = None, master_region: str | None = None) -> None:
         now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
         with self.connection.cursor() as cursor:
+            # First, get current values to check which are NULL/empty
+            cursor.execute(
+                "SELECT name, wkn, isin, region FROM instrument WHERE id = %s",
+                (instrument_id,)
+            )
+            row = cursor.fetchone()
+            if row:
+                # Only update fields that are currently NULL/empty - never overwrite existing values
+                name_val = master_name if master_name and not row.get("name") else None
+                wkn_val = master_wkn if master_wkn and not row.get("wkn") else None
+                isin_val = master_isin if master_isin and not row.get("isin") else None
+                region_val = master_region if master_region and not row.get("region") else None
+            else:
+                name_val = wkn_val = isin_val = region_val = None
+
             cursor.execute(
                 """
                 UPDATE instrument
-                SET active = 1, is_portfolio = 0, mapping_note = CONCAT(COALESCE(mapping_note, ''), %s), updated_at = %s
+                SET active = 1,
+                    is_portfolio = 0,
+                    mapping_note = CONCAT(COALESCE(mapping_note, ''), %s),
+                    name = COALESCE(%s, name),
+                    wkn = COALESCE(%s, wkn),
+                    isin = COALESCE(%s, isin),
+                    region = COALESCE(%s, region),
+                    updated_at = %s
                 WHERE id = %s AND is_portfolio = 0
                 """,
-                (f"\n{note}", now, instrument_id),
+                (f"\n{note}", name_val, wkn_val, isin_val, region_val, now, instrument_id),
             )
         self.connection.commit()
 
@@ -242,8 +264,27 @@ class IntakeRepository:
         self.connection.commit()
         return candidate_id
 
-    def upsert_registry(self, *, run_id: int, candidate_id: int, candidate) -> None:
+    def upsert_registry(self, *, run_id: int, candidate_id: int, candidate, master_data: dict | None = None) -> None:
         now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        # Master data defaults - only set status if master_data was actually provided
+        if master_data is None:
+            # No resolver attempt made - don't touch existing master_data_status
+            master_name = None
+            master_wkn = None
+            master_isin = None
+            master_region = None
+            master_status = None  # Don't overwrite existing status
+            master_source = None
+            master_note = None
+        else:
+            master = master_data
+            master_name = master.get("name")
+            master_wkn = master.get("wkn")
+            master_isin = master.get("isin")
+            master_region = master.get("region")
+            master_status = master.get("status")
+            master_source = master.get("source")
+            master_note = master.get("note")
         # The registry stores these JSON blobs as a cached projection of the latest
         # candidate evaluation. Each new sighting refreshes the projection.
         latest_buy_signals = {
@@ -275,6 +316,13 @@ class IntakeRepository:
                 latest_sepa=latest_sepa,
                 latest_epa=latest_epa,
                 now=now,
+                master_name=master_name,
+                master_wkn=master_wkn,
+                master_isin=master_isin,
+                master_region=master_region,
+                master_status=master_status,
+                master_source=master_source,
+                master_note=master_note,
             )
             return
 
@@ -305,6 +353,13 @@ class IntakeRepository:
                     latest_detail_json = %s,
                     latest_run_id = %s,
                     latest_candidate_id = %s,
+                    name = COALESCE(%s, name),
+                    wkn = COALESCE(%s, wkn),
+                    isin = COALESCE(%s, isin),
+                    region = COALESCE(%s, region),
+                    master_data_status = CASE WHEN %s IS NOT NULL THEN %s ELSE master_data_status END,
+                    master_data_source = CASE WHEN %s IS NOT NULL THEN %s ELSE master_data_source END,
+                    master_data_note = CASE WHEN %s IS NOT NULL THEN %s ELSE master_data_note END,
                     updated_at = %s
                 WHERE id = %s
                 """,
@@ -324,13 +379,26 @@ class IntakeRepository:
                     json.dumps(candidate.detail, ensure_ascii=False, default=str),
                     run_id,
                     candidate_id,
+                    master_name,
+                    master_wkn,
+                    master_isin,
+                    master_region,
+                    master_status,  -- for WHEN check
+                    master_status,  -- for THEN value
+                    master_source,  -- for WHEN check
+                    master_source,  -- for THEN value
+                    master_note,    -- for WHEN check
+                    master_note,    -- for THEN value
                     now,
                     existing["id"],
                 ),
             )
         self.connection.commit()
 
-    def _insert_registry(self, *, run_id: int, candidate_id: int, candidate, latest_buy_signals: dict, latest_sepa: dict, latest_epa: dict, now: str) -> None:
+    def _insert_registry(self, *, run_id: int, candidate_id: int, candidate, latest_buy_signals: dict, latest_sepa: dict, latest_epa: dict, now: str,
+                         master_name: str | None = None, master_wkn: str | None = None, master_isin: str | None = None,
+                         master_region: str | None = None, master_status: str | None = None,
+                         master_source: str | None = None, master_note: str | None = None) -> None:
         with self.connection.cursor() as cursor:
             cursor.execute(
                 """
@@ -338,11 +406,13 @@ class IntakeRepository:
                 (ticker, name, sector_key, sector_label, first_seen_at, last_seen_at, seen_count,
                  latest_intake_score, best_intake_score, latest_status, manual_state, active_candidate,
                  latest_reason, latest_buy_signals_json, latest_sepa_json, latest_epa_json, latest_detail_json,
-                 latest_run_id, latest_candidate_id, created_at, updated_at)
-                VALUES (%s, NULL, %s, %s, %s, %s, 1, %s, %s, %s, NULL, 1, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                 latest_run_id, latest_candidate_id, wkn, isin, region, master_data_status, master_data_source, master_data_note,
+                 created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, 1, %s, %s, %s, NULL, 1, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 (
                     candidate.ticker,
+                    master_name,
                     candidate.sector_key,
                     candidate.sector_label,
                     now,
@@ -357,6 +427,12 @@ class IntakeRepository:
                     json.dumps(candidate.detail, ensure_ascii=False, default=str),
                     run_id,
                     candidate_id,
+                    master_wkn,
+                    master_isin,
+                    master_region,
+                    master_status,
+                    master_source,
+                    master_note,
                     now,
                     now,
                 ),
@@ -408,13 +484,42 @@ class IntakeRepository:
         added = False
         if action == "add":
             signals = self.latest_signals(ticker)
+            # Fetch master data from registry if available
+            registry_entry = self.registry_candidate(ticker)
+            master_name = registry_entry.get("name") if registry_entry else None
+            master_wkn = registry_entry.get("wkn") if registry_entry else None
+            master_isin = registry_entry.get("isin") if registry_entry else None
+            master_region = registry_entry.get("region") if registry_entry else None
+            master_status = registry_entry.get("master_data_status") if registry_entry else None
+
             note = f"Manual Watchlist Intake from {candidate['sector_label']}."
+            if master_status == "unresolved" or master_status is None:
+                note += " Master data unresolved."
+            elif master_status == "ambiguous":
+                note += " Master data ambiguous - manual verification needed."
+            elif master_status == "partial":
+                note += " Master data partial - some fields may be missing."
+
             if signals and signals.get("id"):
                 if not bool(signals.get("is_portfolio")):
-                    self.promote_existing_to_watchlist(int(signals["id"]), note)
+                    self.promote_existing_to_watchlist(
+                        int(signals["id"]),
+                        note,
+                        master_name=master_name,
+                        master_wkn=master_wkn,
+                        master_isin=master_isin,
+                        master_region=master_region,
+                    )
                 added = True
             else:
-                self.add_to_watchlist(ticker, name=None, region="US", note=note)
+                self.add_to_watchlist(
+                    ticker,
+                    name=master_name,
+                    region=master_region,
+                    note=note,
+                    wkn=master_wkn,
+                    isin=master_isin,
+                )
                 added = True
         now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
         with self.connection.cursor() as cursor:
