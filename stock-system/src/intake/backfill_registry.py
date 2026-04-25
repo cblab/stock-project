@@ -13,6 +13,15 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 logger = logging.getLogger(__name__)
 
 
+def _trusted_identifier(value: str | None, source: str | None) -> str | None:
+    if source != "vistafetch" or value is None:
+        return None
+    text = str(value).strip()
+    if not text or text == "-":
+        return None
+    return text
+
+
 def backfill_candidate_registry(
     connection,
     resolver: InstrumentMasterResolver,
@@ -85,10 +94,12 @@ def backfill_candidate_registry(
         updates = {}
         if not row.get("name") and result.name:
             updates["name"] = result.name
-        if not row.get("wkn") and result.wkn:
-            updates["wkn"] = result.wkn
-        if not row.get("isin") and result.isin:
-            updates["isin"] = result.isin
+        trusted_wkn = _trusted_identifier(result.wkn, result.source)
+        trusted_isin = _trusted_identifier(result.isin, result.source)
+        if not row.get("wkn") and trusted_wkn:
+            updates["wkn"] = trusted_wkn
+        if not row.get("isin") and trusted_isin:
+            updates["isin"] = trusted_isin
         if not row.get("region") and result.region:
             updates["region"] = result.region
 
