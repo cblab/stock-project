@@ -4,6 +4,8 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
+from intake.onvista_raw_resolver import OnvistaRawInstrumentResolver
+
 logger = logging.getLogger(__name__)
 
 
@@ -36,13 +38,15 @@ class MasterDataResult:
 class InstrumentMasterResolver:
     """Resolves instrument master data (name, WKN, ISIN, region) from external sources.
 
-    Primary: vistafetch/Onvista for WKN/ISIN/Name
-    Fallback: yfinance for Name/Region/ISIN (no WKN)
+    Primary: OnvistaRawResolver for WKN/ISIN/Name (direct HTTP, no validation issues)
+    Secondary: vistafetch/Onvista for WKN/ISIN/Name (legacy)
+    Fallback: yfinance for Name/Region only (no WKN/ISIN from yfinance)
     Never guesses on ambiguity.
     Never blocks intake on resolution failure.
     """
 
     def __init__(self) -> None:
+        self._onvista_raw = OnvistaRawInstrumentResolver()
         self._vistafetch_available = self._check_vistafetch()
 
     def _check_vistafetch(self) -> bool:
@@ -63,17 +67,20 @@ class InstrumentMasterResolver:
         Returns:
             MasterDataResult with resolved data or status indicating why resolution failed
         """
-        # Try vistafetch first (primary for WKN/ISIN)
+        # Try OnvistaRaw first (primary for WKN/ISIN - no validation issues)
+        raw_result = self._try_onvista_raw(ticker, region_hint)
+        if raw_result.status in ("resolved", "partial", "ambiguous"):
+            return raw_result
+        # Only fall back if raw resolver failed (error/unresolved)
+
+        # Try vistafetch second (legacy, for WKN/ISIN)
         if self._vistafetch_available:
             result = self._try_vistafetch(ticker, region_hint)
-            # If resolved, partial, or ambiguous: DON'T fall back to yfinance
-            # Ambiguous means Onvista found multiple matches - we should NOT
-            # hide this by falling back to a weaker source
             if result.status in ("resolved", "partial", "ambiguous"):
                 return result
-            # Only fall back to yfinance if vistafetch failed (error/unresolved)
+            # Only fall back to yfinance if vistafetch failed
 
-        # Fallback to yfinance (no WKN available there)
+        # Fallback to yfinance (no WKN/ISIN - only name/region)
         result = self._try_yfinance(ticker, region_hint)
         return result
 
@@ -92,6 +99,29 @@ class InstrumentMasterResolver:
     def _is_ticker_only_search(self, search_term: str) -> bool:
         """Determine if search term is just a ticker (not ISIN or WKN)."""
         return not self._looks_like_isin(search_term) and not self._looks_like_wkn(search_term)
+
+    def _try_onvista_raw(self, ticker: str, region_hint: str | None = None) -> MasterDataResult:
+        """Try to resolve via OnvistaRawResolver (direct HTTP)."""
+        try:
+            result = self._onvista_raw.resolve(ticker, region_hint)
+            return MasterDataResult(
+                ticker=result.ticker,
+                name=result.name,
+                wkn=result.wkn,
+                isin=result.isin,
+                region=self._derive_region_from_isin(result.isin) or region_hint,
+                status=result.status,
+                source="onvista_raw",
+                note=result.note,
+            )
+        except Exception as exc:
+            logger.warning(f"OnvistaRaw resolution failed for {ticker}: {exc}")
+            return MasterDataResult(
+                ticker=ticker,
+                status="error",
+                source="onvista_raw",
+                note=f"Error: {exc}",
+            )
 
     def _try_vistafetch(self, ticker: str, region_hint: str | None = None) -> MasterDataResult:
         """Try to resolve via vistafetch/Onvista."""
