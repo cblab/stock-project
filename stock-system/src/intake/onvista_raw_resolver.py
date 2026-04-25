@@ -51,10 +51,10 @@ class OnvistaRawInstrumentResolver:
         return value[:2].isalpha() and value[2:].isalnum()
 
     def _looks_like_wkn(self, value: str | None) -> bool:
-        """Validate WKN format: 6 alphanumeric uppercase."""
+        """Validate WKN format: 6 alphanumeric uppercase characters."""
         if not value or len(value) != 6:
             return False
-        return value.isalnum() and value.isupper()
+        return value.isalnum() and value == value.upper()
 
     def _derive_region_from_isin(self, isin: str | None) -> str | None:
         """Derive region from ISIN country code."""
@@ -87,8 +87,17 @@ class OnvistaRawInstrumentResolver:
         Returns:
             OnvistaRawResult with resolved data or status indicating result
         """
+        search_value = ticker.strip()
+
+        if not search_value:
+            return OnvistaRawResult(
+                ticker=ticker,
+                status="unresolved",
+                note="Empty ticker/search value",
+            )
+
         try:
-            url = f"{self.SEARCH_URL}?limit=5&searchValue={urllib.parse.quote(ticker)}"
+            url = f"{self.SEARCH_URL}?limit=10&searchValue={urllib.parse.quote(search_value)}"
             data = self._make_request(url)
         except urllib.error.URLError as exc:
             logger.warning(f"Onvista API request failed for {ticker}: {exc}")
@@ -131,6 +140,10 @@ class OnvistaRawInstrumentResolver:
             name = self._clean_string(instr.get("name") or instr.get("tinyName"))
             wkn = self._clean_string(instr.get("wkn"))
             isin = self._clean_string(instr.get("isin"))
+            symbol = self._clean_string(instr.get("symbol"))
+            home_symbol = self._clean_string(instr.get("homeSymbol"))
+            entity_value = self._clean_string(instr.get("entityValue"))
+            url_name = self._clean_string(instr.get("urlName"))
 
             # Validate WKN and ISIN formats
             if wkn and not self._looks_like_wkn(wkn):
@@ -146,6 +159,10 @@ class OnvistaRawInstrumentResolver:
                 "name": name,
                 "wkn": wkn,
                 "isin": isin,
+                "symbol": symbol,
+                "home_symbol": home_symbol,
+                "entity_value": entity_value,
+                "url_name": url_name,
             })
 
         if not stock_matches:
@@ -155,6 +172,58 @@ class OnvistaRawInstrumentResolver:
                 note="No STOCK instruments with valid WKN/ISIN found"
             )
 
+        # Determine search type for exact identifier filtering
+        is_isin_search = self._looks_like_isin(search_value)
+        is_wkn_search = self._looks_like_wkn(search_value)
+        is_ticker_only = not is_isin_search and not is_wkn_search
+
+        # Apply exact identifier filtering before region_hint
+        if is_ticker_only:
+            normalized_ticker = search_value.upper()
+            # First try home_symbol exact match
+            home_symbol_matches = [
+                m for m in stock_matches
+                if m.get("home_symbol") and m["home_symbol"].upper() == normalized_ticker
+            ]
+            if home_symbol_matches:
+                stock_matches = home_symbol_matches
+            else:
+                # Fallback to symbol exact match
+                symbol_matches = [
+                    m for m in stock_matches
+                    if m.get("symbol") and m["symbol"].upper() == normalized_ticker
+                ]
+                if symbol_matches:
+                    stock_matches = symbol_matches
+
+        elif is_isin_search:
+            normalized_isin = search_value.upper()
+            exact_isin_matches = [
+                m for m in stock_matches
+                if m.get("isin") and m["isin"].upper() == normalized_isin
+            ]
+            if exact_isin_matches:
+                stock_matches = exact_isin_matches
+
+        elif is_wkn_search:
+            normalized_wkn = search_value.upper()
+            exact_wkn_matches = [
+                m for m in stock_matches
+                if m.get("wkn") and m["wkn"].upper() == normalized_wkn
+            ]
+            if exact_wkn_matches:
+                stock_matches = exact_wkn_matches
+
+        # Apply region_hint filter if provided
+        if region_hint:
+            normalized_hint = region_hint.strip().upper()
+            filtered_matches = [
+                m for m in stock_matches
+                if self._derive_region_from_isin(m.get("isin")) == normalized_hint
+            ]
+            if filtered_matches:
+                stock_matches = filtered_matches
+
         # Check for ambiguity: multiple different ISINs or WKNs
         unique_isins = {m["isin"] for m in stock_matches if m["isin"]}
         unique_wkns = {m["wkn"] for m in stock_matches if m["wkn"]}
@@ -163,7 +232,11 @@ class OnvistaRawInstrumentResolver:
             return OnvistaRawResult(
                 ticker=ticker,
                 status="ambiguous",
-                note=f"Multiple different instruments: {len(unique_isins)} ISINs, {len(unique_wkns)} WKNs"
+                note=(
+                    f"Multiple different instruments: "
+                    f"{len(unique_isins)} ISINs {sorted(unique_isins)}, "
+                    f"{len(unique_wkns)} WKNs {sorted(unique_wkns)}"
+                )
             )
 
         # Single unique instrument (same ISIN/WKN across multiple listings)
@@ -171,10 +244,6 @@ class OnvistaRawInstrumentResolver:
         name = match["name"]
         wkn = match["wkn"]
         isin = match["isin"]
-        region = self._derive_region_from_isin(isin) or region_hint
-
-        # Determine if search term is ticker-only (not ISIN or WKN)
-        is_ticker_only = not self._looks_like_isin(ticker) and not self._looks_like_wkn(ticker)
 
         # Determine status based on completeness and search type
         if is_ticker_only:
