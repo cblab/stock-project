@@ -5,13 +5,17 @@
 {% block body %}
     <div class="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-            <a class="text-sm text-slate-500 hover:text-slate-950" href="{{ path(instrument.portfolio ? 'app_portfolio_index' : 'app_watchlist_index') }}">Zurueck zu {{ instrument.portfolio ? 'Portfolio' : 'Watchlist' }}</a>
+            <a class="text-sm text-slate-500 hover:text-slate-950" href="{{ path(instrument.portfolio ? 'app_portfolio_index' : 'app_watchlist_index') }}">Zurück zu {{ instrument.portfolio ? 'Portfolio' : 'Watchlist' }}</a>
             <h1 class="mt-1 text-2xl font-semibold text-slate-950">{{ instrument.displayTicker }}</h1>
             <p class="mt-1 text-sm text-slate-600">{{ instrument.name ?: 'Kein Name gepflegt' }}{% if instrument.wkn %} | WKN {{ instrument.wkn }}{% endif %}</p>
         </div>
         <div class="flex gap-2">
-            <button type="button" class="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500" onclick="document.getElementById('entry-modal').classList.remove('hidden')">Zu Portfolio hinzufügen</button>
-            <button type="button" class="rounded-md bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-500" onclick="document.getElementById('event-modal').classList.remove('hidden')">Trade Event</button>
+            {% if not instrument.portfolio %}
+                <button type="button" class="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500" onclick="document.getElementById('entry-modal').classList.remove('hidden')">Zu Portfolio hinzufügen</button>
+            {% endif %}
+            {% if open_campaigns is defined and open_campaigns|length > 0 %}
+                <button type="button" class="rounded-md bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-500" onclick="document.getElementById('event-modal').classList.remove('hidden')">Trade Event</button>
+            {% endif %}
             <a class="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800" href="{{ path('app_instrument_edit', {id: instrument.id}) }}">Bearbeiten</a>
         </div>
     </div>
@@ -57,53 +61,33 @@
         {% endif %}
     </section>
 
-    {# Trade Event Modal #}
-    <div id="event-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    {% if not instrument.portfolio %}
+    {# Entry Modal #}
+    <div id="entry-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50">
         <div class="w-full max-w-lg rounded-lg bg-white p-6 shadow-lg max-h-[90vh] overflow-y-auto">
             <div class="mb-4 flex items-center justify-between">
-                <h2 class="text-lg font-semibold text-slate-950">Trade Event: {{ instrument.displayTicker }}</h2>
-                <button type="button" class="text-slate-400 hover:text-slate-600" onclick="document.getElementById('event-modal').classList.add('hidden')">&times;</button>
+                <h2 class="text-lg font-semibold text-slate-950">Entry: {{ instrument.displayTicker }}</h2>
+                <button type="button" class="text-slate-400 hover:text-slate-600" onclick="document.getElementById('entry-modal').classList.add('hidden')">&times;</button>
             </div>
-            {% if open_campaigns is defined and open_campaigns|length > 0 %}
-                <form method="post" action="{{ path('app_trade_campaign_event', {id: open_campaigns[0].id}) }}">
-                    <input type="hidden" name="return_route" value="app_instrument_show">
-                    <div class="grid gap-4">
+            <form method="post" action="{{ path('app_instrument_portfolio_entry', {id: instrument.id}) }}">
+                <input type="hidden" name="return_route" value="{{ instrument.portfolio ? 'app_portfolio_index' : 'app_watchlist_index' }}">
+                <input type="hidden" name="_token" value="{{ csrf_token('portfolio_entry_' ~ instrument.id) }}">
+                <div class="grid gap-4">
+                    <div class="grid grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-sm font-medium text-slate-700">Event-Typ *</label>
-                            <select name="event_type" id="event_type" required class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm" onchange="updateEventFields()">
-                                <option value="">-- Auswählen --</option>
-                                <option value="trim">Teilverkauf (Trim)</option>
-                                <option value="hard_exit">Komplettverkauf (Hard Exit)</option>
-                                <option value="return_to_watchlist">Zurück zur Watchlist</option>
-                                <option value="pause">Pausieren</option>
-                                <option value="resume">Fortsetzen</option>
-                            </select>
-                        </div>
-                        <div id="price-field" class="hidden">
-                            <label class="block text-sm font-medium text-slate-700">Preis *</label>
-                            <input type="number" step="0.0001" name="event_price" id="event_price" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
-                        </div>
-                        <div id="quantity-field" class="hidden">
-                            <label class="block text-sm font-medium text-slate-700">
-                                Menge <span id="quantity-hint" class="text-slate-500 font-normal">(leer = gesamte Position)</span>
-                            </label>
-                            <input type="number" step="0.0001" name="quantity" id="quantity" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
-                        </div>
-                        <div id="exit-reason-field" class="hidden">
-                            <label class="block text-sm font-medium text-slate-700">Exit-Grund *</label>
-                            <select name="exit_reason" id="exit_reason" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
-                                <option value="">-- Auswählen --</option>
-<option value="signal">Signal</option>
-                                <option value="technical">Technisch</option>
-                                <option value="fundamental">Fundamental</option>
-                                <option value="risk">Risiko</option>
-                                <option value="other">Sonstiges</option>
-                            </select>
+                            <label class="block text-sm font-medium text-slate-700">Kaufpreis *</label>
+                            <input type="number" step="0.0001" name="event_price" required class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-slate-700">Zeitstempel *</label>
-                            <input type="datetime-local" name="event_timestamp" required class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+                            <label class="block text-sm font-medium text-slate-700">Menge *</label>
+                            <input type="number" step="0.0001" name="quantity" required class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
                         </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700">Kaufdatum *</label>
+                        <input type="datetime-local" name="event_timestamp" required class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+                    </div>
+                    <div class="grid grid-cols-3 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-slate-700">Gebuehren</label>
                             <input type="number" step="0.01" name="fees" value="0.00" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
@@ -113,18 +97,102 @@
                             <input type="text" name="currency" value="EUR" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-slate-700">Notizen</label>
-                            <textarea name="event_notes" rows="2" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"></textarea>
+                            <label class="block text-sm font-medium text-slate-700">Trade-Typ</label>
+                            <select name="trade_type" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+                                <option value="live" selected>Live</option>
+                                <option value="paper">Paper</option>
+                                <option value="pseudo">Pseudo</option>
+                            </select>
                         </div>
                     </div>
-                    <div class="mt-4 flex gap-2">
-                        <button type="submit" class="rounded-md bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-500">Speichern</button>
-                        <button type="button" class="rounded-md bg-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-300" onclick="document.getElementById('event-modal').classList.add('hidden')">Abbrechen</button>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700">Entry Thesis</label>
+                        <textarea name="entry_thesis" rows="2" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"></textarea>
                     </div>
-                </form>
-            {% else %}
-                <p class="text-sm text-slate-600">Keine offene Trade Campaign gefunden.</p>
-            {% endif %}
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700">Invalidierungsregel</label>
+                        <input type="text" name="invalidation_rule" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700">Notizen</label>
+                        <textarea name="event_notes" rows="2" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"></textarea>
+                    </div>
+                </div>
+                <div class="mt-6 flex justify-end gap-2">
+                    <button type="button" class="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50" onclick="document.getElementById('entry-modal').classList.add('hidden')">Abbrechen</button>
+                    <button type="submit" class="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500">Speichern</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if open_campaigns is defined and open_campaigns|length > 0 %}
+    {# Trade Event Modal #}
+    <div id="event-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div class="w-full max-w-lg rounded-lg bg-white p-6 shadow-lg max-h-[90vh] overflow-y-auto">
+            <div class="mb-4 flex items-center justify-between">
+                <h2 class="text-lg font-semibold text-slate-950">Trade Event: {{ instrument.displayTicker }}</h2>
+                <button type="button" class="text-slate-400 hover:text-slate-600" onclick="document.getElementById('event-modal').classList.add('hidden')">&times;</button>
+            </div>
+            <form method="post" action="{{ path('app_trade_event_create', {id: open_campaigns[0].id}) }}">
+                <input type="hidden" name="return_route" value="app_instrument_show">
+                <input type="hidden" name="_token" value="{{ csrf_token('trade_event_' ~ open_campaigns[0].id) }}">
+                <div class="grid gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700">Event-Typ *</label>
+                        <select name="event_type" id="event_type" required class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm" onchange="updateEventFields()">
+                            <option value="">-- Auswaehlen --</option>
+                            <option value="trim">Teilverkauf (Trim)</option>
+                            <option value="hard_exit">Komplettverkauf (Hard Exit)</option>
+                            <option value="return_to_watchlist">Zurueck zur Watchlist</option>
+                            <option value="pause">Pausieren</option>
+                            <option value="resume">Fortsetzen</option>
+                        </select>
+                    </div>
+                    <div id="price-field" class="hidden">
+                        <label class="block text-sm font-medium text-slate-700">Preis *</label>
+                        <input type="number" step="0.0001" name="event_price" id="event_price" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+                    </div>
+                    <div id="quantity-field" class="hidden">
+                        <label class="block text-sm font-medium text-slate-700">
+                            Menge <span id="quantity-hint" class="text-slate-500 font-normal">(leer = gesamte Position)</span>
+                        </label>
+                        <input type="number" step="0.0001" name="quantity" id="quantity" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+                    </div>
+                    <div id="exit-reason-field" class="hidden">
+                        <label class="block text-sm font-medium text-slate-700">Exit-Grund *</label>
+                        <select name="exit_reason" id="exit_reason" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+                            <option value="">-- Auswaehlen --</option>
+                            <option value="signal">Signal</option>
+                            <option value="technical">Technisch</option>
+                            <option value="fundamental">Fundamental</option>
+                            <option value="risk">Risiko</option>
+                            <option value="other">Sonstiges</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700">Zeitstempel *</label>
+                        <input type="datetime-local" name="event_timestamp" required class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700">Gebuehren</label>
+                        <input type="number" step="0.01" name="fees" value="0.00" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700">Waehrung</label>
+                        <input type="text" name="currency" value="EUR" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700">Notizen</label>
+                        <textarea name="event_notes" rows="2" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"></textarea>
+                    </div>
+                </div>
+                <div class="mt-4 flex gap-2">
+                    <button type="submit" class="rounded-md bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-500">Speichern</button>
+                    <button type="button" class="rounded-md bg-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-300" onclick="document.getElementById('event-modal').classList.add('hidden')">Abbrechen</button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -136,7 +204,6 @@
             const exitReasonField = document.getElementById('exit-reason-field');
             const quantityInput = document.getElementById('quantity');
 
-            // Reset required attributes
             document.getElementById('event_price').required = false;
             document.getElementById('exit_reason').required = false;
             quantityInput.required = false;
@@ -166,4 +233,5 @@
             }
         }
     </script>
+    {% endif %}
 {% endblock %}

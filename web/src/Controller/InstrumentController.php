@@ -212,31 +212,70 @@ class InstrumentController extends AbstractController
     ): Response {
         $returnRoute = $this->returnRoute($request);
 
-        try {
-            $payload = [
-                'instrument_id' => $instrument->getId(),
-                'event_type' => 'entry',
-                'event_price' => $request->request->get('event_price'),
-                'quantity' => $request->request->get('quantity'),
-                'event_timestamp' => $this->convertTimestamp($request->request->get('event_timestamp')),
-                'fees' => $request->request->get('fees', '0.00'),
-                'currency' => $request->request->get('currency', 'EUR'),
-                'trade_type' => $request->request->get('trade_type', 'live'),
-                'entry_thesis' => $request->request->get('entry_thesis'),
-                'invalidation_rule' => $request->request->get('invalidation_rule'),
-                'event_notes' => $request->request->get('event_notes'),
-            ];
+        // CSRF validation
+        $token = (string) $request->request->get('_token', '');
+        if (!$this->isCsrfTokenValid('portfolio_entry_' . $instrument->getId(), $token)) {
+            $this->addFlash('error', 'Ungültige Anfrage.');
+            return $this->redirectToRoute('app_instrument_show', ['id' => $instrument->getId()]);
+        }
 
+        $eventPrice = $request->request->get('event_price');
+        $quantity = $request->request->get('quantity');
+        $eventTimestamp = $request->request->get('event_timestamp');
+        $fees = $request->request->get('fees', '0.00');
+        $currency = $request->request->get('currency', 'EUR');
+        $tradeType = $request->request->get('trade_type', 'live');
+        $entryThesis = $request->request->get('entry_thesis');
+        $invalidationRule = $request->request->get('invalidation_rule');
+        $eventNotes = $request->request->get('event_notes');
+
+        if ($eventPrice === null || $eventPrice === '' || $quantity === null || $quantity === '' || $eventTimestamp === null || $eventTimestamp === '') {
+            $this->addFlash('error', 'Kaufpreis, Menge und Kaufdatum sind Pflichtfelder.');
+            return $this->redirectToRoute('app_instrument_show', ['id' => $instrument->getId()]);
+        }
+
+        // Validate numeric values > 0
+        if (!is_numeric($eventPrice) || (float)$eventPrice <= 0) {
+            $this->addFlash('error', 'Kaufpreis muss größer als 0 sein.');
+            return $this->redirectToRoute('app_instrument_show', ['id' => $instrument->getId()]);
+        }
+        if (!is_numeric($quantity) || (float)$quantity <= 0) {
+            $this->addFlash('error', 'Menge muss größer als 0 sein.');
+            return $this->redirectToRoute('app_instrument_show', ['id' => $instrument->getId()]);
+        }
+
+        // Convert datetime-local format (Y-m-d\TH:i) to Y-m-d H:i:s
+        $normalizedTimestamp = $this->convertTimestamp((string) $eventTimestamp);
+        if ($normalizedTimestamp === null) {
+            $this->addFlash('error', 'Ungültiges Datumsformat.');
+            return $this->redirectToRoute('app_instrument_show', ['id' => $instrument->getId()]);
+        }
+
+        $payload = [
+            'instrument_id' => $instrument->getId(),
+            'event_type' => 'entry',
+            'event_price' => (string) $eventPrice,
+            'quantity' => (string) $quantity,
+            'fees' => (string) $fees ?: '0.00',
+            'currency' => (string) $currency ?: 'EUR',
+            'trade_type' => (string) $tradeType ?: 'live',
+            'event_timestamp' => $normalizedTimestamp,
+            'entry_thesis' => $entryThesis ?: null,
+            'invalidation_rule' => $invalidationRule ?: null,
+            'event_notes' => $eventNotes ?: null,
+        ];
+
+        try {
             $result = $tradeEventWriter->write($payload);
 
-            // Update instrument state: Watchlist -> Portfolio
+            // Setze Instrument als Portfolio, falls noch nicht gesetzt
             if (!$instrument->isPortfolio()) {
                 $instrument->setIsPortfolio(true)->touch();
                 $entityManager->flush();
             }
 
             $this->addFlash('success', sprintf(
-                'Trade erstellt: Campaign #%d, Event #%d',
+                'Eintrag erfolgreich erstellt. Trade-Campaign ID: %d, Event ID: %d',
                 $result->tradeCampaignId,
                 $result->tradeEventId
             ));
@@ -244,10 +283,10 @@ class InstrumentController extends AbstractController
             return $this->redirectToRoute($returnRoute);
         } catch (TradeValidationException $e) {
             $this->addFlash('error', 'Validierungsfehler: ' . $e->getMessage());
-            return $this->redirectToRoute($returnRoute);
-        } catch (\RuntimeException $e) {
-            $this->addFlash('error', 'Fehler beim Erstellen des Trades: ' . $e->getMessage());
-            return $this->redirectToRoute($returnRoute);
+            return $this->redirectToRoute('app_instrument_show', ['id' => $instrument->getId()]);
+        } catch (\Throwable $e) {
+            $this->addFlash('error', 'Der Eintrag konnte nicht erstellt werden.');
+            return $this->redirectToRoute('app_instrument_show', ['id' => $instrument->getId()]);
         }
     }
 
@@ -259,19 +298,21 @@ class InstrumentController extends AbstractController
             : 'app_portfolio_index';
     }
 
-    private function convertTimestamp(?string $timestamp): ?string
+    /**
+     * Convert datetime-local format (Y-m-d\TH:i) to Y-m-d H:i:s
+     */
+    private function convertTimestamp(string $timestamp): ?string
     {
-        if ($timestamp === null || $timestamp === '') {
-            return null;
+        // Handle HTML5 datetime-local format: Y-m-d\TH:i
+        if (preg_match('/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})$/', $timestamp, $matches)) {
+            return $matches[1] . ' ' . $matches[2] . ':00';
         }
-        // datetime-local liefert Y-m-d\TH:i, wir brauchen Y-m-d H:i:s
-        if (str_contains($timestamp, 'T')) {
-            $timestamp = str_replace('T', ' ', $timestamp);
+
+        // Already in Y-m-d H:i:s format
+        if (preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $timestamp)) {
+            return $timestamp;
         }
-        // Falls nur Y-m-d H:i ohne Sekunden, ergaenze :00
-        if (preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/', $timestamp)) {
-            $timestamp .= ':00';
-        }
-        return $timestamp;
+
+        return null;
     }
 }
