@@ -25,6 +25,18 @@ final readonly class TradeEventValidator
     private const TRADE_TYPE_PAPER = 'paper';
     private const TRADE_TYPE_PSEUDO = 'pseudo';
 
+    private const EXIT_REASONS = [
+        'signal',
+        'stop_loss',
+        'trailing_stop',
+        'time_based',
+        'rebalance',
+        'opportunity_cost',
+        'macro_regime_change',
+        'thesis_invalidated',
+        'manual',
+    ];
+
     /**
      * Assert that an event payload is valid for the given campaign context.
      *
@@ -165,6 +177,35 @@ final readonly class TradeEventValidator
                 sprintf('must not be set for event type "%s"', $eventType)
             );
         }
+
+        // Validate exit_reason value against known taxonomy
+        if ($hasExitReason) {
+            $this->validateExitReasonValue($payload['exit_reason']);
+        }
+    }
+
+    /**
+     * Validate exit_reason against known taxonomy.
+     *
+     * @param mixed $exitReason
+     *
+     * @throws TradeValidationException
+     */
+    private function validateExitReasonValue(mixed $exitReason): void
+    {
+        if (!is_string($exitReason)) {
+            throw TradeValidationException::invalidFieldValue(
+                'exit_reason',
+                'must be a string'
+            );
+        }
+
+        if (!in_array($exitReason, self::EXIT_REASONS, true)) {
+            throw TradeValidationException::invalidFieldValue(
+                'exit_reason',
+                sprintf('must be one of: %s', implode(', ', self::EXIT_REASONS))
+            );
+        }
     }
 
     /**
@@ -212,7 +253,11 @@ final readonly class TradeEventValidator
                 throw TradeValidationException::missingRequiredField('quantity', $eventType);
             }
             $this->validateNumericPositive($payload['event_price'], 'event_price');
-            $this->validateNumericPositive($payload['quantity'], 'quantity');
+            $this->validateQuantityAgainstOpenPosition(
+                $payload['quantity'],
+                $campaign,
+                $eventType
+            );
         }
 
         if (in_array($eventType, $requiresPrice, true)) {
