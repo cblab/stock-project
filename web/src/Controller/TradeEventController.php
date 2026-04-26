@@ -36,7 +36,7 @@ class TradeEventController extends AbstractController
 
         // CSRF-Validierung
         if (!$this->isCsrfTokenValid('trade_event_' . $id, $request->request->get('_token'))) {
-            $this->addFlash('error', 'Ungueltiges Sicherheits-Token.');
+            $this->addFlash('error', 'Ungültiges Sicherheits-Token.');
             return $this->redirectToRoute($returnRoute, $this->buildRedirectParams($returnRoute, $campaign));
         }
 
@@ -241,7 +241,7 @@ class TradeEventController extends AbstractController
             'closed_profit' => 'Geschlossen (Gewinn)',
             'closed_loss' => 'Geschlossen (Verlust)',
             'closed_neutral' => 'Geschlossen (Neutral)',
-            'returned_to_watchlist' => 'Zurueck zur Watchlist',
+            'returned_to_watchlist' => 'Zurück zur Watchlist',
             default => $state,
         };
     }

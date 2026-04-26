@@ -293,10 +293,11 @@ class InstrumentController extends AbstractController
     private function returnRoute(Request $request): string
     {
         $route = (string) $request->request->get('return_route', 'app_portfolio_index');
-        return in_array($route, ['app_portfolio_index', 'app_watchlist_index', 'app_instruments_inactive', 'app_instrument_show'], true)
+        return in_array($route, ['app_portfolio_index', 'app_watchlist_index', 'app_instruments_inactive'], true)
             ? $route
             : 'app_portfolio_index';
     }
+
 
     /**
      * Convert datetime-local format (Y-m-d\TH:i) to Y-m-d H:i:s
