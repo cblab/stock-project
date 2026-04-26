@@ -17,6 +17,16 @@ final readonly class TradeEventWriter
     private const DEFAULT_CURRENCY = 'EUR';
     private const DEFAULT_TRADE_TYPE = 'live';
     private const NON_TERMINAL_STATES = ['open', 'trimmed', 'paused'];
+    private const VALID_EVENT_TYPES = [
+        'entry',
+        'add',
+        'trim',
+        'pause',
+        'resume',
+        'hard_exit',
+        'return_to_watchlist',
+        'migration_seed',
+    ];
 
     public function __construct(
         private Connection $connection,
@@ -78,6 +88,13 @@ final readonly class TradeEventWriter
         }
         if (!is_string($payload['event_type']) || $payload['event_type'] === '') {
             throw TradeValidationException::invalidFieldValue('event_type', 'must be a non-empty string');
+        }
+        // Early validation of event_type before DB lookup
+        if (!in_array($payload['event_type'], self::VALID_EVENT_TYPES, true)) {
+            throw TradeValidationException::invalidFieldValue(
+                'event_type',
+                'must be one of: ' . implode(', ', self::VALID_EVENT_TYPES)
+            );
         }
         if (!isset($payload['event_timestamp'])) {
             throw TradeValidationException::missingRequiredField('event_timestamp', 'unknown');
@@ -217,6 +234,8 @@ final readonly class TradeEventWriter
         $now = (new DateTimeImmutable())->format('Y-m-d H:i:s');
         $isEntry = $normalized['event_type'] === 'entry';
 
+        // Note: migration_seed intentionally does not persist entry_thesis/invalidation_rule
+        // as it represents a migrated position without original thesis data
         $this->connection->insert('trade_campaign', [
             'instrument_id' => $normalized['instrument_id'],
             'trade_type' => $normalized['trade_type'],
@@ -292,9 +311,10 @@ final readonly class TradeEventWriter
             'trim' => $this->handleTrim($campaign['id'], $openQty, $avgEntry, $eventPrice, $quantity, $fees, $realizedGross),
             'pause' => $this->handlePause($campaign['id']),
             'resume' => $this->handleResume($campaign['id']),
-            'hard_exit' => $this->handleHardExit($campaign['id'], $openQty, $avgEntry, $eventPrice, $quantity, $fees, $realizedGross, $normalized['event_timestamp']),
-            'return_to_watchlist' => $this->handleReturnToWatchlist($campaign['id'], $openQty, $avgEntry, $eventPrice, $quantity, $fees, $realizedGross, $normalized['event_timestamp']),
-            default => $campaign['state'] ?? 'open',
+            'hard_exit' => $this->handleHardExit($campaign['id'], $totalQty, $openQty, $avgEntry, $eventPrice, $quantity, $fees, $realizedGross, $normalized['event_timestamp']),
+            'return_to_watchlist' => $this->handleReturnToWatchlist($campaign['id'], $totalQty, $openQty, $avgEntry, $eventPrice, $quantity, $fees, $realizedGross, $normalized['event_timestamp']),
+            'entry', 'migration_seed' => $campaign['state'] ?? 'open',
+            default => throw new TradeValidationException(sprintf('Unknown event type: %s', $eventType)),
         };
     }
 
@@ -354,7 +374,7 @@ final readonly class TradeEventWriter
         return 'open';
     }
 
-    private function handleHardExit(int $campaignId, float $openQty, ?float $avgEntry, ?float $eventPrice, ?float $quantity, float $fees, float $realizedGross, DateTimeImmutable $eventTimestamp): string
+    private function handleHardExit(int $campaignId, float $totalQty, float $openQty, ?float $avgEntry, ?float $eventPrice, ?float $quantity, float $fees, float $realizedGross, DateTimeImmutable $eventTimestamp): string
     {
         if ($eventPrice === null) {
             throw new TradeValidationException('hard_exit requires event_price');
@@ -374,9 +394,10 @@ final readonly class TradeEventWriter
             $newRealizedGross = $realizedGross + $exitSummary['realized_pnl_gross'];
             $newRealizedNet = $exitSummary['realized_pnl_net'];
             $taxRate = $exitSummary['tax_rate_applied'];
-            $realizedPct = $exitSummary['realized_pnl_pct'];
         }
 
+        // Calculate campaign-level realized_pnl_pct from cumulative gross P&L
+        $realizedPct = $this->calculateCampaignRealizedPnlPct($newRealizedGross, $avgEntry, $totalQty);
         $newState = $newRealizedGross > 0 ? 'closed_profit' : ($newRealizedGross < 0 ? 'closed_loss' : 'closed_neutral');
 
         $this->connection->update('trade_campaign', [
@@ -392,7 +413,7 @@ final readonly class TradeEventWriter
         return $newState;
     }
 
-    private function handleReturnToWatchlist(int $campaignId, float $openQty, ?float $avgEntry, ?float $eventPrice, ?float $quantity, float $fees, float $realizedGross, DateTimeImmutable $eventTimestamp): string
+    private function handleReturnToWatchlist(int $campaignId, float $totalQty, float $openQty, ?float $avgEntry, ?float $eventPrice, ?float $quantity, float $fees, float $realizedGross, DateTimeImmutable $eventTimestamp): string
     {
         if ($eventPrice === null) {
             throw new TradeValidationException('return_to_watchlist requires event_price');
@@ -412,8 +433,10 @@ final readonly class TradeEventWriter
             $newRealizedGross = $realizedGross + $exitSummary['realized_pnl_gross'];
             $newRealizedNet = $exitSummary['realized_pnl_net'];
             $taxRate = $exitSummary['tax_rate_applied'];
-            $realizedPct = $exitSummary['realized_pnl_pct'];
         }
+
+        // Calculate campaign-level realized_pnl_pct from cumulative gross P&L
+        $realizedPct = $this->calculateCampaignRealizedPnlPct($newRealizedGross, $avgEntry, $totalQty);
 
         $this->connection->update('trade_campaign', [
             'state' => 'returned_to_watchlist',
@@ -426,6 +449,18 @@ final readonly class TradeEventWriter
         ], ['id' => $campaignId]);
 
         return 'returned_to_watchlist';
+    }
+
+    /**
+     * Calculate campaign-level realized P&L percentage.
+     * Formula: cumulative_realized_pnl_gross / (avg_entry_price * total_quantity)
+     */
+    private function calculateCampaignRealizedPnlPct(float $cumulativeRealizedGross, ?float $avgEntry, float $totalQty): ?float
+    {
+        if ($avgEntry === null || $avgEntry <= 0 || $totalQty <= 0) {
+            return null;
+        }
+        return $cumulativeRealizedGross / ($avgEntry * $totalQty);
     }
 
     private function calculateNewAvgPrice(?float $avgEntry, float $openQty, float $eventPrice, float $quantity): ?float
