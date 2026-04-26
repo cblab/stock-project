@@ -8,6 +8,8 @@ use App\Repository\InstrumentEpaSnapshotRepository;
 use App\Repository\InstrumentRepository;
 use App\Repository\InstrumentSepaSnapshotRepository;
 use App\Repository\PipelineRunItemRepository;
+use App\Service\Trade\TradeEventWriter;
+use App\Service\Trade\TradeValidationException;
 use App\Service\WatchlistCandidateRegistryResetService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -182,6 +184,69 @@ class InstrumentController extends AbstractController
         }
 
         return $this->redirectToRoute($returnRoute);
+    }
+
+    #[Route('/instrument/{id}/portfolio/entry', name: 'app_instrument_portfolio_entry', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function portfolioEntry(
+        Instrument $instrument,
+        Request $request,
+        TradeEventWriter $tradeEventWriter,
+        EntityManagerInterface $entityManager,
+    ): Response {
+        $returnRoute = $this->returnRoute($request);
+
+        $eventPrice = $request->request->get('event_price');
+        $quantity = $request->request->get('quantity');
+        $eventTimestamp = $request->request->get('event_timestamp');
+        $fees = $request->request->get('fees', '0.00');
+        $currency = $request->request->get('currency', 'EUR');
+        $tradeType = $request->request->get('trade_type', 'live');
+        $entryThesis = $request->request->get('entry_thesis');
+        $invalidationRule = $request->request->get('invalidation_rule');
+        $eventNotes = $request->request->get('event_notes');
+
+        if (empty($eventPrice) || empty($quantity) || empty($eventTimestamp)) {
+            $this->addFlash('error', 'Kaufpreis, Menge und Kaufdatum sind Pflichtfelder.');
+            return $this->redirectToRoute('app_instrument_show', ['id' => $instrument->getId()]);
+        }
+
+        $payload = [
+            'instrument_id' => $instrument->getId(),
+            'event_type' => 'entry',
+            'event_price' => (string) $eventPrice,
+            'quantity' => (string) $quantity,
+            'fees' => (string) $fees ?: '0.00',
+            'currency' => (string) $currency ?: 'EUR',
+            'trade_type' => (string) $tradeType ?: 'live',
+            'event_timestamp' => (string) $eventTimestamp,
+            'entry_thesis' => $entryThesis ?: null,
+            'invalidation_rule' => $invalidationRule ?: null,
+            'event_notes' => $eventNotes ?: null,
+        ];
+
+        try {
+            $result = $tradeEventWriter->write($payload);
+
+            // Setze Instrument als Portfolio, falls noch nicht gesetzt
+            if (!$instrument->isPortfolio()) {
+                $instrument->setIsPortfolio(true)->touch();
+                $entityManager->flush();
+            }
+
+            $this->addFlash('success', sprintf(
+                'Eintrag erfolgreich erstellt. Trade-Campaign ID: %d, Event ID: %d',
+                $result->tradeCampaignId,
+                $result->tradeEventId
+            ));
+
+            return $this->redirectToRoute($returnRoute);
+        } catch (TradeValidationException $e) {
+            $this->addFlash('error', 'Validierungsfehler: ' . $e->getMessage());
+            return $this->redirectToRoute('app_instrument_show', ['id' => $instrument->getId()]);
+        } catch (\Throwable $e) {
+            $this->addFlash('error', 'Fehler beim Erstellen des Eintrags: ' . $e->getMessage());
+            return $this->redirectToRoute('app_instrument_show', ['id' => $instrument->getId()]);
+        }
     }
 
     private function returnRoute(Request $request): string
