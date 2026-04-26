@@ -85,7 +85,7 @@
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-slate-700">Kaufdatum *</label>
-                        <input type="datetime-local" name="event_timestamp" required class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+                        <input type="datetime-local" name="event_timestamp" value="{{ 'now'|date('Y-m-d\\TH:i') }}" required class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
                     </div>
                     <div class="grid grid-cols-3 gap-4">
                         <div>

@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="de">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>ADI</title>
+                    
+<link rel="stylesheet" href="/assets/styles/app-VbQOJ-W.css">
+<script type="importmap" data-turbo-track="reload">
+{
+    "imports": {
+        "app": "/assets/app-SMi93og.js",
+        "/assets/stimulus_bootstrap.js": "/assets/stimulus_bootstrap-xCO4u8H.js",
+        "@hotwired/turbo": "/assets/vendor/@hotwired/turbo/turbo.index-2MA3cy2.js",
+        "/assets/styles/app.css": "data:application/javascript,",
+        "@symfony/stimulus-bundle": "/assets/@symfony/stimulus-bundle/loader-IOzBDLu.js",
+        "@hotwired/stimulus": "/assets/vendor/@hotwired/stimulus/stimulus.index-S4zNcea.js",
+        "/assets/@symfony/stimulus-bundle/controllers.js": "/assets/@symfony/stimulus-bundle/controllers-8yTkarQ.js",
+        "/assets/@symfony/ux-turbo/turbo_controller.js": "/assets/@symfony/ux-turbo/turbo_controller-bFCo5ub.js",
+        "/assets/controllers/collapse_controller.js": "/assets/controllers/collapse_controller-uSHw7rw.js",
+        "/assets/controllers/csrf_protection_controller.js": "/assets/controllers/csrf_protection_controller-6ynUAeX.js"
+    }
+}
+</script><script data-turbo-track="reload">
+if (!HTMLScriptElement.supports || !HTMLScriptElement.supports('importmap')) (function () {
+    const script = document.createElement('script');
+    script.src = 'https://ga.jspm.io/npm:es-module-shims@1.10.0/dist/es-module-shims.js';
+    script.setAttribute('crossorigin', 'anonymous');
+    script.setAttribute('integrity', 'sha384-ie1x72Xck445i0j4SlNJ5W5iGeL3Dpa0zD48MZopgWsjNB/lt60SuG1iduZGNnJn');
+    script.setAttribute('data-turbo-track', 'reload');
+    document.head.appendChild(script);
+})();
+</script>
+<link rel="modulepreload" href="/assets/app-SMi93og.js">
+<link rel="modulepreload" href="/assets/stimulus_bootstrap-xCO4u8H.js">
+<link rel="modulepreload" href="/assets/vendor/@hotwired/turbo/turbo.index-2MA3cy2.js">
+<link rel="modulepreload" href="/assets/@symfony/stimulus-bundle/loader-IOzBDLu.js">
+<link rel="modulepreload" href="/assets/vendor/@hotwired/stimulus/stimulus.index-S4zNcea.js">
+<link rel="modulepreload" href="/assets/@symfony/stimulus-bundle/controllers-8yTkarQ.js">
+<link rel="modulepreload" href="/assets/@symfony/ux-turbo/turbo_controller-bFCo5ub.js">
+<link rel="modulepreload" href="/assets/controllers/collapse_controller-uSHw7rw.js">
+<script type="module" data-turbo-track="reload">import 'app';</script>            </head>
+    <body class="min-h-screen bg-slate-50 text-slate-900">
+        <header class="border-b border-slate-200 bg-white">
+            <div class="mx-auto flex max-w-screen-2xl items-center justify-between px-4 py-4 2xl:px-6">
+                <a class="text-base font-semibold text-slate-950" href="/">Stock Pipeline</a>
+                <nav class="flex items-center gap-4 text-sm text-slate-500">
+                    <a class="hover:text-slate-950" href="/">Runs</a>
+                    <a class="hover:text-slate-950" href="/buy-signal-matrix">Buy Matrix</a>
+                    <a class="hover:text-slate-950" href="/sell-signal-matrix">Sell Matrix</a>
+                    <a class="hover:text-slate-950" href="/portfolio">Portfolio</a>
+                    <a class="hover:text-slate-950" href="/watchlist">Watchlist</a>
+                    <a class="hover:text-slate-950" href="/watchlist-intake">Intake</a>
+                    <a class="hover:text-slate-950" href="/instruments/inactive">Inaktive</a>
+                </nav>
+            </div>
+        </header>
+        <main class="mx-auto max-w-screen-2xl px-4 py-5 2xl:px-6">
+                            <div class="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+            <a class="text-sm text-slate-500 hover:text-slate-950" href="/watchlist">Zurück zu Watchlist</a>
+            <h1 class="mt-1 text-2xl font-semibold text-slate-950">ADI</h1>
+            <p class="mt-1 text-sm text-slate-600">Analog Devices | WKN 862485</p>
+        </div>
+        <div class="flex gap-2">
+                            <button type="button" class="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500" onclick="document.getElementById('entry-modal').classList.remove('hidden')">Zu Portfolio hinzufügen</button>
+                                    <a class="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800" href="/instrument/58/edit">Bearbeiten</a>
+        </div>
+    </div>
+
+    <div class="mb-6">
+        
+<section class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+            <h2 class="text-sm font-semibold uppercase text-slate-500">Letzter Lauf</h2>
+            <p class="mt-1 text-sm text-slate-600">Neuester gespeicherter Run fuer dieses Instrument.</p>
+        </div>
+                                            <span class="w-fit rounded-full px-2.5 py-1 text-xs font-semibold ring-1 bg-emerald-50 text-emerald-700 ring-emerald-200">
+                Portfolio
+            </span>
+            </div>
+
+                            
+        
+        <dl class="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+            <div class="rounded-md bg-slate-50 p-3">
+                <dt class="text-xs uppercase text-slate-500">Run-Zeit</dt>
+                <dd class="mt-1 font-semibold text-slate-950">25.04.2026 08:03</dd>
+            </div>
+            <div class="rounded-md bg-slate-50 p-3">
+                <dt class="text-xs uppercase text-slate-500">K Norm</dt>
+                <dd class="mt-1 font-semibold text-slate-950">0.0561</dd>
+            </div>
+            <div class="rounded-md bg-slate-50 p-3">
+                <dt class="text-xs uppercase text-slate-500">S Norm</dt>
+                <dd class="mt-1 font-semibold text-slate-950">0.4691</dd>
+            </div>
+            <div class="rounded-md bg-slate-50 p-3">
+                <dt class="text-xs uppercase text-slate-500">Merged</dt>
+                <dd class="mt-1 font-semibold text-slate-950">0.2213</dd>
+            </div>
+            <div class="rounded-md bg-slate-50 p-3">
+                <dt class="text-xs uppercase text-slate-500">Decision</dt>
+                <dd class="mt-1">            <span class="compact-badge bg-blue-50 text-blue-700 ring-blue-200" title="WATCH: merged_score &gt;= 0.15 und &lt; 0.35, positiv aber noch kein Entry.">WATCH</span>
+</dd>
+            </div>
+            <div class="rounded-md bg-slate-50 p-3">
+                <dt class="text-xs uppercase text-slate-500">Sentiment</dt>
+                <dd class="mt-1 font-semibold text-slate-950">positive</dd>
+            </div>
+            <div class="rounded-md bg-slate-50 p-3">
+                <dt class="text-xs uppercase text-slate-500">Mode</dt>
+                <dd class="mt-1">        <span class="compact-badge bg-white text-slate-700 ring-slate-200" title="equity_direct: Sentiment basiert auf direkten Ticker-News.">equity_direct</span>
+</dd>
+            </div>
+            <div class="rounded-md bg-slate-50 p-3">
+                <dt class="text-xs uppercase text-slate-500">Data / News</dt>
+                <dd class="mt-1 flex flex-wrap gap-1">                <span class="compact-badge bg-emerald-50 text-emerald-700 ring-emerald-200" title="Status aus Pipeline-Run: ok">ok</span>
+                 <span class="compact-badge bg-emerald-50 text-emerald-700 ring-emerald-200" title="Status aus Pipeline-Run: ok">ok</span>
+</dd>
+            </div>
+        </dl>
+
+        <div class="mt-4 flex flex-wrap gap-2 text-sm">
+            <a class="rounded-md border border-slate-300 px-3 py-2 font-medium text-slate-700 hover:bg-slate-50" href="/run/48">Run oeffnen</a>
+                            <a class="rounded-md border border-slate-300 px-3 py-2 font-medium text-slate-700 hover:bg-slate-50" href="/ticker/1186">Run-Ticker oeffnen</a>
+                                </div>
+    </section>
+    </div>
+
+    <div class="mb-6">
+        <section class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+            <h2 class="text-sm font-semibold uppercase text-slate-500">Specific Entry Point Analysis / Minervini Snapshot</h2>
+            <p class="mt-1 text-sm text-slate-600">Struktur- und Execution-Bewertung: Trend, relative Staerke, Base, VCP, Mikrostruktur und Setup-Timing.</p>
+        </div>
+                                <span class="w-fit rounded-full px-3 py-1 text-xs font-semibold ring-1 bg-amber-50 text-amber-800 ring-amber-200">Gelb</span>
+            </div>
+
+                                            
+        <div class="mt-4 grid gap-3 md:grid-cols-5">
+            <div class="rounded-md bg-slate-50 p-3">
+                <p class="text-xs uppercase text-slate-500">Total Score</p>
+                <p class="mt-1 text-2xl font-semibold text-slate-950">82.0</p>
+                <p class="text-xs text-slate-500">0-100</p>
+            </div>
+            <div class="rounded-md bg-slate-50 p-3">
+                <p class="text-xs uppercase text-slate-500">Structure</p>
+                <p class="mt-1 text-2xl font-semibold text-slate-950">81.6</p>
+                <p class="text-xs text-slate-500">Trendqualitaet</p>
+            </div>
+            <div class="rounded-md bg-slate-50 p-3">
+                <p class="text-xs uppercase text-slate-500">Execution</p>
+                <p class="mt-1 text-2xl font-semibold text-slate-950">83.0</p>
+                <p class="text-xs text-slate-500">Setup-Timing</p>
+            </div>
+            <div class="rounded-md bg-slate-50 p-3">
+                <p class="text-xs uppercase text-slate-500">As of</p>
+                <p class="mt-1 font-semibold text-slate-950">24.04.2026</p>
+            </div>
+            <div class="rounded-md bg-slate-50 p-3">
+                <p class="text-xs uppercase text-slate-500">Marktdaten</p>
+                <p class="mt-1 font-semibold text-slate-950">ok / 374 Zeilen</p>
+            </div>
+            <div class="rounded-md bg-slate-50 p-3">
+                <p class="text-xs uppercase text-slate-500">Modell</p>
+                <p class="mt-1 font-semibold text-slate-950">Structure + Execution</p>
+                <p class="text-xs text-slate-500">deterministisch</p>
+            </div>
+        </div>
+
+        <h3 class="mt-5 text-sm font-semibold text-slate-950">Structure Layer</h3>
+        <div class="mt-5 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+                            <div class="rounded-md border border-slate-200 p-3">
+                    <div class="flex items-center justify-between gap-3">
+                        <p class="text-sm font-medium text-slate-700 underline decoration-dotted underline-offset-4" title="Bewertet, wie konstruktiv das uebergeordnete Marktumfeld fuer Long-Setups ist.">Markt</p>
+                        <p class="text-sm font-semibold text-slate-950">85.0</p>
+                    </div>
+                    <div class="mt-2 h-2 rounded-full bg-slate-100">
+                        <div class="h-2 rounded-full bg-emerald-500" style="width: 85%"></div>
+                    </div>
+                                            <p class="mt-1 text-xs text-slate-500">Gewicht 10%</p>
+                                    </div>
+                            <div class="rounded-md border border-slate-200 p-3">
+                    <div class="flex items-center justify-between gap-3">
+                        <p class="text-sm font-medium text-slate-700 underline decoration-dotted underline-offset-4" title="Bewertet die mittelfristige Trendstruktur, etwa Kurslage relativ zu 50- und 200-Tage-Linie.">Stage</p>
+                        <p class="text-sm font-semibold text-slate-950">96.0</p>
+                    </div>
+                    <div class="mt-2 h-2 rounded-full bg-slate-100">
+                        <div class="h-2 rounded-full bg-emerald-500" style="width: 96%"></div>
+                    </div>
+                                            <p class="mt-1 text-xs text-slate-500">Gewicht 18%</p>
+                                    </div>
+                            <div class="rounded-md border border-slate-200 p-3">
+                    <div class="flex items-center justify-between gap-3">
+                        <p class="text-sm font-medium text-slate-700 underline decoration-dotted underline-offset-4" title="Misst, wie stark sich die Aktie relativ zum Markt und anderen Titeln verhaelt.">Relative Staerke</p>
+                        <p class="text-sm font-semibold text-slate-950">72.0</p>
+                    </div>
+                    <div class="mt-2 h-2 rounded-full bg-slate-100">
+                        <div class="h-2 rounded-full bg-emerald-500" style="width: 72%"></div>
+                    </div>
+                                            <p class="mt-1 text-xs text-slate-500">Gewicht 17%</p>
+                                    </div>
+                            <div class="rounded-md border border-slate-200 p-3">
+                    <div class="flex items-center justify-between gap-3">
+                        <p class="text-sm font-medium text-slate-700 underline decoration-dotted underline-offset-4" title="Bewertet, ob die aktuelle Konsolidierung sauber, kontrolliert und konstruktiv wirkt.">Base</p>
+                        <p class="text-sm font-semibold text-slate-950">75.0</p>
+                    </div>
+                    <div class="mt-2 h-2 rounded-full bg-slate-100">
+                        <div class="h-2 rounded-full bg-emerald-500" style="width: 75%"></div>
+                    </div>
+                                            <p class="mt-1 text-xs text-slate-500">Gewicht 13%</p>
+                                    </div>
+                            <div class="rounded-md border border-slate-200 p-3">
+                    <div class="flex items-center justify-between gap-3">
+                        <p class="text-sm font-medium text-slate-700 underline decoration-dotted underline-offset-4" title="Prueft, ob das Volumenverhalten eher Akkumulation oder Distribution signalisiert.">Volumen</p>
+                        <p class="text-sm font-semibold text-slate-950">88.0</p>
+                    </div>
+                    <div class="mt-2 h-2 rounded-full bg-slate-100">
+                        <div class="h-2 rounded-full bg-emerald-500" style="width: 88%"></div>
+                    </div>
+                                            <p class="mt-1 text-xs text-slate-500">Gewicht 12%</p>
+                                    </div>
+                            <div class="rounded-md border border-slate-200 p-3">
+                    <div class="flex items-center justify-between gap-3">
+                        <p class="text-sm font-medium text-slate-700 underline decoration-dotted underline-offset-4" title="Misst Staerke und Stabilitaet der juengsten Kursdynamik.">Momentum</p>
+                        <p class="text-sm font-semibold text-slate-950">91.0</p>
+                    </div>
+                    <div class="mt-2 h-2 rounded-full bg-slate-100">
+                        <div class="h-2 rounded-full bg-emerald-500" style="width: 91%"></div>
+                    </div>
+                                            <p class="mt-1 text-xs text-slate-500">Gewicht 12%</p>
+                                    </div>
+                            <div class="rounded-md border border-slate-200 p-3">
+                    <div class="flex items-center justify-between gap-3">
+                        <p class="text-sm font-medium text-slate-700 underline decoration-dotted underline-offset-4" title="Bewertet, wie attraktiv das aktuelle Chancen-/Risikoprofil des Setups ist.">Risiko</p>
+                        <p class="text-sm font-semibold text-slate-950">57.0</p>
+                    </div>
+                    <div class="mt-2 h-2 rounded-full bg-slate-100">
+                        <div class="h-2 rounded-full bg-emerald-500" style="width: 57%"></div>
+                    </div>
+                                            <p class="mt-1 text-xs text-slate-500">Gewicht 10%</p>
+                                    </div>
+                            <div class="rounded-md border border-slate-200 p-3">
+                    <div class="flex items-center justify-between gap-3">
+                        <p class="text-sm font-medium text-slate-700 underline decoration-dotted underline-offset-4" title="Schaetzt das Potenzial fuer Fuehrungsaktien-Qualitaet und klare Outperformance ein.">Superperformance</p>
+                        <p class="text-sm font-semibold text-slate-950">83.0</p>
+                    </div>
+                    <div class="mt-2 h-2 rounded-full bg-slate-100">
+                        <div class="h-2 rounded-full bg-emerald-500" style="width: 83%"></div>
+                    </div>
+                                            <p class="mt-1 text-xs text-slate-500">Gewicht 8%</p>
+                                    </div>
+                    </div>
+
+        <h3 class="mt-5 text-sm font-semibold text-slate-950">Execution Layer</h3>
+        <div class="mt-3 grid gap-3 md:grid-cols-3">
+                            <div class="rounded-md border border-slate-200 p-3">
+                    <div class="flex items-center justify-between gap-3">
+                        <p class="text-sm font-medium text-slate-700 underline decoration-dotted underline-offset-4" title="Bewertet die Kontraktionsfolge der Base: Pullbacks und Volatilitaet sollten konstruktiv enger werden.">VCP</p>
+                        <p class="text-sm font-semibold text-slate-950">80.0</p>
+                    </div>
+                    <div class="mt-2 h-2 rounded-full bg-slate-100">
+                        <div class="h-2 rounded-full bg-sky-500" style="width: 80%"></div>
+                    </div>
+                                            <p class="mt-1 text-xs text-slate-500">Execution-Gewicht 40%</p>
+                                                                <p class="mt-2 text-xs text-slate-500">4 Kontraktionen / Volatilitaet 0.947</p>
+                                    </div>
+                            <div class="rounded-md border border-slate-200 p-3">
+                    <div class="flex items-center justify-between gap-3">
+                        <p class="text-sm font-medium text-slate-700 underline decoration-dotted underline-offset-4" title="Bewertet das kurzfristige Verhalten: gruen/rot-Tage, Pullbacks, Range-Struktur und Up/Down-Volumen.">Mikrostruktur</p>
+                        <p class="text-sm font-semibold text-slate-950">90.0</p>
+                    </div>
+                    <div class="mt-2 h-2 rounded-full bg-slate-100">
+                        <div class="h-2 rounded-full bg-sky-500" style="width: 90%"></div>
+                    </div>
+                                            <p class="mt-1 text-xs text-slate-500">Execution-Gewicht 35%</p>
+                                                                <p class="mt-2 text-xs text-slate-500">14 gruen / 10 rot, U/D 1.524</p>
+                                    </div>
+                            <div class="rounded-md border border-slate-200 p-3">
+                    <div class="flex items-center justify-between gap-3">
+                        <p class="text-sm font-medium text-slate-700 underline decoration-dotted underline-offset-4" title="Bewertet, ob das Setup nahe und sauber an einem Pivot/Trigger liegt oder bereits zu spaet und gestreckt ist.">Breakout Readiness</p>
+                        <p class="text-sm font-semibold text-slate-950">78.0</p>
+                    </div>
+                    <div class="mt-2 h-2 rounded-full bg-slate-100">
+                        <div class="h-2 rounded-full bg-sky-500" style="width: 78%"></div>
+                    </div>
+                                            <p class="mt-1 text-xs text-slate-500">Execution-Gewicht 25%</p>
+                                                                <p class="mt-2 text-xs text-slate-500">near pivot / Pivot -2.15%</p>
+                                    </div>
+                    </div>
+
+        <div class="mt-5 grid gap-4 lg:grid-cols-2">
+            <div class="rounded-md bg-slate-50 p-4">
+                                                <h3 class="text-sm font-semibold text-slate-950">Trigger & Warnungen</h3>
+                                    <p class="mt-2 text-sm text-emerald-800">Keine harten Kill Trigger aktiv.</p>
+                                                    <p class="mt-3 text-xs font-semibold uppercase text-amber-700">Soft Warnings / Execution Flaws</p>
+                    <ul class="mt-2 space-y-1 text-sm text-amber-800">
+                                                    <li class="rounded-md bg-white px-2 py-1 ring-1 ring-amber-100" title="stop_distance_unattractive">Stop-Distanz unattraktiv</li>
+                                                    <li class="rounded-md bg-white px-2 py-1 ring-1 ring-amber-100" title="vcp_too_loose_near_pivot">Setup nicht tight genug</li>
+                                            </ul>
+                            </div>
+            <div class="rounded-md bg-slate-50 p-4">
+                <h3 class="text-sm font-semibold text-slate-950">Einordnung</h3>
+                <p class="mt-2 text-sm text-slate-700">
+                    Specific Entry Point Analysis bewertet die strukturelle Setup-Qualitaet getrennt vom kurzfristigen Kronos-/Sentiment-Lauf.
+                    Der Execution Layer ergaenzt VCP, Mikrostruktur und Breakout-Readiness. Die Ampel kombiniert Strukturqualitaet, Setup-Timing und Warnsignale.
+                </p>
+                                    <p class="mt-2 text-xs text-slate-500">Ampelgrund: soft entry or risk warnings.</p>
+                            </div>
+        </div>
+    </section>
+    </div>
+
+    <div class="mb-6">
+        
+<section class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+            <h2 class="text-sm font-semibold uppercase text-slate-500">Exit Point Analysis / Exit & Risk Snapshot</h2>
+            <p class="mt-1 text-sm text-slate-600">Exit Point Analysis: Failure, Trend Exit, Climax/Overextension und Risk Management.</p>
+        </div>
+                                <span class="compact-badge bg-amber-50 text-amber-700 ring-amber-200" title="TIGHTEN_RISK: halten, aber Stop/Risiko enger fuehren.">TIGHTEN_RISK</span>
+
+            </div>
+
+                            
+        <div class="mt-4 grid gap-3 md:grid-cols-5">
+            <div class="rounded-md bg-slate-50 p-3">
+                <p class="text-xs uppercase text-slate-500">EPA Risk Score</p>
+                <p class="mt-1 text-2xl font-semibold text-slate-950">10.0</p>
+                <p class="text-xs text-slate-500">0-100, hoeher = kritischer</p>
+            </div>
+            <div class="rounded-md bg-slate-50 p-3">
+                <p class="text-xs uppercase text-slate-500">Action</p>
+                <p class="mt-1 font-semibold text-slate-950">TIGHTEN_RISK</p>
+                <p class="text-xs text-slate-500">multiple soft exit warnings</p>
+            </div>
+            <div class="rounded-md bg-slate-50 p-3">
+                <p class="text-xs uppercase text-slate-500">As of</p>
+                <p class="mt-1 font-semibold text-slate-950">24.04.2026</p>
+            </div>
+            <div class="rounded-md bg-slate-50 p-3">
+                <p class="text-xs uppercase text-slate-500">Buy-Kontext</p>
+                <p class="mt-1 font-semibold text-slate-950">Gelb / 82.0</p>
+            </div>
+            <div class="rounded-md bg-slate-50 p-3">
+                <p class="text-xs uppercase text-slate-500">Marktdaten</p>
+                <p class="mt-1 font-semibold text-slate-950">ok / 374 Zeilen</p>
+            </div>
+        </div>
+
+        <div class="mt-5 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+                            <div class="rounded-md border border-slate-200 p-3">
+                    <div class="flex items-center justify-between gap-3">
+                        <p class="text-sm font-medium text-slate-700 underline decoration-dotted underline-offset-4" title="Bewertet, wie stark das aktuelle Verhalten nach einem gescheiterten Setup oder Breakout aussieht.">Failure</p>
+                        <p class="text-sm font-semibold text-slate-950">0.0</p>
+                    </div>
+                    <div class="mt-2 h-2 rounded-full bg-slate-100">
+                        <div class="h-2 rounded-full bg-rose-500" style="width: 0%"></div>
+                    </div>
+                                            <p class="mt-1 text-xs text-slate-500">Gewicht 30%</p>
+                                    </div>
+                            <div class="rounded-md border border-slate-200 p-3">
+                    <div class="flex items-center justify-between gap-3">
+                        <p class="text-sm font-medium text-slate-700 underline decoration-dotted underline-offset-4" title="Bewertet, ob sich Hinweise auf einen echten Trendbruch oder strukturellen Ausstieg mehren.">Trend Exit</p>
+                        <p class="text-sm font-semibold text-slate-950">0.0</p>
+                    </div>
+                    <div class="mt-2 h-2 rounded-full bg-slate-100">
+                        <div class="h-2 rounded-full bg-rose-500" style="width: 0%"></div>
+                    </div>
+                                            <p class="mt-1 text-xs text-slate-500">Gewicht 30%</p>
+                                    </div>
+                            <div class="rounded-md border border-slate-200 p-3">
+                    <div class="flex items-center justify-between gap-3">
+                        <p class="text-sm font-medium text-slate-700 underline decoration-dotted underline-offset-4" title="Misst Ueberdehnung, Blowoff-Charakter und moeglichen Gewinnsicherungsdruck.">Climax</p>
+                        <p class="text-sm font-semibold text-slate-950">22.0</p>
+                    </div>
+                    <div class="mt-2 h-2 rounded-full bg-slate-100">
+                        <div class="h-2 rounded-full bg-rose-500" style="width: 22%"></div>
+                    </div>
+                                            <p class="mt-1 text-xs text-slate-500">Gewicht 20%</p>
+                                    </div>
+                            <div class="rounded-md border border-slate-200 p-3">
+                    <div class="flex items-center justify-between gap-3">
+                        <p class="text-sm font-medium text-slate-700 underline decoration-dotted underline-offset-4" title="Bewertet den aktuellen Druck, Risiko zu reduzieren oder enger zu managen.">Risk</p>
+                        <p class="text-sm font-semibold text-slate-950">28.0</p>
+                    </div>
+                    <div class="mt-2 h-2 rounded-full bg-slate-100">
+                        <div class="h-2 rounded-full bg-rose-500" style="width: 28%"></div>
+                    </div>
+                                            <p class="mt-1 text-xs text-slate-500">Gewicht 20%</p>
+                                    </div>
+                    </div>
+
+        <div class="mt-5 grid gap-4 lg:grid-cols-2">
+            <div class="rounded-md bg-slate-50 p-4">
+                                                <h3 class="text-sm font-semibold text-slate-950">Exit Trigger & Warnings</h3>
+                                    <p class="mt-2 text-sm text-emerald-800">Keine harten EPA-Exit-Trigger aktiv.</p>
+                                                    <p class="mt-3 text-xs font-semibold uppercase text-amber-700">Soft Warnings / Risk Notes</p>
+                    <ul class="mt-2 space-y-1 text-sm text-amber-800">
+                                                    <li class="rounded-md bg-white px-2 py-1 ring-1 ring-amber-100" title="climax_extended_from_20dma">Ueberdehnung sichtbar</li>
+                                                    <li class="rounded-md bg-white px-2 py-1 ring-1 ring-amber-100" title="climax_vertical_acceleration">Vertikale Beschleunigung</li>
+                                                    <li class="rounded-md bg-white px-2 py-1 ring-1 ring-amber-100" title="risk_stop_distance_unattractive, risk_trailing_distance_wide">Stop-Distanz unattraktiv</li>
+                                            </ul>
+                            </div>
+            <div class="rounded-md bg-slate-50 p-4">
+                <h3 class="text-sm font-semibold text-slate-950">Einordnung</h3>
+                <p class="mt-2 text-sm text-slate-700">
+                    Exit Point Analysis bewertet die Verkaufsperspektive getrennt von der Specific Entry Point Analysis.
+                    Ein hoher EPA-Score bedeutet nicht automatisch ein schlechtes Buy-Setup, sondern erhoehten Exit-, Trim- oder Risk-Management-Druck.
+                </p>
+            </div>
+        </div>
+    </section>
+    </div>
+
+    <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <dl class="grid gap-4 text-sm md:grid-cols-3">
+            <div><dt class="text-slate-500">Input Ticker</dt><dd class="font-medium">ADI</dd></div>
+            <div><dt class="text-slate-500">Provider Ticker</dt><dd class="font-medium">ADI</dd></div>
+            <div><dt class="text-slate-500">Display Ticker</dt><dd class="font-medium">ADI</dd></div>
+            <div><dt class="text-slate-500">Asset Class</dt><dd class="font-medium">Equity</dd></div>
+            <div><dt class="text-slate-500">Region</dt><dd class="font-medium">US</dd></div>
+            <div><dt class="text-slate-500">Benchmark</dt><dd class="font-medium">-</dd></div>
+            <div><dt class="text-slate-500">Portfolio</dt><dd class="font-medium">Nein</dd></div>
+            <div><dt class="text-slate-500">Aktiv</dt><dd class="font-medium">Ja</dd></div>
+            <div><dt class="text-slate-500">Mapping Status</dt><dd class="font-medium">sector_intake_manual</dd></div>
+        </dl>
+                            <p class="mt-6 rounded-md bg-slate-50 p-3 text-sm text-slate-700">Manual Watchlist Intake from Technology.</p>
+            </section>
+
+            <div id="entry-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div class="w-full max-w-lg rounded-lg bg-white p-6 shadow-lg max-h-[90vh] overflow-y-auto">
+            <div class="mb-4 flex items-center justify-between">
+                <h2 class="text-lg font-semibold text-slate-950">Entry: ADI</h2>
+                <button type="button" class="text-slate-400 hover:text-slate-600" onclick="document.getElementById('entry-modal').classList.add('hidden')">&times;</button>
+            </div>
+            <form method="post" action="/instrument/58/portfolio/entry" data-turbo="false">
+                <input type="hidden" name="return_route" value="app_watchlist_index">
+                <input type="hidden" name="_token" value="121fa.pE3V4oR7RaLw77yaKI9gVhn9JUa9kBb5FfMiqIqhGh8.8AGausMuI4_Ardnra94MB1SoExSK2WO3cKRFzu7iIk-XNZmn1BggwZrb2w">
+                <div class="grid gap-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">Kaufpreis *</label>
+                            <input type="number" step="0.0001" name="event_price" required class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">Menge *</label>
+                            <input type="number" step="0.0001" name="quantity" required class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700">Kaufdatum *</label>
+                        <input type="datetime-local" name="event_timestamp" required class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+                    </div>
+                    <div class="grid grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">Gebühren</label>
+                            <input type="number" step="0.01" name="fees" value="0.00" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">Währung</label>
+                            <input type="text" name="currency" value="EUR" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">Trade-Typ</label>
+                            <select name="trade_type" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+                                <option value="live" selected>Live</option>
+                                <option value="paper">Paper</option>
+                                <option value="pseudo">Pseudo</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700">Entry Thesis</label>
+                        <textarea name="entry_thesis" rows="2" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700">Invalidierungsregel</label>
+                        <input type="text" name="invalidation_rule" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700">Notizen</label>
+                        <textarea name="event_notes" rows="2" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"></textarea>
+                    </div>
+                </div>
+                <div class="mt-6 flex justify-end gap-2">
+                    <button type="button" class="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50" onclick="document.getElementById('entry-modal').classList.add('hidden')">Abbrechen</button>
+                    <button type="submit" class="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500">Speichern</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+            </main>
+    </body>
+</html>

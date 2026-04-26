@@ -73,13 +73,11 @@
                         {% endif %}
                         {% if showPortfolioColumn %}
                             <td>
-                                <form method="post" action="{{ path('app_instrument_toggle_portfolio', {id: id}) }}">
-                                    <input type="hidden" name="return_route" value="{{ returnRoute }}">
-                                    <label class="inline-flex items-center gap-2 text-xs font-medium text-slate-600">
-                                        <input class="h-4 w-4 rounded border-slate-300 text-emerald-600" type="checkbox" {{ isPortfolio ? 'checked' : '' }} onchange="this.form.requestSubmit()">
-                                        <span>Portfolio</span>
-                                    </label>
-                                </form>
+                                {% if isPortfolio %}
+                                    <span class="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20">Portfolio</span>
+                                {% else %}
+                                    <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 ring-1 ring-inset ring-slate-300">Watchlist</span>
+                                {% endif %}
                             </td>
                         {% endif %}
                         {% if showActiveColumn %}
