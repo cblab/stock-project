@@ -195,6 +195,13 @@ class InstrumentController extends AbstractController
     ): Response {
         $returnRoute = $this->returnRoute($request);
 
+        // CSRF validation
+        $token = $request->request->get('_token');
+        if (!$this->isCsrfTokenValid('portfolio_entry_' . $instrument->getId(), $token)) {
+            $this->addFlash('error', 'Ungueltige Anfrage.');
+            return $this->redirectToRoute('app_instrument_show', ['id' => $instrument->getId()]);
+        }
+
         $eventPrice = $request->request->get('event_price');
         $quantity = $request->request->get('quantity');
         $eventTimestamp = $request->request->get('event_timestamp');
@@ -210,6 +217,23 @@ class InstrumentController extends AbstractController
             return $this->redirectToRoute('app_instrument_show', ['id' => $instrument->getId()]);
         }
 
+        // Validate numeric values > 0
+        if (!is_numeric($eventPrice) || (float)$eventPrice <= 0) {
+            $this->addFlash('error', 'Kaufpreis muss groesser als 0 sein.');
+            return $this->redirectToRoute('app_instrument_show', ['id' => $instrument->getId()]);
+        }
+        if (!is_numeric($quantity) || (float)$quantity <= 0) {
+            $this->addFlash('error', 'Menge muss groesser als 0 sein.');
+            return $this->redirectToRoute('app_instrument_show', ['id' => $instrument->getId()]);
+        }
+
+        // Convert datetime-local format (Y-m-d\TH:i) to Y-m-d H:i:s
+        $normalizedTimestamp = $this->convertTimestamp((string) $eventTimestamp);
+        if ($normalizedTimestamp === null) {
+            $this->addFlash('error', 'Ungueltiges Datumsformat.');
+            return $this->redirectToRoute('app_instrument_show', ['id' => $instrument->getId()]);
+        }
+
         $payload = [
             'instrument_id' => $instrument->getId(),
             'event_type' => 'entry',
@@ -218,7 +242,7 @@ class InstrumentController extends AbstractController
             'fees' => (string) $fees ?: '0.00',
             'currency' => (string) $currency ?: 'EUR',
             'trade_type' => (string) $tradeType ?: 'live',
-            'event_timestamp' => (string) $eventTimestamp,
+            'event_timestamp' => $normalizedTimestamp,
             'entry_thesis' => $entryThesis ?: null,
             'invalidation_rule' => $invalidationRule ?: null,
             'event_notes' => $eventNotes ?: null,
@@ -241,10 +265,10 @@ class InstrumentController extends AbstractController
 
             return $this->redirectToRoute($returnRoute);
         } catch (TradeValidationException $e) {
-            $this->addFlash('error', 'Validierungsfehler: ' . $e->getMessage());
+            $this->addFlash('error', 'Der Eintrag konnte nicht erstellt werden.');
             return $this->redirectToRoute('app_instrument_show', ['id' => $instrument->getId()]);
         } catch (\Throwable $e) {
-            $this->addFlash('error', 'Fehler beim Erstellen des Eintrags: ' . $e->getMessage());
+            $this->addFlash('error', 'Der Eintrag konnte nicht erstellt werden.');
             return $this->redirectToRoute('app_instrument_show', ['id' => $instrument->getId()]);
         }
     }
@@ -255,5 +279,23 @@ class InstrumentController extends AbstractController
         return in_array($route, ['app_portfolio_index', 'app_watchlist_index', 'app_instruments_inactive'], true)
             ? $route
             : 'app_portfolio_index';
+    }
+
+    /**
+     * Convert datetime-local format (Y-m-d\TH:i) to Y-m-d H:i:s
+     */
+    private function convertTimestamp(string $timestamp): ?string
+    {
+        // Handle HTML5 datetime-local format: Y-m-d\TH:i
+        if (preg_match('/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})$/', $timestamp, $matches)) {
+            return $matches[1] . ' ' . $matches[2] . ':00';
+        }
+
+        // Already in Y-m-d H:i:s format
+        if (preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $timestamp)) {
+            return $timestamp;
+        }
+
+        return null;
     }
 }
