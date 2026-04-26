@@ -280,7 +280,7 @@ class InstrumentController extends AbstractController
                 $result->tradeEventId
             ));
 
-            return $this->redirectToRoute($returnRoute);
+            return $this->redirectToRoute('app_instrument_show', ['id' => $instrument->getId()]);
         } catch (TradeValidationException $e) {
             $this->addFlash('error', 'Validierungsfehler: ' . $e->getMessage());
             return $this->redirectToRoute('app_instrument_show', ['id' => $instrument->getId()]);

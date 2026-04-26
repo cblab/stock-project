@@ -72,6 +72,7 @@ temp/
 *.bak
 .aider*
 .gitnexus
+tmp_*.html
 
 # GitNexus generated code graph / local index
 .gitnexus/
