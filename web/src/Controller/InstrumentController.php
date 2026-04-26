@@ -285,7 +285,7 @@ class InstrumentController extends AbstractController
             $this->addFlash('error', 'Validierungsfehler: ' . $e->getMessage());
             return $this->redirectToRoute('app_instrument_show', ['id' => $instrument->getId()]);
         } catch (\Throwable $e) {
-            $this->addFlash('error', 'Der Eintrag konnte nicht erstellt werden.');
+            $this->addFlash('error', 'Der Eintrag konnte nicht erstellt werden: ' . $e->getMessage());
             return $this->redirectToRoute('app_instrument_show', ['id' => $instrument->getId()]);
         }
     }

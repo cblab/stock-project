@@ -69,7 +69,7 @@
                 <h2 class="text-lg font-semibold text-slate-950">Entry: {{ instrument.displayTicker }}</h2>
                 <button type="button" class="text-slate-400 hover:text-slate-600" onclick="document.getElementById('entry-modal').classList.add('hidden')">&times;</button>
             </div>
-            <form method="post" action="{{ path('app_instrument_portfolio_entry', {id: instrument.id}) }}">
+            <form method="post" action="{{ path('app_instrument_portfolio_entry', {id: instrument.id}) }}" data-turbo="false">
                 <input type="hidden" name="return_route" value="{{ instrument.portfolio ? 'app_portfolio_index' : 'app_watchlist_index' }}">
                 <input type="hidden" name="_token" value="{{ csrf_token('portfolio_entry_' ~ instrument.id) }}">
                 <div class="grid gap-4">
@@ -135,7 +135,7 @@
                 <h2 class="text-lg font-semibold text-slate-950">Trade Event: {{ instrument.displayTicker }}</h2>
                 <button type="button" class="text-slate-400 hover:text-slate-600" onclick="document.getElementById('event-modal').classList.add('hidden')">&times;</button>
             </div>
-            <form method="post" action="{{ path('app_trade_campaign_event', {id: open_campaigns[0].id}) }}">
+            <form method="post" action="{{ path('app_trade_campaign_event', {id: open_campaigns[0].id}) }}" data-turbo="false">
                 <input type="hidden" name="return_route" value="app_instrument_show">
                 <input type="hidden" name="_token" value="{{ csrf_token('trade_event_' ~ open_campaigns[0].id) }}">
                 <div class="grid gap-4">
