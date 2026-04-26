@@ -11,6 +11,7 @@ use App\Repository\PipelineRunItemRepository;
 use App\Service\Trade\TradeEventWriter;
 use App\Service\Trade\TradeValidationException;
 use App\Service\WatchlistCandidateRegistryResetService;
+use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -217,7 +218,7 @@ class InstrumentController extends AbstractController
                 'event_type' => 'entry',
                 'event_price' => $request->request->get('event_price'),
                 'quantity' => $request->request->get('quantity'),
-                'event_timestamp' => $request->request->get('event_timestamp'),
+                'event_timestamp' => $this->convertTimestamp($request->request->get('event_timestamp')),
                 'fees' => $request->request->get('fees', '0.00'),
                 'currency' => $request->request->get('currency', 'EUR'),
                 'trade_type' => $request->request->get('trade_type', 'live'),
@@ -256,5 +257,21 @@ class InstrumentController extends AbstractController
         return in_array($route, ['app_portfolio_index', 'app_watchlist_index', 'app_instruments_inactive', 'app_instrument_show'], true)
             ? $route
             : 'app_portfolio_index';
+    }
+
+    private function convertTimestamp(?string $timestamp): ?string
+    {
+        if ($timestamp === null || $timestamp === '') {
+            return null;
+        }
+        // datetime-local liefert Y-m-d\TH:i, wir brauchen Y-m-d H:i:s
+        if (str_contains($timestamp, 'T')) {
+            $timestamp = str_replace('T', ' ', $timestamp);
+        }
+        // Falls nur Y-m-d H:i ohne Sekunden, ergaenze :00
+        if (preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/', $timestamp)) {
+            $timestamp .= ':00';
+        }
+        return $timestamp;
     }
 }

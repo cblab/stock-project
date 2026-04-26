@@ -31,25 +31,28 @@ class TradeEventController extends AbstractController
         $campaign = $this->findCampaign($id);
         if ($campaign === null) {
             $this->addFlash('error', 'Trade Campaign nicht gefunden.');
-            return $this->redirectToRoute($returnRoute);
+            return $this->redirectToRoute('app_portfolio_index');
         }
 
         // Form-Daten validieren
         $eventType = $request->request->get('event_type');
         if (!is_string($eventType) || $eventType === '') {
             $this->addFlash('error', 'Event-Typ ist erforderlich.');
-            return $this->redirectToRoute($returnRoute);
+            return $this->redirectToRoute($returnRoute, $this->buildRedirectParams($returnRoute, $campaign));
         }
 
         // Event-spezifische Validierung
         $validationResult = $this->validateEventData($eventType, $request);
         if ($validationResult !== null) {
             $this->addFlash('error', $validationResult);
-            return $this->redirectToRoute($returnRoute);
+            return $this->redirectToRoute($returnRoute, $this->buildRedirectParams($returnRoute, $campaign));
         }
 
         // Payload bauen
         $payload = $this->buildPayload($campaign, $eventType, $request);
+
+        // Zeitstempel-Format konvertieren (datetime-local -> TradeEventWriter Format)
+        $payload['event_timestamp'] = $this->convertTimestamp($payload['event_timestamp']);
 
         try {
             $result = $this->tradeEventWriter->write($payload);
@@ -66,14 +69,37 @@ class TradeEventController extends AbstractController
                 $this->translateState($result->campaignState)
             ));
 
-            return $this->redirectToRoute($returnRoute);
+            return $this->redirectToRoute($returnRoute, $this->buildRedirectParams($returnRoute, $campaign));
         } catch (TradeValidationException $e) {
             $this->addFlash('error', 'Validierungsfehler: ' . $e->getMessage());
-            return $this->redirectToRoute($returnRoute);
+            return $this->redirectToRoute($returnRoute, $this->buildRedirectParams($returnRoute, $campaign));
         } catch (\RuntimeException $e) {
             $this->addFlash('error', 'Fehler beim Erstellen des Trade Events: ' . $e->getMessage());
-            return $this->redirectToRoute($returnRoute);
+            return $this->redirectToRoute($returnRoute, $this->buildRedirectParams($returnRoute, $campaign));
         }
+    }
+
+    private function buildRedirectParams(string $route, array $campaign): array
+    {
+        return $route === 'app_instrument_show'
+            ? ['id' => (int) $campaign['instrument_id']]
+            : [];
+    }
+
+    private function convertTimestamp(?string $timestamp): ?string
+    {
+        if ($timestamp === null || $timestamp === '') {
+            return null;
+        }
+        // datetime-local liefert Y-m-d\TH:i, wir brauchen Y-m-d H:i:s
+        if (str_contains($timestamp, 'T')) {
+            $timestamp = str_replace('T', ' ', $timestamp);
+        }
+        // Falls nur Y-m-d H:i ohne Sekunden, ergaenze :00
+        if (preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/', $timestamp)) {
+            $timestamp .= ':00';
+        }
+        return $timestamp;
     }
 
     private function findCampaign(int $id): ?array
