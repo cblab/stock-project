@@ -29,6 +29,7 @@ $ALLOWED_COMMANDS = [
         '/run/doctrine-status' => ['doctrine-status', WEB_ROOT, ['php', 'bin/console', 'doctrine:migrations:status']],
         '/run/doctrine-dry-run' => ['doctrine-dry-run', WEB_ROOT, ['php', 'bin/console', 'doctrine:migrations:migrate', '--dry-run', '--no-interaction']],
         '/run/lint-container' => ['lint-container', WEB_ROOT, ['php', 'bin/console', 'lint:container']],
+        '/run/composer-dump-autoload' => ['composer-dump-autoload', WEB_ROOT, null], // Wird mit Cache-Delete behandelt
     ],
 ];
 
@@ -139,6 +140,81 @@ function runCommand(string $name, string $workingDir, array $command): array {
 }
 
 /**
+ * Löscht ein Verzeichnis rekursiv (nur für feste Cache-Pfade).
+ * Folgt keinen Symlinks.
+ *
+ * @param string $path Der zu löschende Pfad
+ * @return array ['success' => bool, 'error' => string|null]
+ */
+function deleteDirectory(string $path): array {
+    // Pfad normalisieren
+    $realPath = realpath($path);
+    if ($realPath === false) {
+        // Verzeichnis existiert nicht - das ist OK
+        return ['success' => true, 'error' => null];
+    }
+
+    // Strikte Prüfung: Pfad muss unterhalb von WEB_ROOT/var/cache liegen
+    $cacheBase = realpath(WEB_ROOT . '/var/cache');
+    if ($cacheBase === false) {
+        return ['success' => false, 'error' => 'Cache base directory does not exist: ' . WEB_ROOT . '/var/cache'];
+    }
+
+    // Pfad muss mit cacheBase beginnen
+    if (strpos($realPath, $cacheBase . DIRECTORY_SEPARATOR) !== 0 && $realPath !== $cacheBase) {
+        return ['success' => false, 'error' => 'Path is outside allowed cache directory: ' . $path];
+    }
+
+    // Prüfe auf Symlink - nur unlink, nicht folgen
+    if (is_link($realPath)) {
+        if (!unlink($realPath)) {
+            return ['success' => false, 'error' => 'Failed to unlink symlink: ' . $path];
+        }
+        return ['success' => true, 'error' => null];
+    }
+
+    // Verzeichnis lesen und rekursiv löschen
+    $items = scandir($realPath);
+    if ($items === false) {
+        return ['success' => false, 'error' => 'Failed to read directory: ' . $path];
+    }
+
+    foreach ($items as $item) {
+        if ($item === '.' || $item === '..') {
+            continue;
+        }
+
+        $itemPath = $realPath . DIRECTORY_SEPARATOR . $item;
+
+        // Prüfe auf Symlink - nicht folgen
+        if (is_link($itemPath)) {
+            if (!unlink($itemPath)) {
+                return ['success' => false, 'error' => 'Failed to unlink symlink: ' . $itemPath];
+            }
+            continue;
+        }
+
+        if (is_dir($itemPath)) {
+            $result = deleteDirectory($itemPath);
+            if (!$result['success']) {
+                return $result;
+            }
+        } else {
+            if (!unlink($itemPath)) {
+                return ['success' => false, 'error' => 'Failed to delete file: ' . $itemPath];
+            }
+        }
+    }
+
+    // Verzeichnis selbst löschen
+    if (!rmdir($realPath)) {
+        return ['success' => false, 'error' => 'Failed to remove directory: ' . $path];
+    }
+
+    return ['success' => true, 'error' => null];
+}
+
+/**
  * Normalisiert und validiert einen Dateipfad für php-lint
  */
 function normalizeLintPath(string $inputPath): ?string {
@@ -239,6 +315,31 @@ if ($name === 'php-lint') {
 
     // Command mit dem validierten Pfad bauen
     $command = ['php', '-l', $filePath];
+}
+
+// Spezialfall: composer-dump-autoload + Cache-Löschung
+if ($name === 'composer-dump-autoload') {
+    // Schritt 1: composer dump-autoload ausführen
+    $command = ['composer', 'dump-autoload', '--classmap-authoritative', '--no-dev'];
+    $result = runCommand($name, $workingDir, $command);
+
+    // Wenn composer fehlschlägt, sofort zurückgeben
+    if ($result['exit_code'] !== 0) {
+        jsonResponse(200, $result);
+    }
+
+    // Schritt 2: Symfony prod Cache löschen
+    $cachePath = WEB_ROOT . '/var/cache/prod';
+    $deleteResult = deleteDirectory($cachePath);
+
+    if (!$deleteResult['success']) {
+        $result['exit_code'] = 1;
+        $result['stderr'] .= "\n[Cache delete failed] " . $deleteResult['error'];
+    }
+
+    // Ergebnis zurückgeben (composer-Ausgabe + ggf. Cache-Fehler)
+    jsonResponse(200, $result);
+    exit;
 }
 
 // Command ausführen

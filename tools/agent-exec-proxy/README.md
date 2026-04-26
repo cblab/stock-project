@@ -99,6 +99,26 @@ curl -X POST http://localhost:8787/run/lint-container
 
 ---
 
+### POST /run/composer-dump-autoload
+Baut die Composer-Classmap neu und löscht den Symfony prod Cache.
+
+**Wichtig:** Diese Action ist nötig nach neuen PHP-Klassen oder wenn `lint:container` "Expected to find class..." meldet.
+
+```bash
+curl -X POST http://localhost:8787/run/composer-dump-autoload
+```
+
+**Ablauf:**
+1. Führt `composer dump-autoload --classmap-authoritative --no-dev` aus
+2. Löscht `/app/web/var/cache/prod` (rekursiv, folgt keinen Symlinks)
+
+**Danach kann `lint:container` erneut laufen:**
+```bash
+curl -X POST http://localhost:8787/run/lint-container
+```
+
+---
+
 ## Response-Format
 
 Alle `/run/*`-Endpunkte geben:
@@ -122,6 +142,7 @@ Alle `/run/*`-Endpunkte geben:
 - Nur feste Commands aus Allowlist – keine beliebigen Shell-Befehle
 - `php-lint` nur für Dateien unter `/app/web` (Pfadnormalisierung + Traversal-Schutz)
 - `doctrine-dry-run` erzwingt immer `--dry-run --no-interaction`
+- `composer-dump-autoload` löscht nur `/app/web/var/cache/prod` (fester Pfad, keine Parameter)
 - Kein `proc_open` mit Shell-Expansion (Array-Argumente)
 - Timeout: 60 Sekunden pro Command
 - Keine Ausgabe von Environment-Variablen
