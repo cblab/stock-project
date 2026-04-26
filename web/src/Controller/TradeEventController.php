@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
-use App\Entity\Instrument;
 use App\Service\Trade\TradeEventWriter;
 use App\Service\Trade\TradeValidationException;
 use Doctrine\DBAL\Connection;
-use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -21,7 +19,6 @@ class TradeEventController extends AbstractController
     public function __construct(
         private readonly TradeEventWriter $tradeEventWriter,
         private readonly Connection $connection,
-        private readonly EntityManagerInterface $entityManager,
     ) {
     }
 
@@ -58,7 +55,9 @@ class TradeEventController extends AbstractController
             $result = $this->tradeEventWriter->write($payload);
 
             // Nach erfolgreichem Exit-Event prüfen, ob Instrument-State geändert werden soll
-            $this->maybeUpdateInstrumentState($campaign, $eventType);
+            // Hinweis: Wir ändern den Instrument-State NICHT automatisch, da dies ein expliziter
+            // Business-Entscheid ist. Bei hard_exit oder return_to_watchlist könnte das Instrument
+            // aus dem Portfolio entfernt werden, aber dies erfolgt manuell.
 
             $this->addFlash('success', sprintf(
                 'Trade Event erstellt: Campaign #%d, Event #%d, Status: %s',
@@ -104,13 +103,13 @@ class TradeEventController extends AbstractController
                 $exitReason = $request->request->get('exit_reason');
 
                 if (!is_string($price) || $price === '') {
-                    return 'Preis ist für Trim erforderlich.';
+                    return 'Preis ist fuer Trim erforderlich.';
                 }
                 if (!is_string($quantity) || $quantity === '') {
-                    return 'Menge ist für Trim erforderlich.';
+                    return 'Menge ist fuer Trim erforderlich.';
                 }
                 if (!is_string($exitReason) || $exitReason === '') {
-                    return 'Exit-Grund ist für Trim erforderlich.';
+                    return 'Exit-Grund ist fuer Trim erforderlich.';
                 }
                 break;
 
@@ -172,7 +171,7 @@ class TradeEventController extends AbstractController
 
             case 'pause':
             case 'resume':
-                // Keine Preis/Menge/Exit-Reason für Pause/Resume
+                // Keine Preis/Menge/Exit-Reason fuer Pause/Resume
                 $payload['event_price'] = null;
                 $payload['quantity'] = null;
                 $payload['exit_reason'] = null;
@@ -180,37 +179,6 @@ class TradeEventController extends AbstractController
         }
 
         return $payload;
-    }
-
-    private function maybeUpdateInstrumentState(array $campaign, string $eventType): void
-    {
-        // Nur bei terminalen Exit-Events: Instrument könnte aus Portfolio entfernt werden
-        if (!in_array($eventType, ['hard_exit', 'return_to_watchlist'], true)) {
-            return;
-        }
-
-        // Prüfen, ob es weitere offene Campaigns für dieses Instrument gibt
-        $openCampaigns = $this->findOpenCampaignsForInstrument((int) $campaign['instrument_id']);
-
-        // Wenn keine weiteren offenen Campaigns existieren, könnte das Instrument aus dem Portfolio entfernt werden
-        // Aber: Wir ändern den State NICHT automatisch, da dies ein expliziter Business-Entscheid ist
-        // Stattdessen loggen wir dies für spätere manuelle Prüfung
-        if (count($openCampaigns) === 0) {
-            // Keine weiteren offenen Campaigns - Instrument könnte aus Portfolio entfernt werden
-            // Wir ändern den State hier NICHT automatisch (kein bestehendes Pattern)
-            // Dies ist ein bewusster Business-Entscheid, der manuell erfolgen sollte
-        }
-    }
-
-    private function findOpenCampaignsForInstrument(int $instrumentId): array
-    {
-        $placeholders = implode(',', array_fill(0, count(self::NON_TERMINAL_STATES), '?'));
-        $params = array_merge([$instrumentId], self::NON_TERMINAL_STATES);
-
-        return $this->connection->fetchAllAssociative(
-            "SELECT * FROM trade_campaign WHERE instrument_id = ? AND state IN ($placeholders)",
-            $params
-        );
     }
 
     private function translateState(string $state): string
@@ -222,7 +190,7 @@ class TradeEventController extends AbstractController
             'closed_profit' => 'Geschlossen (Gewinn)',
             'closed_loss' => 'Geschlossen (Verlust)',
             'closed_neutral' => 'Geschlossen (Neutral)',
-            'returned_to_watchlist' => 'Zurück zur Watchlist',
+            'returned_to_watchlist' => 'Zurueck zur Watchlist',
             default => $state,
         };
     }
