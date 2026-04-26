@@ -95,6 +95,15 @@
                         {% endif %}
                         <td class="text-right">
                             <div class="flex items-center justify-end gap-2">
+                                {% if not isPortfolio %}
+                                    <form method="post" action="{{ path('app_instrument_portfolio_entry', {id: id}) }}" onsubmit="return promptEntryData(this);">
+                                        <input type="hidden" name="return_route" value="{{ returnRoute }}">
+                                        <input type="hidden" name="event_price" class="entry-price">
+                                        <input type="hidden" name="quantity" class="entry-quantity">
+                                        <input type="hidden" name="event_timestamp" class="entry-timestamp">
+                                        <button type="submit" class="rounded-md border border-emerald-200 px-2 py-1 text-[11px] font-medium text-emerald-700 hover:bg-emerald-50" title="Schnell-Entry mit Default-Werten">+ Portfolio</button>
+                                    </form>
+                                {% endif %}
                                 <a class="font-medium text-slate-950 underline decoration-slate-300 underline-offset-4 hover:decoration-slate-900" href="{{ path('app_instrument_show', {id: id}) }}">Details</a>
                                 {% if returnRoute in ['app_portfolio_index', 'app_watchlist_index'] %}
                                     <form method="post" action="{{ path('app_instrument_delete', {id: id}) }}" onsubmit="return confirm('Instrument {{ inputTicker }} endgueltig loeschen?');">
@@ -108,6 +117,25 @@
                 {% else %}
                     <tr><td class="px-4 py-6 text-center text-slate-500" colspan="{{ signalColumn ? 10 : 9 }}">{{ emptyMessage }}</td></tr>
                 {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    <script>
+    function promptEntryData(form) {
+        const price = prompt('Kaufpreis:', '');
+        if (price === null) return false;
+        const quantity = prompt('Menge:', '');
+        if (quantity === null) return false;
+        const now = new Date();
+        const timestamp = now.toISOString().slice(0, 16);
+
+        form.querySelector('.entry-price').value = price;
+        form.querySelector('.entry-quantity').value = quantity;
+        form.querySelector('.entry-timestamp').value = timestamp;
+        return true;
+    }
+    </script>
             </tbody>
         </table>
     </section>

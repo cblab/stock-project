@@ -8,6 +8,8 @@ use App\Repository\InstrumentEpaSnapshotRepository;
 use App\Repository\InstrumentRepository;
 use App\Repository\InstrumentSepaSnapshotRepository;
 use App\Repository\PipelineRunItemRepository;
+use App\Service\Trade\TradeEventWriter;
+use App\Service\Trade\TradeValidationException;
 use App\Service\WatchlistCandidateRegistryResetService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -182,6 +184,54 @@ class InstrumentController extends AbstractController
         }
 
         return $this->redirectToRoute($returnRoute);
+    }
+
+    #[Route('/instrument/{id}/portfolio/entry', name: 'app_instrument_portfolio_entry', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function portfolioEntry(
+        Instrument $instrument,
+        Request $request,
+        TradeEventWriter $tradeEventWriter,
+        EntityManagerInterface $entityManager,
+    ): Response {
+        $returnRoute = $this->returnRoute($request);
+
+        try {
+            $payload = [
+                'instrument_id' => $instrument->getId(),
+                'event_type' => 'entry',
+                'event_price' => $request->request->get('event_price'),
+                'quantity' => $request->request->get('quantity'),
+                'event_timestamp' => $request->request->get('event_timestamp'),
+                'fees' => $request->request->get('fees', '0.00'),
+                'currency' => $request->request->get('currency', 'EUR'),
+                'trade_type' => $request->request->get('trade_type', 'live'),
+                'entry_thesis' => $request->request->get('entry_thesis'),
+                'invalidation_rule' => $request->request->get('invalidation_rule'),
+                'event_notes' => $request->request->get('event_notes'),
+            ];
+
+            $result = $tradeEventWriter->write($payload);
+
+            // Update instrument state: Watchlist -> Portfolio
+            if (!$instrument->isPortfolio()) {
+                $instrument->setIsPortfolio(true)->touch();
+                $entityManager->flush();
+            }
+
+            $this->addFlash('success', sprintf(
+                'Trade erstellt: Campaign #%d, Event #%d',
+                $result->tradeCampaignId,
+                $result->tradeEventId
+            ));
+
+            return $this->redirectToRoute($returnRoute);
+        } catch (TradeValidationException $e) {
+            $this->addFlash('error', 'Validierungsfehler: ' . $e->getMessage());
+            return $this->redirectToRoute($returnRoute);
+        } catch (\RuntimeException $e) {
+            $this->addFlash('error', 'Fehler beim Erstellen des Trades: ' . $e->getMessage());
+            return $this->redirectToRoute($returnRoute);
+        }
     }
 
     private function returnRoute(Request $request): string
