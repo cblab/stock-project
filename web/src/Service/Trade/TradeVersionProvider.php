@@ -13,7 +13,7 @@ use RuntimeException;
  */
 final readonly class TradeVersionProvider
 {
-    private const CONFIG_PATH = __DIR__ . '/../../../../config/system_versions.json';
+    private const CONFIG_PATH = __DIR__ . '/../../../config/system_versions.json';
 
     /**
      * Returns the current system versions.
