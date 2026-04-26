@@ -13,7 +13,7 @@
             {% if not instrument.portfolio %}
                 <button type="button" class="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500" onclick="document.getElementById('entry-modal').classList.remove('hidden')">Zu Portfolio hinzufügen</button>
             {% endif %}
-            {% if open_campaigns is defined and open_campaigns|length > 0 %}
+            {% if instrument.portfolio and open_campaigns is defined and open_campaigns|length > 0 %}
                 <button type="button" class="rounded-md bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-500" onclick="document.getElementById('event-modal').classList.remove('hidden')">Trade Event</button>
             {% endif %}
             <a class="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800" href="{{ path('app_instrument_edit', {id: instrument.id}) }}">Bearbeiten</a>
@@ -127,7 +127,7 @@
     </div>
     {% endif %}
 
-    {% if open_campaigns is defined and open_campaigns|length > 0 %}
+    {% if instrument.portfolio and open_campaigns is defined and open_campaigns|length > 0 %}
     {# Trade Event Modal #}
     <div id="event-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50">
         <div class="w-full max-w-lg rounded-lg bg-white p-6 shadow-lg max-h-[90vh] overflow-y-auto">
@@ -135,7 +135,7 @@
                 <h2 class="text-lg font-semibold text-slate-950">Trade Event: {{ instrument.displayTicker }}</h2>
                 <button type="button" class="text-slate-400 hover:text-slate-600" onclick="document.getElementById('event-modal').classList.add('hidden')">&times;</button>
             </div>
-            <form method="post" action="{{ path('app_trade_event_create', {id: open_campaigns[0].id}) }}">
+            <form method="post" action="{{ path('app_trade_campaign_event', {id: open_campaigns[0].id}) }}">
                 <input type="hidden" name="return_route" value="app_instrument_show">
                 <input type="hidden" name="_token" value="{{ csrf_token('trade_event_' ~ open_campaigns[0].id) }}">
                 <div class="grid gap-4">
@@ -148,6 +148,7 @@
                             <option value="return_to_watchlist">Zurueck zur Watchlist</option>
                             <option value="pause">Pausieren</option>
                             <option value="resume">Fortsetzen</option>
+                            <option value="add">Nachkauf / Aufstocken</option>
                         </select>
                     </div>
                     <div id="price-field" class="hidden">
@@ -226,6 +227,12 @@
                 priceField.classList.add('hidden');
                 quantityField.classList.add('hidden');
                 exitReasonField.classList.add('hidden');
+            } else if (eventType === 'add') {
+                priceField.classList.remove('hidden');
+                quantityField.classList.remove('hidden');
+                exitReasonField.classList.add('hidden');
+                document.getElementById('event_price').required = true;
+                quantityInput.required = true;
             } else {
                 priceField.classList.add('hidden');
                 quantityField.classList.add('hidden');

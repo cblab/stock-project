@@ -34,6 +34,12 @@ class TradeEventController extends AbstractController
             return $this->redirectToRoute('app_portfolio_index');
         }
 
+        // CSRF-Validierung
+        if (!$this->isCsrfTokenValid('trade_event_' . $id, $request->request->get('_token'))) {
+            $this->addFlash('error', 'Ungueltiges Sicherheits-Token.');
+            return $this->redirectToRoute($returnRoute, $this->buildRedirectParams($returnRoute, $campaign));
+        }
+
         // Form-Daten validieren
         $eventType = $request->request->get('event_type');
         if (!is_string($eventType) || $eventType === '') {
@@ -73,8 +79,8 @@ class TradeEventController extends AbstractController
         } catch (TradeValidationException $e) {
             $this->addFlash('error', 'Validierungsfehler: ' . $e->getMessage());
             return $this->redirectToRoute($returnRoute, $this->buildRedirectParams($returnRoute, $campaign));
-        } catch (\RuntimeException $e) {
-            $this->addFlash('error', 'Fehler beim Erstellen des Trade Events: ' . $e->getMessage());
+        } catch (\Throwable $e) {
+            $this->addFlash('error', 'Das Trade Event konnte nicht erstellt werden.');
             return $this->redirectToRoute($returnRoute, $this->buildRedirectParams($returnRoute, $campaign));
         }
     }
@@ -152,6 +158,18 @@ class TradeEventController extends AbstractController
                 }
                 break;
 
+            case 'add':
+                $price = $request->request->get('event_price');
+                $quantity = $request->request->get('quantity');
+
+                if (!is_string($price) || $price === '') {
+                    return 'Preis ist fuer Nachkauf erforderlich.';
+                }
+                if (!is_string($quantity) || $quantity === '') {
+                    return 'Menge ist fuer Nachkauf erforderlich.';
+                }
+                break;
+
             case 'pause':
             case 'resume':
                 // Nur Zeitstempel erforderlich
@@ -193,6 +211,13 @@ class TradeEventController extends AbstractController
                 if (is_string($quantity) && $quantity !== '') {
                     $payload['quantity'] = $quantity;
                 }
+                break;
+
+            case 'add':
+                $payload['event_price'] = $request->request->get('event_price');
+                $payload['quantity'] = $request->request->get('quantity');
+                // Keine exit_reason fuer Nachkauf
+                $payload['exit_reason'] = null;
                 break;
 
             case 'pause':
