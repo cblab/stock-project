@@ -253,11 +253,16 @@ final readonly class TradeEventValidator
                 throw TradeValidationException::missingRequiredField('quantity', $eventType);
             }
             $this->validateNumericPositive($payload['event_price'], 'event_price');
-            $this->validateQuantityAgainstOpenPosition(
-                $payload['quantity'],
-                $campaign,
-                $eventType
-            );
+            $this->validateNumericPositive($payload['quantity'], 'quantity');
+
+            // Only trim events are limited by open position quantity
+            if ($eventType === self::EVENT_TRIM) {
+                $this->validateQuantityAgainstOpenPosition(
+                    $payload['quantity'],
+                    $campaign,
+                    $eventType
+                );
+            }
         }
 
         if (in_array($eventType, $requiresPrice, true)) {
