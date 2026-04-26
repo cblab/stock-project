@@ -11,15 +11,15 @@ services:
   web:
     # Verwendet dasselbe Image wie Prod, aber mit Dev-Overrides
     environment:
-      APP_ENV: dev
-      APP_DEBUG: 1
+      APP_ENV: prod
+      APP_DEBUG: "1"
       # Dev-Secret (kann lokal beliebig sein)
       APP_SECRET: ${STOCK_APP_SECRET:-dev-local-secret-change-me}
-    ports:
+    ports: !override
       - "8001:8000"
     # PHP Built-in Server statt Apache/FPM
     command: >
-      sh -c "cd /app/web && php -S 0.0.0.0:8000 -t public"
+      sh -c "cd /app/web && php -S 0.0.0.0:8000 -t public docker-router.php"
     volumes:
       # Selektive Mounts für Hot-Reload ohne Image-Rebuild
       # Nicht ./:/app mounten - nur gezielt die Dev-relevanten Pfade
