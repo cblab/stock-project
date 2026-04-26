@@ -175,17 +175,41 @@ final readonly class TradeEventWriter
         if (!in_array($eventType, ['hard_exit', 'return_to_watchlist'], true)) {
             return $normalized;
         }
-        if ($normalized['quantity'] !== null) {
-            return $normalized;
-        }
-        $openQty = $campaignData['open_quantity'] ?? null;
-        if ($openQty === null) {
+
+        $openQty = isset($campaignData['open_quantity']) ? (float) $campaignData['open_quantity'] : null;
+        if ($openQty === null || $openQty <= 0) {
             throw new TradeValidationException(
-                sprintf('%s requires quantity or existing open_quantity', $eventType)
+                sprintf('%s requires open_quantity on campaign', $eventType)
             );
         }
-        $normalized['quantity'] = (string) $openQty;
+
+        // If quantity not provided, use full open quantity
+        if ($normalized['quantity'] === null) {
+            $normalized['quantity'] = (string) $openQty;
+            return $normalized;
+        }
+
+        // If quantity provided, validate it matches open_quantity exactly (full exit only)
+        $quantity = (float) $normalized['quantity'];
+        $this->assertFullExitQuantity($quantity, $openQty, $eventType);
+
         return $normalized;
+    }
+
+    private function assertFullExitQuantity(float $quantity, float $openQty, string $eventType): void
+    {
+        $tolerance = 0.000001;
+        if (abs($quantity - $openQty) > $tolerance) {
+            if ($quantity < $openQty) {
+                throw new TradeValidationException(
+                    sprintf('%s must close the entire position (quantity %f < open_quantity %f). Use trim for partial exits.', $eventType, $quantity, $openQty)
+                );
+            }
+            // quantity > openQty will be caught by validator, but we check defensively
+            throw new TradeValidationException(
+                sprintf('%s quantity exceeds open position (quantity %f > open_quantity %f)', $eventType, $quantity, $openQty)
+            );
+        }
     }
 
     private function createCampaign(array $normalized): array
@@ -338,6 +362,7 @@ final readonly class TradeEventWriter
         if ($quantity === null || $quantity <= 0) {
             throw new TradeValidationException('hard_exit requires positive quantity');
         }
+        $this->assertFullExitQuantity($quantity, $openQty, 'hard_exit');
 
         $newRealizedGross = $realizedGross;
         $newRealizedNet = null;
@@ -375,6 +400,7 @@ final readonly class TradeEventWriter
         if ($quantity === null || $quantity <= 0) {
             throw new TradeValidationException('return_to_watchlist requires positive quantity');
         }
+        $this->assertFullExitQuantity($quantity, $openQty, 'return_to_watchlist');
 
         $newRealizedGross = $realizedGross;
         $newRealizedNet = null;
