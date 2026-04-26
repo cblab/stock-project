@@ -1,29 +1,129 @@
 @import "tailwindcss";
 
+@theme {
+    --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+    --color-primary-50: #ecfdf5;
+    --color-primary-100: #d1fae5;
+    --color-primary-200: #a7f3d0;
+    --color-primary-500: #10b981;
+    --color-primary-600: #059669;
+    --color-primary-700: #047857;
+
+    --color-accent-50: #fffbeb;
+    --color-accent-100: #fef3c7;
+    --color-accent-200: #fde68a;
+    --color-accent-500: #f59e0b;
+    --color-accent-600: #d97706;
+    --color-accent-700: #b45309;
+
+    --color-danger-50: #fef2f2;
+    --color-danger-100: #fee2e2;
+    --color-danger-200: #fecaca;
+    --color-danger-500: #ef4444;
+    --color-danger-600: #dc2626;
+    --color-danger-700: #b91c1c;
+
+    --color-surface-0: #ffffff;
+    --color-surface-50: #f8fafc;
+    --color-surface-100: #f1f5f9;
+    --color-surface-200: #e2e8f0;
+    --color-surface-300: #cbd5e1;
+    --color-surface-400: #94a3b8;
+    --color-surface-500: #64748b;
+    --color-surface-600: #475569;
+    --color-surface-700: #334155;
+    --color-surface-800: #1e293b;
+    --color-surface-900: #0f172a;
+}
+
 body {
-    background: #f7f8fb;
-    color: #18212f;
+    background: var(--color-surface-50);
+    color: var(--color-surface-900);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 @layer components {
+    .app-shell {
+        @apply flex h-screen overflow-hidden;
+    }
+
+    .app-sidebar {
+        @apply hidden w-64 flex-col border-r border-surface-800 bg-surface-900 text-white md:flex;
+    }
+
+    .app-nav-link {
+        @apply flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-surface-400 transition-colors hover:bg-surface-800 hover:text-white;
+    }
+
+    .app-nav-link-active {
+        @apply flex items-center gap-3 rounded-lg bg-primary-600 px-3 py-2.5 text-sm font-medium text-white transition-colors;
+    }
+
+    .app-topbar {
+        @apply flex h-16 items-center justify-between border-b border-surface-200 bg-white px-6 lg:px-8;
+    }
+
+    .app-content {
+        @apply flex-1 overflow-y-auto p-6 lg:p-8;
+    }
+
+    .btn-primary {
+        @apply inline-flex items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2;
+    }
+
+    .btn-secondary {
+        @apply inline-flex items-center justify-center gap-2 rounded-lg border border-surface-300 bg-white px-4 py-2 text-sm font-medium text-surface-700 transition-colors hover:bg-surface-50 focus:outline-none focus:ring-2 focus:ring-surface-400 focus:ring-offset-2;
+    }
+
+    .btn-accent {
+        @apply inline-flex items-center justify-center gap-2 rounded-lg bg-accent-500 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-accent-600 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:ring-offset-2;
+    }
+
+    .btn-danger {
+        @apply inline-flex items-center justify-center gap-2 rounded-lg bg-danger-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-danger-700 focus:outline-none focus:ring-2 focus:ring-danger-500 focus:ring-offset-2;
+    }
+
+    .flash-success {
+        @apply rounded-lg border border-primary-200 bg-primary-50 px-4 py-3 text-sm font-medium text-primary-700;
+    }
+
+    .flash-error {
+        @apply rounded-lg border border-danger-200 bg-danger-50 px-4 py-3 text-sm font-medium text-danger-700;
+    }
+
+    .flash-warning {
+        @apply rounded-lg border border-accent-200 bg-accent-50 px-4 py-3 text-sm font-medium text-accent-700;
+    }
+
+    .panel-card {
+        @apply overflow-hidden rounded-xl border border-surface-200 bg-white shadow-sm;
+    }
+
     .metric-card {
-        @apply rounded-lg border border-slate-200 bg-white p-4 shadow-sm;
+        @apply rounded-xl border border-surface-200 bg-white p-5 shadow-sm;
     }
 
     .data-table {
-        @apply w-full table-fixed divide-y divide-slate-200 text-sm;
+        @apply w-full table-fixed divide-y divide-surface-200 text-sm;
     }
 
     .data-table th {
-        @apply bg-slate-50 px-2.5 py-2 text-left text-[11px] font-semibold uppercase text-slate-500;
+        @apply bg-surface-50 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-surface-500;
     }
 
     .data-table td {
-        @apply px-2.5 py-2 align-top text-slate-700;
+        @apply px-4 py-3 align-top text-surface-700;
+    }
+
+    .data-table tbody tr {
+        @apply transition-colors hover:bg-surface-50;
     }
 
     .compact-badge {
-        @apply rounded-full px-1.5 py-0.5 text-[10px] font-medium leading-4 ring-1;
+        @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset;
     }
 
     .signal-stack {
@@ -31,26 +131,26 @@ body {
     }
 
     .signal-stack dt {
-        @apply text-slate-500;
+        @apply text-surface-500;
     }
 
     .signal-stack dd {
-        @apply text-right font-semibold tabular-nums text-slate-900;
+        @apply text-right font-semibold tabular-nums text-surface-900;
     }
 
     .instrument-form .instrument-label {
-        @apply mb-1.5 block text-sm font-medium text-slate-700;
+        @apply mb-1.5 block text-sm font-medium text-surface-700;
     }
 
     .instrument-form input[type="text"],
     .instrument-form input[type="number"],
     .instrument-form select,
     .instrument-form textarea {
-        @apply w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20;
+        @apply w-full rounded-lg border border-surface-300 bg-white px-3 py-2 text-sm text-surface-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20;
     }
 
     .instrument-form .instrument-checkbox {
-        @apply mt-0.5 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500;
+        @apply mt-0.5 h-4 w-4 rounded border-surface-300 text-primary-600 focus:ring-primary-500;
     }
 
     .instrument-form textarea {
@@ -58,10 +158,10 @@ body {
     }
 
     .instrument-form .form-help {
-        @apply mt-1 text-xs text-slate-500;
+        @apply mt-1 text-xs text-surface-500;
     }
 
     .instrument-form ul {
-        @apply mt-1 list-none p-0 text-xs text-rose-600;
+        @apply mt-1 list-none p-0 text-xs text-danger-600;
     }
 }

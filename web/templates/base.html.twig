@@ -1,36 +1,181 @@
 <!DOCTYPE html>
 <html lang="de">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>{% block title %}Stock Pipeline{% endblock %}</title>
-        {% block javascripts %}
-            {% block importmap %}{{ importmap('app') }}{% endblock %}
-        {% endblock %}
-    </head>
-    <body class="min-h-screen bg-slate-50 text-slate-900">
-        <header class="border-b border-slate-200 bg-white">
-            <div class="mx-auto flex max-w-screen-2xl items-center justify-between px-4 py-4 2xl:px-6">
-                <a class="text-base font-semibold text-slate-950" href="{{ path('app_runs_index') }}">Stock Pipeline</a>
-                <nav class="flex items-center gap-4 text-sm text-slate-500">
-                    <a class="hover:text-slate-950" href="{{ path('app_runs_index') }}">Runs</a>
-                    <a class="hover:text-slate-950" href="{{ path('app_buy_signal_matrix') }}">Buy Matrix</a>
-                    <a class="hover:text-slate-950" href="{{ path('app_sell_signal_matrix') }}">Sell Matrix</a>
-                    <a class="hover:text-slate-950" href="{{ path('app_portfolio_index') }}">Portfolio</a>
-                    <a class="hover:text-slate-950" href="{{ path('app_watchlist_index') }}">Watchlist</a>
-                    <a class="hover:text-slate-950" href="{{ path('app_watchlist_intake') }}">Intake</a>
-                    <a class="hover:text-slate-950" href="{{ path('app_instruments_inactive') }}">Inaktive</a>
-                </nav>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Stock Pipeline{% endblock %}</title>
+    {% block stylesheets %}{% endblock %}
+    {% block javascripts %}
+        {% block importmap %}{{ importmap('app') }}{% endblock %}
+    {% endblock %}
+</head>
+<body class="bg-surface-50 text-surface-900 font-sans antialiased">
+    <div class="app-shell">
+        <aside class="app-sidebar">
+            <div class="flex h-16 items-center border-b border-surface-800 px-6">
+                <a class="flex items-center gap-3" href="{{ path('app_runs_index') }}">
+                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary-500">
+                        <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                        </svg>
+                    </span>
+                    <span class="text-lg font-semibold tracking-tight text-white">Stock Project</span>
+                </a>
             </div>
-        </header>
-        <main class="mx-auto max-w-screen-2xl px-4 py-5 2xl:px-6">
+
+            <nav class="flex-1 space-y-0.5 overflow-y-auto px-3 py-4">
+                {% set current_route = app.request.attributes.get('_route') %}
+
+                <a href="{{ path('app_runs_index') }}"
+                   class="group {{ current_route starts with 'app_runs' ? 'app-nav-link-active' : 'app-nav-link' }}">
+                    <svg class="h-5 w-5 shrink-0 {{ current_route starts with 'app_runs' ? 'text-white' : 'text-surface-500 group-hover:text-white' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                    Runs
+                </a>
+
+                <a href="{{ path('app_portfolio_index') }}"
+                   class="group {{ current_route starts with 'app_portfolio' ? 'app-nav-link-active' : 'app-nav-link' }}">
+                    <svg class="h-5 w-5 shrink-0 {{ current_route starts with 'app_portfolio' ? 'text-white' : 'text-surface-500 group-hover:text-white' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                    </svg>
+                    Portfolio
+                </a>
+
+                <a href="{{ path('app_watchlist_index') }}"
+                   class="group {{ current_route == 'app_watchlist_index' ? 'app-nav-link-active' : 'app-nav-link' }}">
+                    <svg class="h-5 w-5 shrink-0 {{ current_route == 'app_watchlist_index' ? 'text-white' : 'text-surface-500 group-hover:text-white' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                    </svg>
+                    Watchlist
+                </a>
+
+                <a href="{{ path('app_watchlist_intake') }}"
+                   class="group {{ current_route starts with 'app_watchlist_intake' ? 'app-nav-link-active' : 'app-nav-link' }}">
+                    <svg class="h-5 w-5 shrink-0 {{ current_route starts with 'app_watchlist_intake' ? 'text-white' : 'text-surface-500 group-hover:text-white' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    Intake
+                </a>
+
+                <a href="{{ path('app_buy_signal_matrix') }}"
+                   class="group {{ current_route starts with 'app_buy_signal' ? 'app-nav-link-active' : 'app-nav-link' }}">
+                    <svg class="h-5 w-5 shrink-0 {{ current_route starts with 'app_buy_signal' ? 'text-white' : 'text-surface-500 group-hover:text-white' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                    </svg>
+                    Buy Matrix
+                </a>
+
+                <a href="{{ path('app_sell_signal_matrix') }}"
+                   class="group {{ current_route starts with 'app_sell_signal' ? 'app-nav-link-active' : 'app-nav-link' }}">
+                    <svg class="h-5 w-5 shrink-0 {{ current_route starts with 'app_sell_signal' ? 'text-white' : 'text-surface-500 group-hover:text-white' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"/>
+                    </svg>
+                    Sell Matrix
+                </a>
+
+                <a href="{{ path('app_instruments_index') }}"
+                   class="group {{ current_route == 'app_instruments_index' ? 'app-nav-link-active' : 'app-nav-link' }}">
+                    <svg class="h-5 w-5 shrink-0 {{ current_route == 'app_instruments_index' ? 'text-white' : 'text-surface-500 group-hover:text-white' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                    </svg>
+                    Instrumente
+                </a>
+
+                <a href="{{ path('app_instruments_inactive') }}"
+                   class="group {{ current_route == 'app_instruments_inactive' ? 'app-nav-link-active' : 'app-nav-link' }}">
+                    <svg class="h-5 w-5 shrink-0 {{ current_route == 'app_instruments_inactive' ? 'text-white' : 'text-surface-500 group-hover:text-white' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+                    </svg>
+                    Inaktive
+                </a>
+            </nav>
+
+            <div class="border-t border-surface-800 p-4">
+                <div class="rounded-lg bg-surface-800/70 px-3 py-2">
+                    <p class="text-xs font-medium uppercase tracking-wider text-surface-500">Workspace</p>
+                    <p class="mt-1 truncate text-sm font-medium text-white">Stock Pipeline</p>
+                </div>
+            </div>
+        </aside>
+
+        <div class="flex flex-1 flex-col overflow-hidden">
+            <header class="app-topbar">
+                <button type="button"
+                        class="-ml-2 rounded-lg p-2 text-surface-500 transition-colors hover:bg-surface-100 hover:text-surface-700 md:hidden"
+                        onclick="document.getElementById('mobile-menu').classList.toggle('hidden')"
+                        aria-label="Navigation öffnen">
+                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                    </svg>
+                </button>
+
+                <div class="min-w-0">
+                    <p class="hidden text-xs font-medium uppercase tracking-wider text-surface-500 md:block">Stock Project</p>
+                    <h1 class="truncate text-lg font-semibold tracking-tight text-surface-900 md:text-xl">
+                        {% block page_title %}{{ block('title') }}{% endblock %}
+                    </h1>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <a href="{{ path('app_instrument_new') }}" class="btn-primary">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                        </svg>
+                        Instrument
+                    </a>
+                </div>
+            </header>
+
             {% for label, messages in app.flashes %}
                 {% for message in messages %}
-                    {% set tone = label == 'warning' ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-slate-200 bg-white text-slate-700' %}
-                    <div class="mb-4 rounded-md border px-4 py-3 text-sm {{ tone }}">{{ message }}</div>
+                    <div class="mx-6 mt-4 lg:mx-8">
+                        <div class="flex items-start gap-3 {{ label == 'success' ? 'flash-success' : label == 'error' ? 'flash-error' : label == 'warning' ? 'flash-warning' : 'rounded-lg border border-surface-200 bg-surface-100 px-4 py-3 text-sm font-medium text-surface-800' }}">
+                            {% if label == 'success' %}
+                                <svg class="mt-0.5 h-5 w-5 shrink-0 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                </svg>
+                            {% elseif label == 'error' %}
+                                <svg class="mt-0.5 h-5 w-5 shrink-0 text-danger-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                </svg>
+                            {% elseif label == 'warning' %}
+                                <svg class="mt-0.5 h-5 w-5 shrink-0 text-accent-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                                </svg>
+                            {% endif %}
+                            <span>{{ message }}</span>
+                        </div>
+                    </div>
                 {% endfor %}
             {% endfor %}
-            {% block body %}{% endblock %}
-        </main>
-    </body>
+
+            <main class="app-content">
+                <div class="mx-auto max-w-screen-2xl">
+                    {% block body %}{% endblock %}
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <div id="mobile-menu" class="hidden fixed inset-0 z-50 md:hidden">
+        <div class="absolute inset-0 bg-black/50" onclick="document.getElementById('mobile-menu').classList.add('hidden')"></div>
+        <div class="absolute left-0 top-0 flex h-full w-64 flex-col bg-surface-900 text-white">
+            <div class="flex h-16 items-center border-b border-surface-800 px-6">
+                <span class="text-lg font-semibold tracking-tight">Stock Project</span>
+            </div>
+            <nav class="flex-1 space-y-0.5 overflow-y-auto px-3 py-4">
+                <a href="{{ path('app_runs_index') }}" class="app-nav-link">Runs</a>
+                <a href="{{ path('app_portfolio_index') }}" class="app-nav-link">Portfolio</a>
+                <a href="{{ path('app_watchlist_index') }}" class="app-nav-link">Watchlist</a>
+                <a href="{{ path('app_watchlist_intake') }}" class="app-nav-link">Intake</a>
+                <a href="{{ path('app_buy_signal_matrix') }}" class="app-nav-link">Buy Matrix</a>
+                <a href="{{ path('app_sell_signal_matrix') }}" class="app-nav-link">Sell Matrix</a>
+                <a href="{{ path('app_instruments_index') }}" class="app-nav-link">Instrumente</a>
+                <a href="{{ path('app_instruments_inactive') }}" class="app-nav-link">Inaktive</a>
+            </nav>
+        </div>
+    </div>
+</body>
 </html>
