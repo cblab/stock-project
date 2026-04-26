@@ -1,0 +1,32 @@
+# Dev-Compose-Overlay für schnelles UI-Testing ohne Image-Rebuild
+# Verwendung siehe DEV_SETUP.md
+#
+# Start:
+#   docker compose --env-file docker/prod.env -p stock-project-dev -f compose.yaml -f docker/compose.dev.yml up -d web
+#
+# Die DB wird aus dem Base-Compose (compose.yaml) übernommen.
+# Port 8001 für Dev (Prod läuft auf 8000).
+
+services:
+  web:
+    # Verwendet dasselbe Image wie Prod, aber mit Dev-Overrides
+    environment:
+      APP_ENV: dev
+      APP_DEBUG: 1
+      # Dev-Secret (kann lokal beliebig sein)
+      APP_SECRET: ${STOCK_APP_SECRET:-dev-local-secret-change-me}
+    ports:
+      - "8001:8000"
+    # PHP Built-in Server statt Apache/FPM
+    command: >
+      sh -c "cd /app/web && php -S 0.0.0.0:8000 -t public"
+    volumes:
+      # Selektive Mounts für Hot-Reload ohne Image-Rebuild
+      # Nicht ./:/app mounten - nur gezielt die Dev-relevanten Pfade
+      - ./web/templates:/app/web/templates:ro
+      - ./web/src:/app/web/src:ro
+      - ./web/config:/app/web/config:ro
+      - ./web/assets:/app/web/assets:ro
+      - ./web/migrations:/app/web/migrations:ro
+      # Var muss beschreibbar sein für Cache/Logs
+      - web_var:/app/web/var
