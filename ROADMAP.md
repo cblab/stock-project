@@ -19,7 +19,8 @@
    - `100+` ⇒ **High Evidence**
 
 4. **Snapshot timing is law**
-   - Jeder Trade referenziert konkrete Snapshot-IDs:
+   - Jeder Trade-Event referenziert den letzten abgeschlossenen Snapshot vor dem Event-Timestamp. Kein Snapshot mit Zeitstempel nach dem Event darf verknüpft werden.
+   - Die Referenzen laufen konkret über:
      - `buy_signal_snapshot_id`
      - `sepa_snapshot_id`
      - `epa_snapshot_id`
@@ -162,10 +163,10 @@ Immer zeigen:
 
 ---
 
-## v0.6 – Sizing & Portfolio Core
+## v0.6 – Exit Engine & Portfolio Core
 
 ### Ziel
-Vom Signal zur Kapitalentscheidung.
+Vom Signal zur Kapitalentscheidung. Nutzt die v0.4 Truth Layer State Machine als Grundlage für echte Exit-/Trim-/Hold-Entscheidungslogik.
 
 ### Bauen
 - Exit-Aktionen: `hold`, `watch_tightly`, `trim`, `hard_exit`, `pause`
@@ -177,9 +178,23 @@ Vom Signal zur Kapitalentscheidung.
 - Länderverteilung
 - Sektorverteilung
 - Cash-Anteil
+- **Daily Monitoring View / Open Position Monitor:**
+  - Offene Campaigns
+  - Aktueller SEPA/EPA/K/S/M-State
+  - Letzte Snapshot-Zeit
+  - Signalverschlechterung
+  - Stop-/Trailing-/Thesis-Warnungen
+  - Makro-Regime-Hinweis, sobald v0.7 verfügbar
+  - Vorgeschlagene Aktion: hold / watch_tightly / trim / hard_exit / pause
 
 ### Nicht enthalten
 - Auto-Trading
+
+### Einordnung
+- v0.4 enthält die State Machine und den Truth Layer
+- v0.6 nutzt diese Grundlage für echte Exit-/Trim-/Hold-Entscheidungslogik und Portfolio-Core
+- Sizing bleibt Teil von v0.6, aber nicht alleiniger Schwerpunkt
+- Minimalversion des Monitoring in v0.6, weil Exit Engine ohne Monitoring blind ist
 
 ### Sizing-Logik (später)
 - Basis-Risikobudget
@@ -191,6 +206,7 @@ Vom Signal zur Kapitalentscheidung.
 - Der Nutzer bekommt beim Kauf eine Größenempfehlung
 - Der Nutzer bekommt beim Verkauf/Trimmen einen strukturierten Exit-Vorschlag
 - Portfolio-Risiken werden sichtbar
+- Offene Positionen sind im Monitoring View übersichtlich dargestellt
 
 ---
 
@@ -245,7 +261,7 @@ Das System erklärt und coacht.
 - Zahlen und Regeln bleiben deterministisch
 - LLM erklärt
 - LLM prüft Widersprüche
-- LLM schreibt Thesen/Invalidation Rules vor
+- LLM entwirft Thesen und Invalidation Rules als Vorschlag – der Nutzer muss sie prüfen, ändern und bestätigen
 - LLM entscheidet nicht numerisch
 
 ### Definition of done
@@ -269,15 +285,25 @@ Bevor dem System vertraut wird, muss es sich selbst prüfen.
 - Robustness Checks
 - Walk-forward/Stabilität
 - Live vs Paper vs Pseudo Vergleich
-- QuantStats-Reports
+- QuantStats-Reports (On-Demand- oder periodischer Performance-/Drawdown-/Return-Report)
 - Alignment-Validierung
 - Exit-Reason-Analysen
-- Optionale spätere vectorbt-Validierung
+- Optionale spätere vectorbt-Validierung für Strategie-/Policy-Simulation
 
 ### Definition of done
-- Das System kann seine eigene Evidenzqualität prüfen
-- Schwächen einzelner Policies oder Exit-Klassen werden sichtbar
-- Keine stillen Regressions in Score- oder Policy-Logik
+- Mindestens ein reproduzierbarer Evidence-/Performance-Report existiert
+- Live/Paper/Pseudo werden getrennt ausgewertet
+- Exit-Reason-Analysen sind sichtbar
+- Regressions in Score-/Policy-Logik werden erkennbar
+- Für jeden abgeschlossenen Trade kann der vollständige Entscheidungsweg rekonstruiert werden:
+  - Entry-Event
+  - Verknüpfte Snapshots
+  - Versionen
+  - Thesis / Invalidation Rule
+  - Exit-/Trim-/Pause-Events
+  - Exit-Reason
+  - P&L
+  - Evidence-Kontext
 
 ---
 
@@ -328,6 +354,17 @@ Self-Learning bleibt **deaktiviert**, bis gleichzeitig erfüllt ist:
 - Vollständige Versionierung aktiv
 - Offline-Validierung schlägt naive Baselines
 
+### Geplanter v0.9-Job: check_self_learning_gate.py
+
+**Zweck:**
+- Prüft täglich oder manuell aufrufbar, ob alle Bedingungen erfüllt sind
+- Erzeugt Status:
+  - `locked`
+  - `eligible_for_review`
+  - `unlocked`
+- Öffnet Self-Learning **nicht automatisch**
+- Finale Freigabe bleibt **manuell**
+
 Vorher gilt:
 - **Evidence Engine only**
 - Keine automatischen Gewichtsänderungen
@@ -342,7 +379,7 @@ Vorher gilt:
 2. **v0.5 Evidence Engine**
    - Ohne ehrliche Evidenz lügt das System über seine Qualität
 
-3. **v0.6 Sizing & Portfolio Core**
+3. **v0.6 Exit Engine & Portfolio Core**
    - Ohne saubere Exit- und Positionslogik fehlt der eigentliche Nutzwert
 
 ---
@@ -377,7 +414,7 @@ Vorher gilt:
 - Ehrliche Evidence Engine ohne ML
 
 ### Dann
-- Sizing & Portfolio + Makro + Advisor
+- Exit Engine & Portfolio + Makro + Advisor
 
 ### Erst ganz am Ende
 - Self-Learning, nur mit harten Gates
