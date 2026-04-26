@@ -1,68 +1,305 @@
 {% extends 'base.html.twig' %}
 
 {% block title %}{{ instrument.inputTicker }}{% endblock %}
+{% block page_title %}{{ instrument.displayTicker }}{% endblock %}
 
 {% block body %}
-    <div class="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div>
-            <a class="text-sm text-slate-500 hover:text-slate-950" href="{{ path(instrument.portfolio ? 'app_portfolio_index' : 'app_watchlist_index') }}">Zurück zu {{ instrument.portfolio ? 'Portfolio' : 'Watchlist' }}</a>
-            <h1 class="mt-1 text-2xl font-semibold text-slate-950">{{ instrument.displayTicker }}</h1>
-            <p class="mt-1 text-sm text-slate-600">{{ instrument.name ?: 'Kein Name gepflegt' }}{% if instrument.wkn %} | WKN {{ instrument.wkn }}{% endif %}</p>
-        </div>
-        <div class="flex gap-2">
-            {% if not instrument.portfolio %}
-                <button type="button" class="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500" onclick="document.getElementById('entry-modal').classList.remove('hidden')">Zu Portfolio hinzufügen</button>
-            {% endif %}
-            {% if instrument.portfolio and open_campaigns is defined and open_campaigns|length > 0 %}
-                <button type="button" class="rounded-md bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-500" onclick="document.getElementById('event-modal').classList.remove('hidden')">Trade Event</button>
-            {% endif %}
-            <a class="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800" href="{{ path('app_instrument_edit', {id: instrument.id}) }}">Bearbeiten</a>
-        </div>
-    </div>
+    {# Preserve-refactor: new visual shell, existing truth-layer blocks and trade forms retained. #}
 
-    <div class="mb-6">
-        {% include '_last_run_snapshot.html.twig' with {
-            lastRunItem: lastRunItem,
-            showTickerLink: true,
-            showInstrumentLink: false
-        } only %}
-    </div>
+    <section class="panel-card mb-6">
+        <div class="px-6 py-5">
+            <div class="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+                <div class="min-w-0">
+                    <a class="text-sm font-medium text-surface-500 hover:text-surface-900" href="{{ path(instrument.portfolio ? 'app_portfolio_index' : 'app_watchlist_index') }}">
+                        ← Zurück zu {{ instrument.portfolio ? 'Portfolio' : 'Watchlist' }}
+                    </a>
 
-    <div class="mb-6">
-        {% include 'instrument/_sepa_snapshot.html.twig' with {sepaSnapshot: sepaSnapshot} only %}
-    </div>
+                    <div class="mt-3 flex flex-wrap items-center gap-2">
+                        <h1 class="text-3xl font-bold tracking-tight text-surface-900">{{ instrument.displayTicker }}</h1>
 
-    <div class="mb-6">
-        {% include 'instrument/_epa_snapshot.html.twig' with {epaSnapshot: epaSnapshot} only %}
-    </div>
+                        {% if instrument.portfolio %}
+                            <span class="compact-badge bg-primary-50 text-primary-700 ring-primary-600/20">Portfolio</span>
+                        {% else %}
+                            <span class="compact-badge bg-surface-100 text-surface-600 ring-surface-300">Watchlist</span>
+                        {% endif %}
 
-    <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        <dl class="grid gap-4 text-sm md:grid-cols-3">
-            <div><dt class="text-slate-500">Input Ticker</dt><dd class="font-medium">{{ instrument.inputTicker }}</dd></div>
-            <div><dt class="text-slate-500">Provider Ticker</dt><dd class="font-medium">{{ instrument.providerTicker }}</dd></div>
-            <div><dt class="text-slate-500">Display Ticker</dt><dd class="font-medium">{{ instrument.displayTicker }}</dd></div>
-            <div><dt class="text-slate-500">Asset Class</dt><dd class="font-medium">{{ instrument.assetClass }}</dd></div>
-            <div><dt class="text-slate-500">Region</dt><dd class="font-medium">{{ instrument.region ?: '-' }}</dd></div>
-            <div><dt class="text-slate-500">Benchmark</dt><dd class="font-medium">{{ instrument.benchmark ?: '-' }}</dd></div>
-            <div><dt class="text-slate-500">Portfolio</dt><dd class="font-medium">{{ instrument.portfolio ? 'Ja' : 'Nein' }}</dd></div>
-            <div><dt class="text-slate-500">Aktiv</dt><dd class="font-medium">{{ instrument.active ? 'Ja' : 'Nein' }}</dd></div>
-            <div><dt class="text-slate-500">Mapping Status</dt><dd class="font-medium">{{ instrument.mappingStatus ?: '-' }}</dd></div>
-        </dl>
-        {% if instrument.assetClass == 'ETF' %}
-            <div class="mt-6 grid gap-4 text-sm md:grid-cols-2">
-                <div><p class="text-slate-500">Region Exposure</p><p class="font-medium">{{ instrument.regionExposure|join(', ') ?: '-' }}</p></div>
-                <div><p class="text-slate-500">Sector Profile</p><p class="font-medium">{{ instrument.sectorProfile|join(', ') ?: '-' }}</p></div>
-                <div><p class="text-slate-500">Top Holdings</p><p class="font-medium">{{ instrument.topHoldingsProfile|join(', ') ?: '-' }}</p></div>
-                <div><p class="text-slate-500">Macro Profile</p><p class="font-medium">{{ instrument.macroProfile|join(', ') ?: '-' }}</p></div>
+                        {% if instrument.active %}
+                            <span class="compact-badge bg-surface-100 text-surface-700 ring-surface-300">Aktiv</span>
+                        {% else %}
+                            <span class="compact-badge bg-danger-50 text-danger-700 ring-danger-600/20">Inaktiv</span>
+                        {% endif %}
+
+                        {% if instrument.mappingStatus %}
+                            <span class="compact-badge bg-accent-50 text-accent-700 ring-accent-600/20">{{ instrument.mappingStatus }}</span>
+                        {% endif %}
+
+                        {% if instrument.portfolio and open_campaigns is defined and open_campaigns|length > 0 %}
+                            <span class="compact-badge bg-accent-50 text-accent-700 ring-accent-600/20">Offene Campaign</span>
+                        {% endif %}
+                    </div>
+
+                    <p class="mt-2 text-base text-surface-600">
+                        {{ instrument.name ?: 'Kein Name gepflegt' }}
+                        {% if instrument.wkn %}<span class="text-surface-400"> · WKN {{ instrument.wkn }}</span>{% endif %}
+                        {% if instrument.isin %}<span class="text-surface-400"> · ISIN {{ instrument.isin }}</span>{% endif %}
+                    </p>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2">
+                    {% if not instrument.portfolio %}
+                        <button type="button" class="btn-primary" onclick="document.getElementById('entry-modal').classList.remove('hidden')">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                            </svg>
+                            Zu Portfolio hinzufügen
+                        </button>
+                    {% endif %}
+
+                    {% if instrument.portfolio and open_campaigns is defined and open_campaigns|length > 0 %}
+                        <button type="button" class="btn-accent" onclick="document.getElementById('event-modal').classList.remove('hidden')">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v8m-4-4h8"/>
+                            </svg>
+                            Trade Event
+                        </button>
+                    {% endif %}
+
+                    <a href="{{ path('app_instrument_edit', {id: instrument.id}) }}" class="btn-secondary">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                        </svg>
+                        Bearbeiten
+                    </a>
+                </div>
             </div>
-        {% endif %}
-        {% if instrument.mappingNote %}
-            <p class="mt-6 rounded-md bg-slate-50 p-3 text-sm text-slate-700">{{ instrument.mappingNote }}</p>
-        {% endif %}
+        </div>
+    </section>
+
+    {# Executive Summary only. Full diagnostic truth remains in the existing includes below. #}
+    <section class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div class="metric-card">
+            <p class="text-xs font-medium uppercase tracking-wider text-surface-500">SEPA</p>
+            <div class="mt-2 flex items-baseline justify-between gap-3">
+                <p class="text-3xl font-bold text-surface-900">
+                    {% if sepaSnapshot %}{{ sepaSnapshot.totalScore|number_format(1, '.', '') }}{% else %}–{% endif %}
+                </p>
+                {% if sepaSnapshot %}
+                    <span class="compact-badge {{ sepaSnapshot.trafficLight == 'Grün' ? 'bg-primary-50 text-primary-700 ring-primary-600/20' : sepaSnapshot.trafficLight == 'Gelb' ? 'bg-accent-50 text-accent-700 ring-accent-600/20' : 'bg-danger-50 text-danger-700 ring-danger-600/20' }}">
+                        {{ sepaSnapshot.trafficLight }}
+                    </span>
+                {% endif %}
+            </div>
+            <p class="mt-1 text-xs text-surface-500">
+                {% if sepaSnapshot %}{{ sepaSnapshot.asOfDate|date('d.m.Y') }}{% else %}Kein SEPA Snapshot{% endif %}
+            </p>
+        </div>
+
+        <div class="metric-card">
+            <p class="text-xs font-medium uppercase tracking-wider text-surface-500">EPA</p>
+            <div class="mt-2 flex items-baseline justify-between gap-3">
+                <p class="text-3xl font-bold text-surface-900">
+                    {% if epaSnapshot %}{{ epaSnapshot.totalScore|number_format(1, '.', '') }}{% else %}–{% endif %}
+                </p>
+                {% if epaSnapshot %}
+                    <span class="compact-badge {{ epaSnapshot.action in ['HARD_EXIT', 'EXIT'] ? 'bg-danger-50 text-danger-700 ring-danger-600/20' : epaSnapshot.action in ['TRIM', 'TIGHTEN_RISK'] ? 'bg-accent-50 text-accent-700 ring-accent-600/20' : 'bg-primary-50 text-primary-700 ring-primary-600/20' }}">
+                        {{ epaSnapshot.action }}
+                    </span>
+                {% endif %}
+            </div>
+            <p class="mt-1 text-xs text-surface-500">
+                {% if epaSnapshot %}{{ epaSnapshot.asOfDate|date('d.m.Y') }}{% else %}Kein EPA Snapshot{% endif %}
+            </p>
+        </div>
+
+        <div class="metric-card">
+            <p class="text-xs font-medium uppercase tracking-wider text-surface-500">Last Run</p>
+            <div class="mt-2 flex items-baseline justify-between gap-3">
+                <p class="text-3xl font-bold text-surface-900">
+                    {% if lastRunItem and lastRunItem.mergedScore is not null %}{{ lastRunItem.mergedScore|number_format(3, '.', '') }}{% else %}–{% endif %}
+                </p>
+                {% if lastRunItem %}
+                    <span class="compact-badge bg-surface-100 text-surface-700 ring-surface-300">{{ lastRunItem.decision }}</span>
+                {% endif %}
+            </div>
+            <p class="mt-1 text-xs text-surface-500">
+                {% if lastRunItem %}Merged / Decision{% else %}Kein Run Item{% endif %}
+            </p>
+        </div>
+
+        <div class="metric-card">
+            <p class="text-xs font-medium uppercase tracking-wider text-surface-500">Sentiment</p>
+            <div class="mt-2 flex items-baseline justify-between gap-3">
+                <p class="truncate text-2xl font-bold text-surface-900">
+                    {% if lastRunItem and lastRunItem.sentimentLabel %}{{ lastRunItem.sentimentLabel }}{% else %}–{% endif %}
+                </p>
+                {% if lastRunItem and lastRunItem.sentimentNormalizedScore is not null %}
+                    <span class="compact-badge bg-surface-100 text-surface-700 ring-surface-300">{{ lastRunItem.sentimentNormalizedScore|number_format(3, '.', '') }}</span>
+                {% endif %}
+            </div>
+            <p class="mt-1 text-xs text-surface-500">
+                {% if lastRunItem and lastRunItem.sentimentMode %}{{ lastRunItem.sentimentMode }}{% else %}Sentiment Mode{% endif %}
+            </p>
+        </div>
+    </section>
+
+    {# Truth layer diagnostics: keep full information density. Do not replace with KPI-only cards. #}
+    <section class="mb-6">
+        <div class="mb-3 flex items-center justify-between">
+            <div>
+                <h2 class="text-lg font-semibold tracking-tight text-surface-900">Diagnose & Signal-Wahrheit</h2>
+                <p class="text-sm text-surface-500">Last Run, SEPA und EPA bleiben vollständig erhalten: Scores, Bänder, Gewichte, Trigger und Warnungen.</p>
+            </div>
+        </div>
+
+        <div class="space-y-6">
+            {% include '_last_run_snapshot.html.twig' with {
+                lastRunItem: lastRunItem,
+                showTickerLink: true,
+                showInstrumentLink: false
+            } only %}
+
+            {% include 'instrument/_sepa_snapshot.html.twig' with {sepaSnapshot: sepaSnapshot} only %}
+
+            {% include 'instrument/_epa_snapshot.html.twig' with {epaSnapshot: epaSnapshot} only %}
+        </div>
+    </section>
+
+    <section class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div class="lg:col-span-1">
+            <div class="panel-card">
+                <div class="border-b border-surface-100 px-6 py-4">
+                    <h3 class="text-sm font-semibold uppercase tracking-wider text-surface-900">Stammdaten</h3>
+                </div>
+                <div class="divide-y divide-surface-100">
+                    <div class="flex items-center justify-between gap-4 px-6 py-3">
+                        <span class="text-sm text-surface-500">Input Ticker</span>
+                        <span class="font-mono text-sm font-medium text-surface-900">{{ instrument.inputTicker }}</span>
+                    </div>
+                    <div class="flex items-center justify-between gap-4 px-6 py-3">
+                        <span class="text-sm text-surface-500">Provider Ticker</span>
+                        <span class="font-mono text-sm font-medium text-surface-900">{{ instrument.providerTicker }}</span>
+                    </div>
+                    <div class="flex items-center justify-between gap-4 px-6 py-3">
+                        <span class="text-sm text-surface-500">Display Ticker</span>
+                        <span class="font-mono text-sm font-medium text-surface-900">{{ instrument.displayTicker }}</span>
+                    </div>
+                    <div class="flex items-center justify-between gap-4 px-6 py-3">
+                        <span class="text-sm text-surface-500">Asset Class</span>
+                        <span class="text-sm font-medium text-surface-900">{{ instrument.assetClass ?: '–' }}</span>
+                    </div>
+                    <div class="flex items-center justify-between gap-4 px-6 py-3">
+                        <span class="text-sm text-surface-500">Region</span>
+                        <span class="text-sm font-medium text-surface-900">{{ instrument.region ?: '–' }}</span>
+                    </div>
+                    <div class="flex items-center justify-between gap-4 px-6 py-3">
+                        <span class="text-sm text-surface-500">Benchmark</span>
+                        <span class="text-right text-sm font-medium text-surface-900">{{ instrument.benchmark ?: '–' }}</span>
+                    </div>
+                    <div class="flex items-center justify-between gap-4 px-6 py-3">
+                        <span class="text-sm text-surface-500">Mapping Status</span>
+                        <span class="text-sm font-medium text-surface-900">{{ instrument.mappingStatus ?: '–' }}</span>
+                    </div>
+                    {% if instrument.contextType %}
+                        <div class="flex items-center justify-between gap-4 px-6 py-3">
+                            <span class="text-sm text-surface-500">Context Type</span>
+                            <span class="text-sm font-medium text-surface-900">{{ instrument.contextType }}</span>
+                        </div>
+                    {% endif %}
+                </div>
+                {% if instrument.mappingNote %}
+                    <div class="border-t border-surface-100 px-6 py-4">
+                        <p class="text-xs font-medium uppercase tracking-wider text-surface-500">Mapping Note</p>
+                        <p class="mt-2 rounded-lg bg-surface-50 p-3 text-sm text-surface-700">{{ instrument.mappingNote }}</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="space-y-4 lg:col-span-2">
+            <div class="panel-card">
+                <div class="flex items-center justify-between border-b border-surface-100 px-6 py-4">
+                    <h3 class="text-sm font-semibold uppercase tracking-wider text-surface-900">Region Exposure</h3>
+                    {% if instrument.regionExposure|length > 0 %}
+                        <span class="compact-badge bg-surface-100 text-surface-600 ring-surface-300">{{ instrument.regionExposure|length }}</span>
+                    {% endif %}
+                </div>
+                <div class="px-6 py-4">
+                    {% if instrument.regionExposure|length > 0 %}
+                        <div class="flex flex-wrap gap-2">
+                            {% for region in instrument.regionExposure %}
+                                <span class="inline-flex items-center rounded-lg bg-surface-100 px-3 py-1.5 text-sm font-medium text-surface-700">{{ region }}</span>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-sm italic text-surface-400">Keine Regionen hinterlegt.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="panel-card">
+                <div class="flex items-center justify-between border-b border-surface-100 px-6 py-4">
+                    <h3 class="text-sm font-semibold uppercase tracking-wider text-surface-900">Sector Profile</h3>
+                    {% if instrument.sectorProfile|length > 0 %}
+                        <span class="compact-badge bg-surface-100 text-surface-600 ring-surface-300">{{ instrument.sectorProfile|length }}</span>
+                    {% endif %}
+                </div>
+                <div class="px-6 py-4">
+                    {% if instrument.sectorProfile|length > 0 %}
+                        <div class="flex flex-wrap gap-2">
+                            {% for sector in instrument.sectorProfile %}
+                                <span class="inline-flex items-center rounded-lg bg-primary-50 px-3 py-1.5 text-sm font-medium text-primary-700">{{ sector }}</span>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-sm italic text-surface-400">Keine Sektoren hinterlegt.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="panel-card">
+                <div class="flex items-center justify-between border-b border-surface-100 px-6 py-4">
+                    <h3 class="text-sm font-semibold uppercase tracking-wider text-surface-900">Top Holdings</h3>
+                    {% if instrument.topHoldingsProfile|length > 0 %}
+                        <span class="compact-badge bg-surface-100 text-surface-600 ring-surface-300">{{ instrument.topHoldingsProfile|length }}</span>
+                    {% endif %}
+                </div>
+                <div class="px-6 py-4">
+                    {% if instrument.topHoldingsProfile|length > 0 %}
+                        <div class="flex flex-wrap gap-2">
+                            {% for holding in instrument.topHoldingsProfile %}
+                                <span class="inline-flex items-center rounded-lg bg-accent-50 px-3 py-1.5 text-sm font-medium text-accent-700">{{ holding }}</span>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-sm italic text-surface-400">Keine Holdings hinterlegt.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="panel-card">
+                <div class="flex items-center justify-between border-b border-surface-100 px-6 py-4">
+                    <h3 class="text-sm font-semibold uppercase tracking-wider text-surface-900">Macro Profile</h3>
+                    {% if instrument.macroProfile|length > 0 %}
+                        <span class="compact-badge bg-surface-100 text-surface-600 ring-surface-300">{{ instrument.macroProfile|length }}</span>
+                    {% endif %}
+                </div>
+                <div class="px-6 py-4">
+                    {% if instrument.macroProfile|length > 0 %}
+                        <div class="flex flex-wrap gap-2">
+                            {% for macro in instrument.macroProfile %}
+                                <span class="inline-flex items-center rounded-lg bg-danger-50 px-3 py-1.5 text-sm font-medium text-danger-700">{{ macro }}</span>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-sm italic text-surface-400">Kein Macro-Profil hinterlegt.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
     </section>
 
     {% if not instrument.portfolio %}
-    {# Entry Modal #}
+    {# Entry Modal: preserved from working v0.4 flow. #}
     <div id="entry-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50">
         <div class="w-full max-w-lg rounded-lg bg-white p-6 shadow-lg max-h-[90vh] overflow-y-auto">
             <div class="mb-4 flex items-center justify-between">
@@ -128,7 +365,7 @@
     {% endif %}
 
     {% if instrument.portfolio and open_campaigns is defined and open_campaigns|length > 0 %}
-    {# Trade Event Modal #}
+    {# Trade Event Modal: preserved from working v0.4 flow. #}
     <div id="event-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50">
         <div class="w-full max-w-lg rounded-lg bg-white p-6 shadow-lg max-h-[90vh] overflow-y-auto">
             <div class="mb-4 flex items-center justify-between">
