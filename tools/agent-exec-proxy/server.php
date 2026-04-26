@@ -147,30 +147,32 @@ function runCommand(string $name, string $workingDir, array $command): array {
  * @return array ['success' => bool, 'error' => string|null]
  */
 function deleteDirectory(string $path): array {
+    // WICHTIG: Zuerst auf Symlink prüfen, BEVOR realpath() aufgerufen wird!
+    // realpath() löst Symlinks auf, daher würde is_link() danach nie true zurückgeben.
+    if (is_link($path)) {
+        if (!unlink($path)) {
+            return ['success' => false, 'error' => 'Failed to unlink symlink: ' . $path];
+        }
+        return ['success' => true, 'error' => null];
+    }
+
     // Pfad normalisieren
     $realPath = realpath($path);
     if ($realPath === false) {
-        // Verzeichnis existiert nicht - das ist OK
+        // Verzeichnis existiert nicht - das ist OK (rm -rf Semantik)
         return ['success' => true, 'error' => null];
     }
 
     // Strikte Prüfung: Pfad muss unterhalb von WEB_ROOT/var/cache liegen
     $cacheBase = realpath(WEB_ROOT . '/var/cache');
     if ($cacheBase === false) {
-        return ['success' => false, 'error' => 'Cache base directory does not exist: ' . WEB_ROOT . '/var/cache'];
+        // Cache-Verzeichnis existiert nicht - das ist OK (rm -rf Semantik)
+        return ['success' => true, 'error' => null];
     }
 
     // Pfad muss mit cacheBase beginnen
     if (strpos($realPath, $cacheBase . DIRECTORY_SEPARATOR) !== 0 && $realPath !== $cacheBase) {
         return ['success' => false, 'error' => 'Path is outside allowed cache directory: ' . $path];
-    }
-
-    // Prüfe auf Symlink - nur unlink, nicht folgen
-    if (is_link($realPath)) {
-        if (!unlink($realPath)) {
-            return ['success' => false, 'error' => 'Failed to unlink symlink: ' . $path];
-        }
-        return ['success' => true, 'error' => null];
     }
 
     // Verzeichnis lesen und rekursiv löschen
