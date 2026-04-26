@@ -29,6 +29,29 @@ services:
       start_period: 20s
     volumes:
       - db_data:/var/lib/mysql
+  agent-runner:
+    image: ${STOCK_WEB_CLI_IMAGE:-stock-project-migrate:latest}
+    build:
+      context: .
+      dockerfile: docker/web-cli/Dockerfile
+    working_dir: /app/web
+    command: ["sleep", "infinity"]
+    environment:
+      <<: *db-env
+      APP_ENV: prod
+      APP_SECRET: ${STOCK_APP_SECRET:-docker-local-change-me}
+      PROJECT_ROOT: /app
+      PYTHON_BIN: python3
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8787:8787"
+    volumes:
+      - .:/app
+      - web_vendor:/app/web/vendor
+      - web_var:/app/web/var
+    profiles: ["agent"]
 
   migrate:
     image: ${STOCK_WEB_CLI_IMAGE:-stock-project-migrate:latest}
@@ -116,3 +139,4 @@ volumes:
   hf_cache:
   yfinance_cache:
   web_var:
+  web_vendor:  
