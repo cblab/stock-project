@@ -196,9 +196,9 @@ class InstrumentController extends AbstractController
         $returnRoute = $this->returnRoute($request);
 
         // CSRF validation
-        $token = $request->request->get('_token');
+        $token = (string) $request->request->get('_token', '');
         if (!$this->isCsrfTokenValid('portfolio_entry_' . $instrument->getId(), $token)) {
-            $this->addFlash('error', 'Ungueltige Anfrage.');
+            $this->addFlash('error', 'Ungültige Anfrage.');
             return $this->redirectToRoute('app_instrument_show', ['id' => $instrument->getId()]);
         }
 
@@ -212,25 +212,25 @@ class InstrumentController extends AbstractController
         $invalidationRule = $request->request->get('invalidation_rule');
         $eventNotes = $request->request->get('event_notes');
 
-        if (empty($eventPrice) || empty($quantity) || empty($eventTimestamp)) {
+        if ($eventPrice === null || $eventPrice === '' || $quantity === null || $quantity === '' || $eventTimestamp === null || $eventTimestamp === '') {
             $this->addFlash('error', 'Kaufpreis, Menge und Kaufdatum sind Pflichtfelder.');
             return $this->redirectToRoute('app_instrument_show', ['id' => $instrument->getId()]);
         }
 
         // Validate numeric values > 0
         if (!is_numeric($eventPrice) || (float)$eventPrice <= 0) {
-            $this->addFlash('error', 'Kaufpreis muss groesser als 0 sein.');
+            $this->addFlash('error', 'Kaufpreis muss größer als 0 sein.');
             return $this->redirectToRoute('app_instrument_show', ['id' => $instrument->getId()]);
         }
         if (!is_numeric($quantity) || (float)$quantity <= 0) {
-            $this->addFlash('error', 'Menge muss groesser als 0 sein.');
+            $this->addFlash('error', 'Menge muss größer als 0 sein.');
             return $this->redirectToRoute('app_instrument_show', ['id' => $instrument->getId()]);
         }
 
         // Convert datetime-local format (Y-m-d\TH:i) to Y-m-d H:i:s
         $normalizedTimestamp = $this->convertTimestamp((string) $eventTimestamp);
         if ($normalizedTimestamp === null) {
-            $this->addFlash('error', 'Ungueltiges Datumsformat.');
+            $this->addFlash('error', 'Ungültiges Datumsformat.');
             return $this->redirectToRoute('app_instrument_show', ['id' => $instrument->getId()]);
         }
 
@@ -265,7 +265,7 @@ class InstrumentController extends AbstractController
 
             return $this->redirectToRoute($returnRoute);
         } catch (TradeValidationException $e) {
-            $this->addFlash('error', 'Der Eintrag konnte nicht erstellt werden.');
+            $this->addFlash('error', 'Validierungsfehler: ' . $e->getMessage());
             return $this->redirectToRoute('app_instrument_show', ['id' => $instrument->getId()]);
         } catch (\Throwable $e) {
             $this->addFlash('error', 'Der Eintrag konnte nicht erstellt werden.');
