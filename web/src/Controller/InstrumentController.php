@@ -111,14 +111,30 @@ class InstrumentController extends AbstractController
         PipelineRunItemRepository $pipelineRunItemRepository,
         InstrumentSepaSnapshotRepository $sepaSnapshotRepository,
         InstrumentEpaSnapshotRepository $epaSnapshotRepository,
+        Connection $connection,
     ): Response
     {
+        $openCampaigns = $this->findOpenCampaignsForInstrument($connection, $instrument->getId());
+
         return $this->render('instrument/show.html.twig', [
             'instrument' => $instrument,
             'lastRunItem' => $pipelineRunItemRepository->findLatestForInstrument($instrument),
             'sepaSnapshot' => $sepaSnapshotRepository->findLatestForInstrument($instrument),
             'epaSnapshot' => $epaSnapshotRepository->findLatestForInstrument($instrument),
+            'open_campaigns' => $openCampaigns,
         ]);
+    }
+
+    private function findOpenCampaignsForInstrument(Connection $connection, int $instrumentId): array
+    {
+        $nonTerminalStates = ['open', 'trimmed', 'paused'];
+        $placeholders = implode(',', array_fill(0, count($nonTerminalStates), '?'));
+        $params = array_merge([$instrumentId], $nonTerminalStates);
+
+        return $connection->fetchAllAssociative(
+            "SELECT * FROM trade_campaign WHERE instrument_id = ? AND state IN ($placeholders)",
+            $params
+        );
     }
 
     #[Route('/instrument/{id}/edit', name: 'app_instrument_edit', requirements: ['id' => '\d+'])]
@@ -237,7 +253,7 @@ class InstrumentController extends AbstractController
     private function returnRoute(Request $request): string
     {
         $route = (string) $request->request->get('return_route', 'app_portfolio_index');
-        return in_array($route, ['app_portfolio_index', 'app_watchlist_index', 'app_instruments_inactive'], true)
+        return in_array($route, ['app_portfolio_index', 'app_watchlist_index', 'app_instruments_inactive', 'app_instrument_show'], true)
             ? $route
             : 'app_portfolio_index';
     }
