@@ -1,6 +1,10 @@
 # ARCHITECTURE v0.4 – Truth Layer
 
-stock-project · v0.4 · aktualisierter Arbeitsstand
+stock-project · v0.4 · finaler Architekturstand  
+Status: **abgeschlossen**  
+Stand: **2026-04-27**
+
+Dieses Dokument beschreibt den abgeschlossenen v0.4 Truth Layer. Neue Evidence-Engine-Planung gehört nach `ARCHITECTURE_v05.md`, nicht in dieses Dokument.
 
 ## Leitprinzip
 
@@ -20,15 +24,17 @@ Kein Exit ohne Trade-Event.
 Kein Return-to-Watchlist ohne Trade-Event.
 ```
 
+v0.4 ist der Teil, der verhindert, dass spätere Auswertungen auf nachträglicher Selbsttäuschung beruhen.
+
 ---
 
 ## 1. Ziel
 
-Das System soll ab v0.4 jede neue Trade-Entscheidung zeitlich und fachlich nachvollziehbar speichern.
+Das System speichert jede neue Trade-Entscheidung zeitlich und fachlich nachvollziehbar.
 
-Gespeichert werden muss:
+Gespeichert wird:
 
-- was gekauft oder verkauft wurde
+- was gekauft, getrimmt, pausiert, fortgeführt, verkauft oder zurück auf die Watchlist gesetzt wurde
 - wann es passierte
 - zu welchem Preis
 - mit welcher Menge
@@ -38,7 +44,7 @@ Gespeichert werden muss:
 - warum ein Exit/Trim/Return passierte
 - welches Ergebnis daraus entstand
 
-Damit wird später v0.5 möglich:
+Damit wird v0.5 möglich:
 
 ```text
 Evidence Engine: Was hat in ähnlichen Situationen historisch funktioniert?
@@ -74,19 +80,19 @@ trade_event
 trade_migration_log
 ```
 
-### trade_campaign
+### `trade_campaign`
 
 Eine Campaign ist ein vollständiger Trade-Zyklus pro Instrument.
 
 Beispiel:
 
 ```text
-POET gekauft → nachgekauft → 30 % getrimmt → Rest verkauft
+AAPL gekauft → nachgekauft → 30 % getrimmt → Rest verkauft
 ```
 
 Das ist eine Campaign mit mehreren Events.
 
-### trade_event
+### `trade_event`
 
 Ein Event ist eine einzelne Aktion innerhalb einer Campaign:
 
@@ -101,17 +107,13 @@ return_to_watchlist
 migration_seed
 ```
 
-### trade_migration_log
+### `trade_migration_log`
 
-Dokumentiert später, wie sauber bestehende Altpositionen in den Truth Layer überführt wurden.
+Dokumentiert, wie bestehende Altpositionen in den Truth Layer überführt wurden.
 
 ---
 
-## 4. Wichtige Korrektur: Schema-Migration vs. Bestandsmigration
-
-Chunk 1 braucht eine Doctrine-Schema-Migration, weil die Tabellen existieren müssen.
-
-Chunk 1 braucht aber keine Migration bestehender Portfolio-Positionen.
+## 4. Schema-Migration vs. Bestandsmigration
 
 Unterscheidung:
 
@@ -123,21 +125,20 @@ Bestandsmigration:
   überführt alte Portfolio-Positionen in trade_campaign/trade_event
 ```
 
-Beschluss:
+Finaler Stand:
 
 ```text
-Bestandsmigration kommt nicht in Chunk 1.
-Bestehende Positionen können zunächst legacy bleiben.
-Neue Positionen laufen ab v0.4 sauber über den Truth Layer.
+Schema Foundation abgeschlossen.
+Legacy-Positionen wurden später kontrolliert als migration_seed migriert.
 ```
 
 ---
 
-## 5. Datenmodell – Zielbild
+## 5. Datenmodell
 
-### 5.1 trade_campaign
+### 5.1 `trade_campaign`
 
-Pflichtfelder konzeptionell:
+Konzeptionelle Pflichtfelder:
 
 ```text
 id
@@ -146,7 +147,6 @@ trade_type: live | paper | pseudo
 state
 entry_thesis
 invalidation_rule
-outcome_tag
 total_quantity
 open_quantity
 avg_entry_price
@@ -181,9 +181,9 @@ entry_macro_snapshot_id und exit_macro_snapshot_id bleiben in v0.4 nullable ohne
 macro_snapshot existiert erst später.
 ```
 
-### 5.2 trade_event
+### 5.2 `trade_event`
 
-Pflichtfelder konzeptionell:
+Konzeptionelle Pflichtfelder:
 
 ```text
 id
@@ -242,7 +242,7 @@ event_price und quantity bleiben nullable.
 pause, resume und migration_seed sind keine echten Ausführungen.
 ```
 
-### 5.3 trade_migration_log
+### 5.3 `trade_migration_log`
 
 Konzeptionell:
 
@@ -265,7 +265,7 @@ Grundregel:
 Der verknüpfte Snapshot ist der letzte abgeschlossene Snapshot vor dem Event.
 ```
 
-Im bestehenden Repo heißen Snapshot-Datumsfelder:
+Snapshot-Datumsfelder:
 
 ```text
 as_of_date
@@ -310,11 +310,18 @@ Zweck:
 Look-ahead-Bias verhindern.
 ```
 
+Legacy Seed Sonderregel:
+
+```text
+Wenn opened_at vor Snapshot-Datum liegt, wird keine Snapshot-ID gesetzt.
+Lieber NULL als falsche historische Wahrheit.
+```
+
 ---
 
 ## 7. Versionierung
 
-Versionsstrings gehören auf jedes trade_event, nicht nur auf trade_campaign.
+Versionsstrings gehören auf jedes `trade_event`, nicht nur auf `trade_campaign`.
 
 Grund:
 
@@ -347,15 +354,7 @@ PHP und Python können JSON ohne zusätzliche Abhängigkeiten lesen.
 
 ---
 
-## 8. Keine Redis-Queue für v0.4
-
-Beschluss:
-
-```text
-Redis wird für v0.4 nicht eingeführt.
-```
-
-Grund:
+## 8. TradeEventWriter als Wahrheitsschreibstelle
 
 Trade-Writes müssen synchron und atomar sein.
 
@@ -376,23 +375,19 @@ Instrument ist Portfolio
 Trade-Event kommt später vielleicht aus der Queue
 ```
 
-Asynchronität ist später sinnvoll für:
+Kernsatz:
 
 ```text
-snapshot refresh
-evidence aggregation
-daily briefing
-macro refresh
-LLM explanations
+TradeEventWriter ist die einzige normale Schreibstelle für Portfolio-Trade-Zustände.
 ```
 
-Aber nicht für Wahrheitserzeugung.
+Wenn irgendwo direkt `instrument.is_portfolio` geändert wird, ohne ein Trade-Event zu erzeugen, ist v0.4 fachlich gebrochen.
 
 ---
 
-## 9. Keine neuen Libraries, keine Docker-Änderung für v0.4
+## 9. Keine neuen Runtime-Libraries für v0.4
 
-Für die eigentliche v0.4-Implementierung reicht der bestehende Stack:
+Für v0.4 reicht der bestehende Stack:
 
 ```text
 Symfony
@@ -400,8 +395,6 @@ Doctrine
 Doctrine Migrations
 Twig
 PHPUnit
-PyMySQL
-PyYAML vorhanden, aber nicht nötig
 MariaDB
 bestehender web/job/migrate Stack
 ```
@@ -411,11 +404,10 @@ Beschluss:
 ```text
 Keine neue PHP-Library.
 Keine neue Python-Library.
-Kein Redis.
 Kein neuer Pflichtcontainer für Runtime.
 ```
 
-Agent-Runner Light ist nur Entwickler-/Agenten-Tooling, nicht v0.4-Produktarchitektur.
+Agent-Runner Light ist Entwickler-/Agenten-Tooling, nicht v0.4-Produktarchitektur.
 
 ---
 
@@ -440,15 +432,11 @@ Batch-/Maintenance-Jobs
 
 ---
 
-## 11. Die 10 Technical Work Packages
+## 11. Technical Work Packages – finaler Stand
 
 ### Chunk 1 — Database Schema / Persistence Model
 
-Ziel:
-
-```text
-Leere Tabellen für den Truth Layer schaffen.
-```
+Status: **abgeschlossen**
 
 Baut:
 
@@ -458,33 +446,11 @@ trade_event
 trade_migration_log
 ```
 
-Nicht-Ziele:
-
-```text
-keine Bestandsmigration
-keine UI
-keine P&L-Logik
-keine Services
-keine Daten anfassen
-```
-
-DoD:
-
-```text
-Tabellen existieren.
-FKs passen zu bestehenden Typen.
-Altbestand bleibt unverändert.
-```
-
 ---
 
 ### Chunk 2 — Configuration Management
 
-Ziel:
-
-```text
-Zentrale Versionsquelle für Trade-Events schaffen.
-```
+Status: **abgeschlossen**
 
 Baut:
 
@@ -493,23 +459,11 @@ config/system_versions.json
 TradeVersionProvider
 ```
 
-DoD:
-
-```text
-scoring_version und policy_version kommen aus Config.
-model_version und macro_version dürfen NULL sein.
-Keine Versionen im Controller hardcoden.
-```
-
 ---
 
 ### Chunk 3 — Snapshot Resolution / Temporal Data Access
 
-Ziel:
-
-```text
-Letzten gültigen Snapshot vor Event-Zeitpunkt finden.
-```
+Status: **abgeschlossen**
 
 Baut:
 
@@ -523,23 +477,11 @@ Regel:
 as_of_date < DATE(event_timestamp)
 ```
 
-DoD:
-
-```text
-Snapshot gestern wird gefunden.
-Snapshot gleicher Tag wird nicht gefunden.
-Kein Snapshot ergibt NULL.
-```
-
 ---
 
 ### Chunk 4 — Finite State Machine + Domain Validation
 
-Ziel:
-
-```text
-Erlaubte Trade-Übergänge und Pflichtfelder zentral erzwingen.
-```
+Status: **abgeschlossen**
 
 Baut:
 
@@ -553,31 +495,27 @@ Regeln:
 
 ```text
 entry nur ohne offene Campaign
-trim nur bei open/trimmed
-pause nur bei open/trimmed
-resume nur bei paused
+trim bei open/trimmed
+pause bei open/trimmed
+resume bei paused
 hard_exit bei open/trimmed/paused
 return_to_watchlist bei open/trimmed/paused
 keine Events nach Terminal-State
 ```
 
-DoD:
+Exit-Reason ist Pflicht bei:
 
 ```text
-Exit-Reason Pflicht bei trim/hard_exit/return.
-Keine Exit-Reason bei entry/add/pause/resume/migration_seed.
-Nicht mehr verkaufen als Bestand.
+trim
+hard_exit
+return_to_watchlist
 ```
 
 ---
 
 ### Chunk 5 — Domain Calculation Service / P&L Engine
 
-Ziel:
-
-```text
-Brutto-P&L und P&L-Prozent deterministisch berechnen.
-```
+Status: **abgeschlossen**
 
 Baut:
 
@@ -585,29 +523,24 @@ Baut:
 TradePnlCalculator
 ```
 
-DoD:
+Wichtige Konvention:
 
 ```text
-Partial Trim korrekt.
-Full Exit korrekt.
-Fees berücksichtigt.
-Steuer optional, nicht erzwungen.
+realized_pnl_pct ist Ratio.
+0.30 = 30 %
 ```
 
 ---
 
 ### Chunk 6 — Application Service / Transaction Script
 
-Ziel:
-
-```text
-Zentrale Wahrheitsschreibstelle bauen.
-```
+Status: **abgeschlossen**
 
 Baut:
 
 ```text
 TradeEventWriter
+TradeEventWriteResult
 ```
 
 Macht atomar:
@@ -623,71 +556,52 @@ Instrument-State aktualisieren
 P&L setzen
 ```
 
-DoD:
+Finale Full-Exit-Regel:
 
 ```text
-Entry erzeugt Campaign + Event.
-Trim erzeugt Event + State trimmed.
-Pause erzeugt Event + State paused.
-Exit erzeugt Event + Closed-State.
-Rollback bei Fehler.
+hard_exit:
+  trade_campaign.state = closed_profit | closed_loss | closed_neutral
+  trade_campaign.open_quantity = 0
+  instrument.is_portfolio = 0
+  instrument.active = 1
+
+return_to_watchlist:
+  trade_campaign.state = returned_to_watchlist
+  trade_campaign.open_quantity = 0
+  instrument.is_portfolio = 0
+  instrument.active = 1
+
+trim:
+  trade_campaign.state = trimmed
+  trade_campaign.open_quantity > 0
+  instrument.is_portfolio bleibt 1
+  instrument.active bleibt 1
 ```
 
 ---
 
-### Chunk 7 — Command/UI Flow for Entry
+### Chunk 7 — Entry UI
+
+Status: **abgeschlossen**
 
 Ziel:
 
 ```text
-Watchlist → Portfolio nur noch über dokumentierten Entry.
+Watchlist → Portfolio nur über dokumentierten Entry.
 ```
 
 Baut:
 
 ```text
-TradeEntryController
 Entry Modal/Form
 POST /instrument/{id}/portfolio/entry
 ```
 
-Felder:
-
-```text
-Kaufpreis
-Menge
-Gebühren
-Kaufdatum
-Entry Thesis
-Invalidation Rule
-Trade Type live/paper/pseudo
-```
-
-DoD:
-
-```text
-Alter Toggle-Portfolio-Button ist aus normaler UI entfernt.
-Entry läuft über TradeEventWriter.
-Instrument wird erst nach Trade-Event Portfolio.
-```
-
 ---
 
-### Chunk 8 — Command/UI Flow for Exit Events
+### Chunk 8 — Exit / Trim / Pause / Return UI
 
-Ziel:
-
-```text
-Portfolio-Aktionen als Trade-Events erfassen.
-```
-
-Baut:
-
-```text
-TradeCampaignEventController
-Exit/Trim/Pause/Return Modal
-POST /trade-campaign/{id}/event
-```
+Status: **abgeschlossen**
 
 Events:
 
@@ -711,7 +625,9 @@ Exit-Reason Dropdown Pflicht bei Exit/Trim/Return.
 
 ---
 
-### Chunk 9 — Read Model / Query Model / Reporting UI
+### Chunk 9a — Minimal Audit View
+
+Status: **abgeschlossen**
 
 Ziel:
 
@@ -719,198 +635,125 @@ Ziel:
 Trade-Wahrheit sichtbar machen.
 ```
 
-Baut:
-
-```text
-/trade-history
-/trade-campaign/{id}
-TradeHistoryQuery
-```
-
 Anzeigen:
 
 ```text
-Ticker
-Entry-Datum
-Entry-Preis
-Exit-Datum
-Exit-Preis
-Exit-Reason
-Haltedauer
-P&L %
-State
-Trade Type
-Outcome Tag
-Events chronologisch
-Snapshot-Links oder NULL
-Versionsstrings
-```
-
-DoD:
-
-```text
-Live/Paper/Pseudo werden nicht vermischt.
-Events sind chronologisch sichtbar.
-Snapshot- und Versionskontext sichtbar.
+Campaigns
+Events
+Snapshot-IDs
+Versionstrings
+P&L
+States
 ```
 
 ---
 
-### Chunk 10 — Legacy Data Migration + Reconciliation Job
+### Chunk 10a–10d — Legacy Integrity / Seed Plan / Template / Validator
 
-Ziel:
-
-```text
-Altbestand optional in Truth Layer überführen.
-```
+Status: **abgeschlossen**
 
 Baut:
 
 ```text
-run_trade_migration.py
-run_trade_pnl_recalculate.py
-```
-
-Wichtig:
-
-```text
-Dieser Chunk ist nicht Voraussetzung für neue Positionen.
-```
-
-Migration:
-
-```text
-bestehende instrument.is_portfolio = 1
-→ trade_campaign state=open
-→ trade_event event_type=migration_seed
-→ trade_migration_log
-```
-
-DoD:
-
-```text
-Dry-run vorhanden.
-Idempotent.
-Keine historischen Daten geraten.
-manual_seed dokumentiert Lücken.
+Legacy Integrity Report
+Legacy Seed Plan
+Legacy Seed Template
+Legacy Seed Validator
 ```
 
 ---
 
-## 12. Reihenfolge
+### Legacy SQL Seed
+
+Status: **abgeschlossen**
+
+Ergebnis:
 
 ```text
-1 Schema Foundation
-2 Version Config
-3 Snapshot Resolver
-4 State Machine + Validator
-5 P&L Calculator
-6 TradeEventWriter
-7 Entry Flow UI
-8 Exit / Trim / Pause / Return Flow
-9 Trade History + Campaign Detail
-10 Legacy Migration + Recalculator + Final Validation
+21 bestehende Portfolio-Positionen wurden als migration_seed migriert.
+21 trade_campaign
+21 trade_event
+21 trade_migration_log
 ```
 
-Kritischer Pfad für neue Trades:
+Snapshot-IDs wurden bewusst `NULL` gelassen, um Hindsight Bias zu vermeiden.
+
+Wichtiger Satz:
 
 ```text
-1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9
-```
-
-Chunk 10 ist Altlasten-Nachzug.
-
----
-
-## 13. v0.4 Minimal vs. v0.4 Full
-
-### v0.4 Minimal
-
-Fertig, wenn:
-
-```text
-neue Entries erzeugen Campaign + Event
-neue Exits erzeugen Event
-Snapshot-Regel wird eingehalten
-State Machine greift
-P&L wird für neue Trades berechnet
-Trade-History zeigt neue Campaigns
-```
-
-Nicht zwingend:
-
-```text
-alte Portfolio-Positionen migriert
-```
-
-### v0.4 Full
-
-Zusätzlich:
-
-```text
-bestehende Portfolio-Positionen als manual_seed erfasst
-trade_migration_log dokumentiert Lücken
-P&L-Recalculator vorhanden
-5 manuelle Stichproben validiert
+Wir migrieren nicht historische Wahrheit.
+Wir migrieren heutige Position mit bestmöglich auditierbarem Ursprung.
 ```
 
 ---
 
-## 14. Agent-Runner Light
+## 13. Finaler Test-/Audit-Abschluss
 
-Agent-Runner Light ist kein Teil der Produktarchitektur, sondern Arbeitsinfrastruktur.
-
-Ziel:
+Abgeschlossene Nacharbeiten:
 
 ```text
-Susi kann Syntax prüfen, Doctrine-Kommandos dry-runnen, Tests ausführen und Diffs kontrollieren.
+T1 Decimal/Money Safety Audit
+T2 Campaign-Level realized_pnl_pct Verifikation
+T2b Test-Payload-Fix für exit_reason
+T2c Portfolio Flag After Full Exit
 ```
 
-Nicht geben:
+Lokaler finaler Teststand nach T2c:
 
 ```text
-Docker-Socket
-DB-root
-Host-root
-Volume-Löschrechte
-Deployment-Rechte
+TradeEventWriterIntegrationTest
+OK (8 tests, 32 assertions)
 ```
 
-Erlaubt:
+Damit sind die kritischen Truth-Layer-Bugs geschlossen:
 
 ```text
-git status
-git diff
-php bin/console doctrine:migrations:status
-php bin/console doctrine:migrations:migrate --dry-run
-php bin/console lint:container
-php bin/phpunit
-php -l <datei>
-composer validate
-```
-
-Nicht erlaubt:
-
-```text
-docker compose down -v
-docker system prune
-rm -rf
-doctrine:schema:update --force
-DROP / TRUNCATE
-git push --force
+realized_pnl_pct ist Campaign-Level, nicht letzter Exit-Anteil.
+hard_exit entfernt Instrument aus Portfolio.
+return_to_watchlist entfernt Instrument aus Portfolio.
+trim lässt Instrument im Portfolio.
 ```
 
 ---
 
-## 15. Warum das gebraucht wird
+## 14. Bekannte technische Schuld
 
-Aktuell kann ein Instrument im System einfach den Zustand wechseln:
+### Float-Arithmetik
+
+DB-Spalten nutzen `DECIMAL`, aber Services verwenden intern teilweise PHP `float`.
+
+Bewertung:
+
+```text
+Für v0.4 akzeptabel.
+Für v0.5 kein Blocker.
+Für spätere exakte Money-/Broker-/Tax-Logik als T3 Decimal Strategy prüfen.
+```
+
+Mögliche spätere Optionen:
+
+```text
+DecimalCalculator mit string-in/string-out
+BCMath
+brick/math
+MoneyPHP nur falls Währungsbeträge statt quantity × price im Zentrum stehen
+```
+
+### Concurrency
+
+`SELECT FOR UPDATE` / Unique Constraints für offene Campaigns bleiben spätere technische Schuld.
+
+---
+
+## 15. Warum v0.4 gebraucht wird
+
+Vor v0.4 konnte ein Instrument im System einfach den Zustand wechseln:
 
 ```text
 Watchlist → Portfolio
 ```
 
-Das erzeugt aber keine echte Entscheidungs-Historie.
+Das erzeugt keine echte Entscheidungs-Historie.
 
 v0.4 macht daraus:
 
@@ -941,36 +784,21 @@ Ohne diese Schicht ist jede spätere Evidence Engine nur ein Narrativ auf unsaub
 
 ---
 
-## 16. Kernsatz für die Umsetzung
-
-```text
-TradeEventWriter ist die einzige normale Schreibstelle für Portfolio-Trade-Zustände.
-```
-
-Wenn irgendwo weiterhin direkt `instrument.is_portfolio` geändert wird, ohne ein Trade-Event zu erzeugen, ist v0.4 gebrochen.
-
----
-
-## 17. Kurzfassung
+## 16. Abschlussnotiz
 
 ```text
 v0.4 baut nicht Intelligenz.
 v0.4 baut Wahrheit.
 ```
 
-Die 10 Chunks bauen nacheinander:
+Status:
 
 ```text
-1. Persistenz
-2. Versionierung
-3. zeitlich saubere Snapshot-Verknüpfung
-4. erlaubte Zustände
-5. Ergebnisrechnung
-6. atomare Schreiblogik
-7. Entry-UI
-8. Exit-UI
-9. History-UI
-10. Legacy-Nachzug
+v0.4 Truth Layer ist fachlich und technisch abgeschlossen.
 ```
 
-Das ist das Fundament für v0.5 Evidence Engine.
+Nächster Architekturvertrag:
+
+```text
+ARCHITECTURE_v05.md
+```
