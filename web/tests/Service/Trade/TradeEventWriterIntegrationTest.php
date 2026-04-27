@@ -156,6 +156,7 @@ final class TradeEventWriterIntegrationTest extends KernelTestCase
             'event_timestamp' => $baseTime->modify('+1 hour')->format('Y-m-d H:i:s'),
             'event_price' => '12.00',
             'quantity' => '50',
+            'exit_reason' => 'rebalance',
         ]);
 
         // Step 3: Hard Exit 50 @ 8€
@@ -218,6 +219,7 @@ final class TradeEventWriterIntegrationTest extends KernelTestCase
             'event_timestamp' => $baseTime->modify('+1 hour')->format('Y-m-d H:i:s'),
             'event_price' => '12.00',
             'quantity' => '50',
+            'exit_reason' => 'rebalance',
         ]);
 
         // Hard Exit 50 @ 14€
@@ -275,6 +277,7 @@ final class TradeEventWriterIntegrationTest extends KernelTestCase
             'event_timestamp' => $baseTime->modify('+1 hour')->format('Y-m-d H:i:s'),
             'event_price' => '8.00',
             'quantity' => '25',
+            'exit_reason' => 'rebalance',
         ]);
 
         // Hard Exit 75 @ 12€ (profit)
@@ -326,6 +329,7 @@ final class TradeEventWriterIntegrationTest extends KernelTestCase
             'event_timestamp' => $baseTime->modify('+1 hour')->format('Y-m-d H:i:s'),
             'event_price' => '12.00',
             'quantity' => '50',
+            'exit_reason' => 'rebalance',
         ]);
 
         // Return to watchlist 50 @ 8€
@@ -383,6 +387,7 @@ final class TradeEventWriterIntegrationTest extends KernelTestCase
             'event_timestamp' => $baseTime->modify('+1 hour')->format('Y-m-d H:i:s'),
             'event_price' => '12.00',
             'quantity' => '25',
+            'exit_reason' => 'rebalance',
         ]);
 
         // Trim 2: 25 @ 8€ (-50€)
@@ -392,6 +397,7 @@ final class TradeEventWriterIntegrationTest extends KernelTestCase
             'event_timestamp' => $baseTime->modify('+2 hours')->format('Y-m-d H:i:s'),
             'event_price' => '8.00',
             'quantity' => '25',
+            'exit_reason' => 'rebalance',
         ]);
 
         // Hard Exit: 50 @ 10€ (0€)
