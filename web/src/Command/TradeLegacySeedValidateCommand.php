@@ -140,13 +140,31 @@ class TradeLegacySeedValidateCommand extends Command
             return null;
         }
 
+        $expectedCols = count($headers);
         $rows = [];
         $rowNumber = 2; // Header is row 1
         while (($data = fgetcsv($handle, 0, ';')) !== false) {
-            if (count($data) === count($headers)) {
+            $actualCols = count($data);
+
+            // Skip empty trailing rows
+            if ($actualCols === 1 && $data[0] === null) {
+                $rowNumber++;
+                continue;
+            }
+
+            if ($actualCols !== $expectedCols) {
+                $rows[] = [
+                    'row_number' => $rowNumber,
+                    'data' => [],
+                    'malformed' => true,
+                    'expected_cols' => $expectedCols,
+                    'actual_cols' => $actualCols,
+                ];
+            } else {
                 $rows[] = [
                     'row_number' => $rowNumber,
                     'data' => array_combine($headers, $data),
+                    'malformed' => false,
                 ];
             }
             $rowNumber++;
@@ -163,45 +181,68 @@ class TradeLegacySeedValidateCommand extends Command
 
         foreach ($rows as $row) {
             $rowNumber = $row['row_number'];
+
+            // Handle malformed CSV rows
+            if ($row['malformed'] ?? false) {
+                $results[] = [
+                    'row_number' => $rowNumber,
+                    'instrument_id' => null,
+                    'input_ticker' => null,
+                    'status' => 'invalid',
+                    'errors' => ["Malformed CSV row: expected {$row['expected_cols']} columns, got {$row['actual_cols']}"],
+                ];
+                continue;
+            }
+
             $data = $row['data'];
             $errors = [];
 
-            $instrumentId = (int) ($data['instrument_id'] ?? 0);
+            $instrumentIdRaw = $data['instrument_id'] ?? '';
             $inputTicker = $data['input_ticker'] ?? '';
 
-            // Check duplicate instrument_id
-            if (in_array($instrumentId, $seenInstrumentIds, true)) {
-                $errors[] = "Duplicate instrument_id: {$instrumentId}";
+            // Validate instrument_id is a valid integer string
+            if (!ctype_digit($instrumentIdRaw)) {
+                $errors[] = "Invalid instrument_id: '{$instrumentIdRaw}'. Must be a positive integer";
+                $instrumentId = null;
             } else {
-                $seenInstrumentIds[] = $instrumentId;
+                $instrumentId = (int) $instrumentIdRaw;
             }
 
-            // Validate instrument exists
-            $instrument = $this->connection->fetchAssociative(
-                "SELECT id, input_ticker, is_portfolio FROM instrument WHERE id = ?",
-                [$instrumentId]
-            );
-
-            if (!$instrument) {
-                $errors[] = "Instrument ID {$instrumentId} does not exist";
-            } else {
-                // Check is_portfolio
-                if (!$instrument['is_portfolio']) {
-                    $errors[] = "Instrument is not marked as portfolio (is_portfolio=0)";
+            // Check duplicate instrument_id
+            if ($instrumentId !== null) {
+                if (in_array($instrumentId, $seenInstrumentIds, true)) {
+                    $errors[] = "Duplicate instrument_id: {$instrumentId}";
+                } else {
+                    $seenInstrumentIds[] = $instrumentId;
                 }
 
-                // Check input_ticker matches
-                if ($instrument['input_ticker'] !== $inputTicker) {
-                    $errors[] = "input_ticker mismatch: CSV='{$inputTicker}', DB='{$instrument['input_ticker']}'";
-                }
-
-                // Check no existing trade_campaign
-                $hasCampaign = $this->connection->fetchOne(
-                    "SELECT 1 FROM trade_campaign WHERE instrument_id = ?",
+                // Validate instrument exists
+                $instrument = $this->connection->fetchAssociative(
+                    "SELECT id, input_ticker, is_portfolio FROM instrument WHERE id = ?",
                     [$instrumentId]
                 );
-                if ($hasCampaign) {
-                    $errors[] = "Instrument already has a trade_campaign";
+
+                if (!$instrument) {
+                    $errors[] = "Instrument ID {$instrumentId} does not exist";
+                } else {
+                    // Check is_portfolio
+                    if (!$instrument['is_portfolio']) {
+                        $errors[] = "Instrument is not marked as portfolio (is_portfolio=0)";
+                    }
+
+                    // Check input_ticker matches
+                    if ($instrument['input_ticker'] !== $inputTicker) {
+                        $errors[] = "input_ticker mismatch: CSV='{$inputTicker}', DB='{$instrument['input_ticker']}'";
+                    }
+
+                    // Check no existing trade_campaign
+                    $hasCampaign = $this->connection->fetchOne(
+                        "SELECT 1 FROM trade_campaign WHERE instrument_id = ?",
+                        [$instrumentId]
+                    );
+                    if ($hasCampaign) {
+                        $errors[] = "Instrument already has a trade_campaign";
+                    }
                 }
             }
 
@@ -241,54 +282,79 @@ class TradeLegacySeedValidateCommand extends Command
             if ($openedAt === '') {
                 $errors[] = "opened_at is required";
             } else {
-                $openedAtDate = \DateTime::createFromFormat('Y-m-d H:i:s', $openedAt);
-                if (!$openedAtDate) {
-                    $openedAtDate = \DateTime::createFromFormat('Y-m-d', $openedAt);
+                $dateTimeErrors = [];
+
+                // Try strict datetime format first
+                $openedAtDate = \DateTimeImmutable::createFromFormat('!Y-m-d H:i:s', $openedAt);
+                if ($openedAtDate === false) {
+                    $dateTimeErrors = \DateTimeImmutable::getLastErrors() ?: ['error_count' => 1, 'errors' => ['Invalid format']];
                 }
-                if (!$openedAtDate) {
+
+                // Try date-only format if datetime failed
+                if ($openedAtDate === false) {
+                    $openedAtDate = \DateTimeImmutable::createFromFormat('!Y-m-d', $openedAt);
+                    if ($openedAtDate === false) {
+                        $dateTimeErrors = \DateTimeImmutable::getLastErrors() ?: ['error_count' => 1, 'errors' => ['Invalid format']];
+                    } else {
+                        $dateTimeErrors = [];
+                    }
+                }
+
+                if ($openedAtDate === false || ($dateTimeErrors['error_count'] ?? 0) > 0 || ($dateTimeErrors['warning_count'] ?? 0) > 0) {
+                    $openedAtDate = null;
                     $errors[] = "Invalid opened_at format: '{$openedAt}'. Use YYYY-MM-DD HH:MM:SS or YYYY-MM-DD";
                 }
             }
 
             // Validate candidate_sepa_snapshot_id
-            $sepaSnapshotId = $data['candidate_sepa_snapshot_id'] ?? '';
-            if ($sepaSnapshotId !== '') {
-                $sepaSnapshot = $this->connection->fetchAssociative(
-                    "SELECT id, instrument_id, as_of_date FROM instrument_sepa_snapshot WHERE id = ?",
-                    [(int) $sepaSnapshotId]
-                );
-                if (!$sepaSnapshot) {
-                    $errors[] = "candidate_sepa_snapshot_id {$sepaSnapshotId} does not exist";
+            $sepaSnapshotIdRaw = $data['candidate_sepa_snapshot_id'] ?? '';
+            if ($sepaSnapshotIdRaw !== '') {
+                if (!ctype_digit($sepaSnapshotIdRaw)) {
+                    $errors[] = "Invalid candidate_sepa_snapshot_id: '{$sepaSnapshotIdRaw}'. Must be a positive integer";
                 } else {
-                    if ((int) $sepaSnapshot['instrument_id'] !== $instrumentId) {
-                        $errors[] = "SEPA snapshot {$sepaSnapshotId} does not belong to instrument {$instrumentId}";
-                    }
-                    if ($openedAtDate) {
-                        $snapshotDate = new \DateTime($sepaSnapshot['as_of_date']);
-                        if ($snapshotDate > $openedAtDate) {
-                            $errors[] = "SEPA snapshot date ({$sepaSnapshot['as_of_date']}) is after opened_at ({$openedAt})";
+                    $sepaSnapshotId = (int) $sepaSnapshotIdRaw;
+                    $sepaSnapshot = $this->connection->fetchAssociative(
+                        "SELECT id, instrument_id, as_of_date FROM instrument_sepa_snapshot WHERE id = ?",
+                        [$sepaSnapshotId]
+                    );
+                    if (!$sepaSnapshot) {
+                        $errors[] = "candidate_sepa_snapshot_id {$sepaSnapshotId} does not exist";
+                    } else {
+                        if ($instrumentId !== null && (int) $sepaSnapshot['instrument_id'] !== $instrumentId) {
+                            $errors[] = "SEPA snapshot {$sepaSnapshotId} does not belong to instrument {$instrumentId}";
+                        }
+                        if ($openedAtDate) {
+                            $snapshotDate = new \DateTimeImmutable($sepaSnapshot['as_of_date']);
+                            if ($snapshotDate > $openedAtDate) {
+                                $errors[] = "SEPA snapshot date ({$sepaSnapshot['as_of_date']}) is after opened_at ({$openedAt})";
+                            }
                         }
                     }
                 }
             }
 
             // Validate candidate_epa_snapshot_id
-            $epaSnapshotId = $data['candidate_epa_snapshot_id'] ?? '';
-            if ($epaSnapshotId !== '') {
-                $epaSnapshot = $this->connection->fetchAssociative(
-                    "SELECT id, instrument_id, as_of_date FROM instrument_epa_snapshot WHERE id = ?",
-                    [(int) $epaSnapshotId]
-                );
-                if (!$epaSnapshot) {
-                    $errors[] = "candidate_epa_snapshot_id {$epaSnapshotId} does not exist";
+            $epaSnapshotIdRaw = $data['candidate_epa_snapshot_id'] ?? '';
+            if ($epaSnapshotIdRaw !== '') {
+                if (!ctype_digit($epaSnapshotIdRaw)) {
+                    $errors[] = "Invalid candidate_epa_snapshot_id: '{$epaSnapshotIdRaw}'. Must be a positive integer";
                 } else {
-                    if ((int) $epaSnapshot['instrument_id'] !== $instrumentId) {
-                        $errors[] = "EPA snapshot {$epaSnapshotId} does not belong to instrument {$instrumentId}";
-                    }
-                    if ($openedAtDate) {
-                        $snapshotDate = new \DateTime($epaSnapshot['as_of_date']);
-                        if ($snapshotDate > $openedAtDate) {
-                            $errors[] = "EPA snapshot date ({$epaSnapshot['as_of_date']}) is after opened_at ({$openedAt})";
+                    $epaSnapshotId = (int) $epaSnapshotIdRaw;
+                    $epaSnapshot = $this->connection->fetchAssociative(
+                        "SELECT id, instrument_id, as_of_date FROM instrument_epa_snapshot WHERE id = ?",
+                        [$epaSnapshotId]
+                    );
+                    if (!$epaSnapshot) {
+                        $errors[] = "candidate_epa_snapshot_id {$epaSnapshotId} does not exist";
+                    } else {
+                        if ($instrumentId !== null && (int) $epaSnapshot['instrument_id'] !== $instrumentId) {
+                            $errors[] = "EPA snapshot {$epaSnapshotId} does not belong to instrument {$instrumentId}";
+                        }
+                        if ($openedAtDate) {
+                            $snapshotDate = new \DateTimeImmutable($epaSnapshot['as_of_date']);
+                            if ($snapshotDate > $openedAtDate) {
+                                $errors[] = "EPA snapshot date ({$epaSnapshot['as_of_date']}) is after opened_at ({$openedAt})";
+                            }
                         }
                     }
                 }
@@ -322,10 +388,10 @@ class TradeLegacySeedValidateCommand extends Command
             foreach ($results as $result) {
                 if ($result['status'] === 'invalid') {
                     $io->text(sprintf(
-                        'Row %d (ID: %d, %s):',
+                        'Row %d (ID: %s, %s):',
                         $result['row_number'],
-                        $result['instrument_id'],
-                        $result['input_ticker']
+                        $result['instrument_id'] ?? 'N/A',
+                        $result['input_ticker'] ?? 'N/A'
                     ));
                     foreach ($result['errors'] as $error) {
                         $io->text('  • ' . $error);
