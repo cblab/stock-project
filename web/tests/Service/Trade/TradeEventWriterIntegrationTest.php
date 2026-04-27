@@ -17,61 +17,79 @@ final class TradeEventWriterIntegrationTest extends KernelTestCase
 {
     private TradeEventWriter $writer;
     private \Doctrine\DBAL\Connection $connection;
+    private static int $testRunId = 0;
+    private int $testInstrumentId;
 
     protected function setUp(): void
     {
-        self::bootKernel();
+        self::bootKernel(['environment' => 'test']);
         $container = self::getContainer();
         $this->writer = $container->get(TradeEventWriter::class);
         $this->connection = $container->get('doctrine.dbal.default_connection');
 
+        // Unique instrument ID per test to ensure isolation
+        self::$testRunId++;
+        $this->testInstrumentId = 990000 + self::$testRunId;
+
+        $this->connection->beginTransaction();
         $this->seedTestData();
+    }
+
+    protected function tearDown(): void
+    {
+        // Rollback transaction to ensure test isolation
+        if ($this->connection->isTransactionActive()) {
+            $this->connection->rollBack();
+        }
+        parent::tearDown();
     }
 
     private function seedTestData(): void
     {
-        // Ensure test instrument exists
-        $exists = $this->connection->fetchOne(
-            'SELECT 1 FROM instrument WHERE id = ?',
-            [999999]
-        );
+        $instrumentId = $this->testInstrumentId;
+        $testDate = '2025-01-15';
 
-        if (!$exists) {
-            $this->connection->insert('instrument', [
-                'id' => 999999,
-                'symbol' => 'TEST',
-                'name' => 'Test Instrument for TradeEventWriter',
-                'isin' => 'TEST00000001',
-                'created_at' => date('Y-m-d H:i:s'),
-                'updated_at' => date('Y-m-d H:i:s'),
-            ]);
-        }
+        // Insert test instrument
+        $this->connection->insert('instrument', [
+            'id' => $instrumentId,
+            'symbol' => 'TEST' . $instrumentId,
+            'name' => 'Test Instrument ' . $instrumentId,
+            'isin' => 'TEST' . str_pad((string)$instrumentId, 6, '0', STR_PAD_LEFT),
+            'created_at' => $testDate . ' 00:00:00',
+            'updated_at' => $testDate . ' 00:00:00',
+        ]);
 
-        // Ensure snapshots exist
-        $snapshots = ['instrument_buy_signal_snapshot', 'instrument_sepa_snapshot', 'instrument_epa_snapshot'];
-        foreach ($snapshots as $table) {
-            $exists = $this->connection->fetchOne(
-                "SELECT 1 FROM {$table} WHERE id = ?",
-                [999999]
-            );
-            if (!$exists) {
-                $this->connection->insert($table, [
-                    'id' => 999999,
-                    'instrument_id' => 999999,
-                    'created_at' => date('Y-m-d H:i:s'),
-                ]);
-            }
-        }
+        // Insert valid buy_signal_snapshot with all required fields
+        $this->connection->insert('instrument_buy_signal_snapshot', [
+            'instrument_id' => $instrumentId,
+            'as_of_date' => $testDate,
+            'kronos_score' => 0.5,
+            'sentiment_score' => 0.5,
+            'merged_score' => 0.5,
+            'decision' => 'buy',
+            'created_at' => $testDate . ' 00:00:00',
+            'updated_at' => $testDate . ' 00:00:00',
+        ]);
 
-        // Clean up any existing test campaigns for this instrument
-        $this->connection->executeStatement(
-            'DELETE FROM trade_event WHERE trade_campaign_id IN (SELECT id FROM trade_campaign WHERE instrument_id = ?)',
-            [999999]
-        );
-        $this->connection->executeStatement(
-            'DELETE FROM trade_campaign WHERE instrument_id = ?',
-            [999999]
-        );
+        // Insert valid sepa_snapshot with all required fields
+        $this->connection->insert('instrument_sepa_snapshot', [
+            'instrument_id' => $instrumentId,
+            'as_of_date' => $testDate,
+            'eps_growth_score' => 50.0,
+            'sales_growth_score' => 50.0,
+            'total_score' => 50.0,
+            'created_at' => $testDate . ' 00:00:00',
+            'updated_at' => $testDate . ' 00:00:00',
+        ]);
+
+        // Insert valid epa_snapshot with all required fields
+        $this->connection->insert('instrument_epa_snapshot', [
+            'instrument_id' => $instrumentId,
+            'as_of_date' => $testDate,
+            'trend_exit_score' => 50.0,
+            'created_at' => $testDate . ' 00:00:00',
+            'updated_at' => $testDate . ' 00:00:00',
+        ]);
     }
 
     /**
@@ -88,7 +106,7 @@ final class TradeEventWriterIntegrationTest extends KernelTestCase
      */
     public function testTrimThenExitCalculatesCorrectNeutralCampaignPnl(): void
     {
-        $instrumentId = 999999;
+        $instrumentId = $this->testInstrumentId;
         $baseTime = new \DateTimeImmutable('2025-01-15 10:00:00');
 
         // Step 1: Entry
@@ -123,8 +141,8 @@ final class TradeEventWriterIntegrationTest extends KernelTestCase
         self::assertSame('closed_neutral', $result->campaignState);
 
         $campaign = $this->connection->fetchAssociative(
-            'SELECT * FROM trade_campaign WHERE id = ?',
-            [$result->tradeCampaignId]
+            'SELECT * FROM trade_campaign WHERE instrument_id = ?',
+            [$instrumentId]
         );
 
         // BUG-01 FIX VERIFICATION:
@@ -150,7 +168,7 @@ final class TradeEventWriterIntegrationTest extends KernelTestCase
      */
     public function testTrimThenExitCalculatesCorrectProfitCampaignPnl(): void
     {
-        $instrumentId = 999999;
+        $instrumentId = $this->testInstrumentId;
         $baseTime = new \DateTimeImmutable('2025-01-15 10:00:00');
 
         // Entry
@@ -185,8 +203,8 @@ final class TradeEventWriterIntegrationTest extends KernelTestCase
         self::assertSame('closed_profit', $result->campaignState);
 
         $campaign = $this->connection->fetchAssociative(
-            'SELECT * FROM trade_campaign WHERE id = ?',
-            [$result->tradeCampaignId]
+            'SELECT * FROM trade_campaign WHERE instrument_id = ?',
+            [$instrumentId]
         );
 
         // realized_pnl_gross = (12-10)*50 + (14-10)*50 = 100 + 200 = 300
@@ -207,7 +225,7 @@ final class TradeEventWriterIntegrationTest extends KernelTestCase
      */
     public function testPartialLossTrimThenProfitExitCalculatesCorrectCampaignPnl(): void
     {
-        $instrumentId = 999999;
+        $instrumentId = $this->testInstrumentId;
         $baseTime = new \DateTimeImmutable('2025-01-15 10:00:00');
 
         // Entry
@@ -242,8 +260,8 @@ final class TradeEventWriterIntegrationTest extends KernelTestCase
         self::assertSame('closed_profit', $result->campaignState);
 
         $campaign = $this->connection->fetchAssociative(
-            'SELECT * FROM trade_campaign WHERE id = ?',
-            [$result->tradeCampaignId]
+            'SELECT * FROM trade_campaign WHERE instrument_id = ?',
+            [$instrumentId]
         );
 
         // realized_pnl_gross = (8-10)*25 + (12-10)*75 = -50 + 150 = 100
@@ -254,11 +272,11 @@ final class TradeEventWriterIntegrationTest extends KernelTestCase
     }
 
     /**
-     * Test return_to_watchlist behaves identically to hard_exit for PnL calculation.
+     * BUG-01 Fix Test Case 4: return_to_watchlist behaves identically to hard_exit for PnL calculation.
      */
     public function testReturnToWatchlistCalculatesCorrectCampaignPnl(): void
     {
-        $instrumentId = 999999;
+        $instrumentId = $this->testInstrumentId;
         $baseTime = new \DateTimeImmutable('2025-01-15 10:00:00');
 
         // Entry
@@ -292,14 +310,80 @@ final class TradeEventWriterIntegrationTest extends KernelTestCase
         self::assertSame('returned_to_watchlist', $result->campaignState);
 
         $campaign = $this->connection->fetchAssociative(
-            'SELECT * FROM trade_campaign WHERE id = ?',
-            [$result->tradeCampaignId]
+            'SELECT * FROM trade_campaign WHERE instrument_id = ?',
+            [$instrumentId]
         );
 
         // realized_pnl_gross = (12-10)*50 + (8-10)*50 = 100 - 100 = 0
         self::assertEqualsWithDelta(0.0, (float) $campaign['realized_pnl_gross'], 0.01);
 
         // realized_pnl_pct should be 0% (campaign-level, not last exit)
+        self::assertEqualsWithDelta(0.0, (float) $campaign['realized_pnl_pct'], 0.0001);
+    }
+
+    /**
+     * BUG-01 Fix Test Case 5: Multiple trims before exit.
+     *
+     * Scenario:
+     * - Entry: 100 shares @ 10€
+     * - Trim 1: Sell 25 shares @ 12€ (+50€)
+     * - Trim 2: Sell 25 shares @ 8€ (-50€)
+     * - Hard Exit: Sell 50 shares @ 10€ (0€)
+     * - Expected Campaign P&L: 0€ (0%)
+     */
+    public function testMultipleTrimsThenExitCalculatesCorrectCampaignPnl(): void
+    {
+        $instrumentId = $this->testInstrumentId;
+        $baseTime = new \DateTimeImmutable('2025-01-15 10:00:00');
+
+        // Entry
+        $this->writer->write([
+            'instrument_id' => $instrumentId,
+            'event_type' => 'entry',
+            'event_timestamp' => $baseTime->format('Y-m-d H:i:s'),
+            'event_price' => '10.00',
+            'quantity' => '100',
+        ]);
+
+        // Trim 1: 25 @ 12€ (+50€)
+        $this->writer->write([
+            'instrument_id' => $instrumentId,
+            'event_type' => 'trim',
+            'event_timestamp' => $baseTime->modify('+1 hour')->format('Y-m-d H:i:s'),
+            'event_price' => '12.00',
+            'quantity' => '25',
+        ]);
+
+        // Trim 2: 25 @ 8€ (-50€)
+        $this->writer->write([
+            'instrument_id' => $instrumentId,
+            'event_type' => 'trim',
+            'event_timestamp' => $baseTime->modify('+2 hours')->format('Y-m-d H:i:s'),
+            'event_price' => '8.00',
+            'quantity' => '25',
+        ]);
+
+        // Hard Exit: 50 @ 10€ (0€)
+        $result = $this->writer->write([
+            'instrument_id' => $instrumentId,
+            'event_type' => 'hard_exit',
+            'event_timestamp' => $baseTime->modify('+3 hours')->format('Y-m-d H:i:s'),
+            'event_price' => '10.00',
+            'quantity' => '50',
+            'exit_reason' => 'time_based',
+        ]);
+
+        self::assertSame('closed_neutral', $result->campaignState);
+
+        $campaign = $this->connection->fetchAssociative(
+            'SELECT * FROM trade_campaign WHERE instrument_id = ?',
+            [$instrumentId]
+        );
+
+        // realized_pnl_gross = 50 - 50 + 0 = 0
+        self::assertEqualsWithDelta(0.0, (float) $campaign['realized_pnl_gross'], 0.01);
+
+        // realized_pnl_pct = 0 / (10 * 100) = 0%
         self::assertEqualsWithDelta(0.0, (float) $campaign['realized_pnl_pct'], 0.0001);
     }
 }

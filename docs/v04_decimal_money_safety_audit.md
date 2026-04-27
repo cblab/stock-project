@@ -22,7 +22,9 @@
 
 **Gesamturteil:** Die v0.4 Implementierung ist für den aktuellen Scope akzeptabel, birgt aber Float-Risiken für v0.5.
 
-**Empfehlung:** v0.5 NICHT blockieren, aber T2 Fix-Chunk vor Evidence Engine Lite empfohlen.
+**Gate-Entscheidung:** v0.5 bleibt blockiert bis T2 grün ist.
+
+**T2-Ergebnis:** BUG-01 war Code-seitig nicht vorhanden, aber Testlücke wurde geschlossen. TradeEventWriter berechnet realized_pnl_pct korrekt als Campaign-Level Wert (cumulative realized_pnl_gross / (avg_entry * total_quantity)).
 
 ---
 
@@ -416,12 +418,21 @@ return round(($exit - $avgEntry) * $qty - $feeAmount, 4);
 
 ---
 
-## 9. Akzeptanzkriterien-Check
+## 9. T2 Fix Ergebnis
 
 | Kriterium | Status | Anmerkung |
 |-----------|--------|-----------|
-| Audit-Report existiert | ✅ | Dieses Dokument |
-| Alle Money-relevanten Services geprüft | ✅ | 4 Services |
-| Tests laufen | ⚠️ | Nur 1 Test-Datei vorhanden |
-| Float-Risiken explizit benannt | ✅ | Siehe Abschnitt 7 |
+| TradeEventWriter Exit-Pfade geprüft | ✅ | handleHardExit, handleReturnToWatchlist korrekt |
+| handleTrim akkumuliert realized_pnl_gross | ✅ | Korrekt, setzt aber kein realized_pnl_pct (Absicht) |
+| calculateCampaignRealizedPnlPct Nutzung | ✅ | Korrekt in handleHardExit und handleReturnToWatchlist |
+| Tests ergänzt | ✅ | 5 Tests in TradeEventWriterIntegrationTest |
+| BUG-01 Verifizierung | ✅ | realized_pnl_pct ist Campaign-Level, nicht letzter Exit |
+| Test-Isolation | ✅ | Transaction-Rollback, unique Instrument-IDs |
+| Test-Fixture | ✅ | Gültige Snapshots mit allen NOT-NULL-Spalten |
+
+**Fazit:** T2 Fix erfolgreich. BUG-01 war Code-seitig nicht vorhanden — der Code war korrekt, aber ungetestet. Die neuen Tests beweisen die korrekte Campaign-Level Berechnung.
+
+## 10. Empfohlene Fixes (T3 Chunk - Post v0.5)
+
+### 10.1 Option A: BC Math Extension (Empfohlen für T3)
 |
