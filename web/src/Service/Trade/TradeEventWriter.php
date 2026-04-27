@@ -311,8 +311,8 @@ final readonly class TradeEventWriter
             'trim' => $this->handleTrim($campaign['id'], $openQty, $avgEntry, $eventPrice, $quantity, $fees, $realizedGross),
             'pause' => $this->handlePause($campaign['id']),
             'resume' => $this->handleResume($campaign['id']),
-            'hard_exit' => $this->handleHardExit($campaign['id'], $totalQty, $openQty, $avgEntry, $eventPrice, $quantity, $fees, $realizedGross, $normalized['event_timestamp']),
-            'return_to_watchlist' => $this->handleReturnToWatchlist($campaign['id'], $totalQty, $openQty, $avgEntry, $eventPrice, $quantity, $fees, $realizedGross, $normalized['event_timestamp']),
+            'hard_exit' => $this->handleHardExit($campaign['id'], $campaign['instrument_id'], $totalQty, $openQty, $avgEntry, $eventPrice, $quantity, $fees, $realizedGross, $normalized['event_timestamp']),
+            'return_to_watchlist' => $this->handleReturnToWatchlist($campaign['id'], $campaign['instrument_id'], $totalQty, $openQty, $avgEntry, $eventPrice, $quantity, $fees, $realizedGross, $normalized['event_timestamp']),
             'entry', 'migration_seed' => $campaign['state'] ?? 'open',
             default => throw new TradeValidationException(sprintf('Unknown event type: %s', $eventType)),
         };
@@ -374,7 +374,7 @@ final readonly class TradeEventWriter
         return 'open';
     }
 
-    private function handleHardExit(int $campaignId, float $totalQty, float $openQty, ?float $avgEntry, ?float $eventPrice, ?float $quantity, float $fees, float $realizedGross, DateTimeImmutable $eventTimestamp): string
+    private function handleHardExit(int $campaignId, int $instrumentId, float $totalQty, float $openQty, ?float $avgEntry, ?float $eventPrice, ?float $quantity, float $fees, float $realizedGross, DateTimeImmutable $eventTimestamp): string
     {
         if ($eventPrice === null) {
             throw new TradeValidationException('hard_exit requires event_price');
@@ -410,10 +410,12 @@ final readonly class TradeEventWriter
             'closed_at' => $eventTimestamp->format('Y-m-d H:i:s'),
         ], ['id' => $campaignId]);
 
+        $this->markInstrumentAsWatchlist($instrumentId);
+
         return $newState;
     }
 
-    private function handleReturnToWatchlist(int $campaignId, float $totalQty, float $openQty, ?float $avgEntry, ?float $eventPrice, ?float $quantity, float $fees, float $realizedGross, DateTimeImmutable $eventTimestamp): string
+    private function handleReturnToWatchlist(int $campaignId, int $instrumentId, float $totalQty, float $openQty, ?float $avgEntry, ?float $eventPrice, ?float $quantity, float $fees, float $realizedGross, DateTimeImmutable $eventTimestamp): string
     {
         if ($eventPrice === null) {
             throw new TradeValidationException('return_to_watchlist requires event_price');
@@ -448,7 +450,21 @@ final readonly class TradeEventWriter
             'closed_at' => $eventTimestamp->format('Y-m-d H:i:s'),
         ], ['id' => $campaignId]);
 
+        $this->markInstrumentAsWatchlist($instrumentId);
+
         return 'returned_to_watchlist';
+    }
+
+    /**
+     * Mark instrument as watchlist (no longer in portfolio).
+     * Keeps instrument active for watchlist visibility.
+     */
+    private function markInstrumentAsWatchlist(int $instrumentId): void
+    {
+        $this->connection->update('instrument', [
+            'is_portfolio' => 0,
+            'active' => 1,
+        ], ['id' => $instrumentId]);
     }
 
     /**

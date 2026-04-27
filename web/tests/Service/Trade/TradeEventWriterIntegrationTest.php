@@ -424,4 +424,167 @@ final class TradeEventWriterIntegrationTest extends KernelTestCase
         // realized_pnl_pct = 0 / (10 * 100) = 0%
         self::assertEqualsWithDelta(0.0, (float) $campaign['realized_pnl_pct'], 0.0001);
     }
+
+    /**
+     * T2c Fix: hard_exit removes instrument from portfolio.
+     *
+     * Scenario:
+     * - Entry: 100 shares @ 10€
+     * - Hard Exit: Sell 100 shares @ 12€
+     * - Expected: is_portfolio = 0, active = 1
+     */
+    public function testHardExitRemovesInstrumentFromPortfolio(): void
+    {
+        $instrumentId = $this->testInstrumentId;
+        $baseTime = new \DateTimeImmutable('2025-01-15 10:00:00');
+
+        // Entry
+        $this->writer->write([
+            'instrument_id' => $instrumentId,
+            'event_type' => 'entry',
+            'event_timestamp' => $baseTime->format('Y-m-d H:i:s'),
+            'event_price' => '10.00',
+            'quantity' => '100',
+        ]);
+
+        // Verify initial portfolio state
+        $instrument = $this->connection->fetchAssociative(
+            'SELECT is_portfolio, active FROM instrument WHERE id = ?',
+            [$instrumentId]
+        );
+        self::assertSame(1, (int) $instrument['is_portfolio'], 'Instrument should be in portfolio after entry');
+        self::assertSame(1, (int) $instrument['active'], 'Instrument should be active after entry');
+
+        // Hard Exit: 100 @ 12€
+        $result = $this->writer->write([
+            'instrument_id' => $instrumentId,
+            'event_type' => 'hard_exit',
+            'event_timestamp' => $baseTime->modify('+2 hours')->format('Y-m-d H:i:s'),
+            'event_price' => '12.00',
+            'quantity' => '100',
+            'exit_reason' => 'signal',
+        ]);
+
+        // Verify campaign state
+        self::assertSame('closed_profit', $result->campaignState);
+
+        // Verify instrument moved to watchlist
+        $instrument = $this->connection->fetchAssociative(
+            'SELECT is_portfolio, active FROM instrument WHERE id = ?',
+            [$instrumentId]
+        );
+        self::assertSame(0, (int) $instrument['is_portfolio'], 'Instrument should not be in portfolio after hard_exit');
+        self::assertSame(1, (int) $instrument['active'], 'Instrument should remain active after hard_exit');
+    }
+
+    /**
+     * T2c Fix: return_to_watchlist removes instrument from portfolio.
+     *
+     * Scenario:
+     * - Entry: 100 shares @ 10€
+     * - Return to Watchlist: Sell 100 shares @ 12€
+     * - Expected: is_portfolio = 0, active = 1
+     */
+    public function testReturnToWatchlistRemovesInstrumentFromPortfolio(): void
+    {
+        $instrumentId = $this->testInstrumentId;
+        $baseTime = new \DateTimeImmutable('2025-01-15 10:00:00');
+
+        // Entry
+        $this->writer->write([
+            'instrument_id' => $instrumentId,
+            'event_type' => 'entry',
+            'event_timestamp' => $baseTime->format('Y-m-d H:i:s'),
+            'event_price' => '10.00',
+            'quantity' => '100',
+        ]);
+
+        // Verify initial portfolio state
+        $instrument = $this->connection->fetchAssociative(
+            'SELECT is_portfolio, active FROM instrument WHERE id = ?',
+            [$instrumentId]
+        );
+        self::assertSame(1, (int) $instrument['is_portfolio'], 'Instrument should be in portfolio after entry');
+        self::assertSame(1, (int) $instrument['active'], 'Instrument should be active after entry');
+
+        // Return to Watchlist: 100 @ 12€
+        $result = $this->writer->write([
+            'instrument_id' => $instrumentId,
+            'event_type' => 'return_to_watchlist',
+            'event_timestamp' => $baseTime->modify('+2 hours')->format('Y-m-d H:i:s'),
+            'event_price' => '12.00',
+            'quantity' => '100',
+            'exit_reason' => 'manual',
+        ]);
+
+        // Verify campaign state
+        self::assertSame('returned_to_watchlist', $result->campaignState);
+
+        // Verify instrument moved to watchlist
+        $instrument = $this->connection->fetchAssociative(
+            'SELECT is_portfolio, active FROM instrument WHERE id = ?',
+            [$instrumentId]
+        );
+        self::assertSame(0, (int) $instrument['is_portfolio'], 'Instrument should not be in portfolio after return_to_watchlist');
+        self::assertSame(1, (int) $instrument['active'], 'Instrument should remain active after return_to_watchlist');
+    }
+
+    /**
+     * T2c Fix: trim keeps instrument in portfolio.
+     *
+     * Scenario:
+     * - Entry: 100 shares @ 10€
+     * - Trim: Sell 50 shares @ 12€
+     * - Expected: is_portfolio = 1, active = 1, open_quantity = 50
+     */
+    public function testTrimKeepsInstrumentInPortfolio(): void
+    {
+        $instrumentId = $this->testInstrumentId;
+        $baseTime = new \DateTimeImmutable('2025-01-15 10:00:00');
+
+        // Entry
+        $this->writer->write([
+            'instrument_id' => $instrumentId,
+            'event_type' => 'entry',
+            'event_timestamp' => $baseTime->format('Y-m-d H:i:s'),
+            'event_price' => '10.00',
+            'quantity' => '100',
+        ]);
+
+        // Verify initial portfolio state
+        $instrument = $this->connection->fetchAssociative(
+            'SELECT is_portfolio, active FROM instrument WHERE id = ?',
+            [$instrumentId]
+        );
+        self::assertSame(1, (int) $instrument['is_portfolio'], 'Instrument should be in portfolio after entry');
+        self::assertSame(1, (int) $instrument['active'], 'Instrument should be active after entry');
+
+        // Trim: 50 @ 12€
+        $result = $this->writer->write([
+            'instrument_id' => $instrumentId,
+            'event_type' => 'trim',
+            'event_timestamp' => $baseTime->modify('+1 hour')->format('Y-m-d H:i:s'),
+            'event_price' => '12.00',
+            'quantity' => '50',
+            'exit_reason' => 'rebalance',
+        ]);
+
+        // Verify campaign state
+        self::assertSame('trimmed', $result->campaignState);
+
+        // Verify instrument remains in portfolio
+        $instrument = $this->connection->fetchAssociative(
+            'SELECT is_portfolio, active FROM instrument WHERE id = ?',
+            [$instrumentId]
+        );
+        self::assertSame(1, (int) $instrument['is_portfolio'], 'Instrument should remain in portfolio after trim');
+        self::assertSame(1, (int) $instrument['active'], 'Instrument should remain active after trim');
+
+        // Verify open quantity
+        $campaign = $this->connection->fetchAssociative(
+            'SELECT open_quantity FROM trade_campaign WHERE instrument_id = ?',
+            [$instrumentId]
+        );
+        self::assertEqualsWithDelta(50.0, (float) $campaign['open_quantity'], 0.01, 'Open quantity should be 50 after trim');
+    }
 }
