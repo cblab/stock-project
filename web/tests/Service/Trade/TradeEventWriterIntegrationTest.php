@@ -71,22 +71,44 @@ final class TradeEventWriterIntegrationTest extends KernelTestCase
             'updated_at' => $testDate . ' 00:00:00',
         ]);
 
-        // Insert valid sepa_snapshot with all required fields
+        // Insert valid sepa_snapshot with all NOT NULL columns
         $this->connection->insert('instrument_sepa_snapshot', [
             'instrument_id' => $instrumentId,
             'as_of_date' => $testDate,
-            'eps_growth_score' => 50.0,
-            'sales_growth_score' => 50.0,
+            'market_score' => 50.0,
+            'stage_score' => 50.0,
+            'relative_strength_score' => 50.0,
+            'base_quality_score' => 50.0,
+            'volume_score' => 50.0,
+            'momentum_score' => 50.0,
+            'risk_score' => 50.0,
+            'superperformance_score' => 50.0,
             'total_score' => 50.0,
+            'vcp_score' => 50.0,
+            'microstructure_score' => 50.0,
+            'breakout_readiness_score' => 50.0,
+            'structure_score' => 50.0,
+            'execution_score' => 50.0,
+            'traffic_light' => 'green',
+            'kill_triggers_json' => '{}',
+            'detail_json' => '{}',
             'created_at' => $testDate . ' 00:00:00',
             'updated_at' => $testDate . ' 00:00:00',
         ]);
 
-        // Insert valid epa_snapshot with all required fields
+        // Insert valid epa_snapshot with all NOT NULL columns
         $this->connection->insert('instrument_epa_snapshot', [
             'instrument_id' => $instrumentId,
             'as_of_date' => $testDate,
+            'failure_score' => 50.0,
             'trend_exit_score' => 50.0,
+            'climax_score' => 50.0,
+            'risk_score' => 50.0,
+            'total_score' => 50.0,
+            'action' => 'hold',
+            'hard_triggers_json' => '{}',
+            'soft_warnings_json' => '{}',
+            'detail_json' => '{}',
             'created_at' => $testDate . ' 00:00:00',
             'updated_at' => $testDate . ' 00:00:00',
         ]);

@@ -430,9 +430,8 @@ return round(($exit - $avgEntry) * $qty - $feeAmount, 4);
 | Test-Isolation | ✅ | Transaction-Rollback, unique Instrument-IDs |
 | Test-Fixture | ✅ | Gültige Snapshots mit allen NOT-NULL-Spalten |
 
-**Fazit:** T2 Fix erfolgreich. BUG-01 war Code-seitig nicht vorhanden — der Code war korrekt, aber ungetestet. Die neuen Tests beweisen die korrekte Campaign-Level Berechnung.
+**T2 Fazit:** Code war korrekt, Testlücke wurde geschlossen. Die 5 neuen Tests beweisen, dass realized_pnl_pct korrekt als Campaign-Level Wert berechnet wird.
 
-## 10. Empfohlene Fixes (T3 Chunk - Post v0.5)
+---
 
-### 10.1 Option A: BC Math Extension (Empfohlen für T3)
-|
+*Dokument endet hier. T3 Empfehlungen (BCMath etc.) wurden entfernt — nicht Teil von T2 Scope.*
