@@ -145,11 +145,11 @@ class TradeIntegrityReportCommand extends Command
 
     private function checkMultipleOpenCampaigns(?int $instrumentId): array
     {
-        $filter = $instrumentId ? "WHERE i.id = {$instrumentId}" : '';
+        $filter = $instrumentId ? " AND i.id = {$instrumentId}" : '';
         $sql = "SELECT i.id as instrument_id, i.input_ticker, COUNT(tc.id) as open_count
             FROM instrument i
             JOIN trade_campaign tc ON i.id = tc.instrument_id
-            {$filter}
+            WHERE tc.state IN ('open', 'trimmed', 'paused'){$filter}
             GROUP BY i.id, i.input_ticker
             HAVING open_count > 1";
 
@@ -288,9 +288,11 @@ class TradeIntegrityReportCommand extends Command
             LEFT JOIN instrument_buy_signal_snapshot bss ON te.buy_signal_snapshot_id = bss.id
             LEFT JOIN instrument_sepa_snapshot ss ON te.sepa_snapshot_id = ss.id
             LEFT JOIN instrument_epa_snapshot es ON te.epa_snapshot_id = es.id
-            WHERE (te.buy_signal_snapshot_id IS NOT NULL AND bss.id IS NULL)
-            OR (te.sepa_snapshot_id IS NOT NULL AND ss.id IS NULL)
-            OR (te.epa_snapshot_id IS NOT NULL AND es.id IS NULL){$filter}";
+            WHERE (
+                (te.buy_signal_snapshot_id IS NOT NULL AND bss.id IS NULL)
+                OR (te.sepa_snapshot_id IS NOT NULL AND ss.id IS NULL)
+                OR (te.epa_snapshot_id IS NOT NULL AND es.id IS NULL)
+            ){$filter}";
 
         $rows = $this->connection->fetchAllAssociative($sql);
 
@@ -318,10 +320,12 @@ class TradeIntegrityReportCommand extends Command
                 te.scoring_version, te.policy_version, te.model_version, te.macro_version
             FROM trade_event te
             JOIN trade_campaign tc ON te.trade_campaign_id = tc.id
-            WHERE te.scoring_version IS NULL
-            OR te.policy_version IS NULL
-            OR te.model_version IS NULL
-            OR te.macro_version IS NULL{$filter}";
+            WHERE (
+                te.scoring_version IS NULL
+                OR te.policy_version IS NULL
+                OR te.model_version IS NULL
+                OR te.macro_version IS NULL
+            ){$filter}";
 
         $rows = $this->connection->fetchAllAssociative($sql);
 
