@@ -13,17 +13,37 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 #[AsCommand(name: 'app:trade:legacy-seed-plan', description: 'Generate legacy seed plan for portfolio instruments without trade campaigns.')]
 class TradeLegacySeedPlanCommand extends Command
 {
-    private const SYSTEM_VERSIONS = [
-        'scoring_version' => 'v0.4.0',
-        'policy_version' => 'v0.4.0',
-        'model_version' => 'v0.4.0',
-        'macro_version' => 'v0.4.0',
-    ];
+    private ?array $systemVersions = null;
 
     public function __construct(
         private readonly Connection $connection,
+        private readonly string $projectDir,
     ) {
         parent::__construct();
+    }
+
+    private function loadSystemVersions(): array
+    {
+        if ($this->systemVersions === null) {
+            $versionsFile = $this->projectDir . '/config/system_versions.json';
+            if (file_exists($versionsFile)) {
+                $content = file_get_contents($versionsFile);
+                $this->systemVersions = json_decode($content, true) ?: $this->getDefaultVersions();
+            } else {
+                $this->systemVersions = $this->getDefaultVersions();
+            }
+        }
+        return $this->systemVersions;
+    }
+
+    private function getDefaultVersions(): array
+    {
+        return [
+            'scoring_version' => 'v0.4',
+            'policy_version' => 'v0.4',
+            'model_version' => 'stock-project-local',
+            'macro_version' => 'none',
+        ];
     }
 
     protected function configure(): void
@@ -58,16 +78,18 @@ class TradeLegacySeedPlanCommand extends Command
 
         $plans = array_map(fn($i) => $this->buildSeedPlan($i), $instruments);
 
+        $systemVersions = $this->loadSystemVersions();
+
         if ($format === 'json') {
             $output->writeln(json_encode([
                 'count' => count($plans),
-                'system_versions' => self::SYSTEM_VERSIONS,
+                'system_versions' => $systemVersions,
                 'instruments' => $plans,
             ], JSON_PRETTY_PRINT));
             return Command::SUCCESS;
         }
 
-        $this->renderTextOutput($io, $plans);
+        $this->renderTextOutput($io, $plans, $systemVersions);
         return Command::SUCCESS;
     }
 
@@ -197,10 +219,10 @@ class TradeLegacySeedPlanCommand extends Command
                 'candidate_sepa_snapshot_id' => $sepaSnapshot ? $sepaSnapshot['id'] : null,
                 'candidate_epa_snapshot_id' => $epaSnapshot ? $epaSnapshot['id'] : null,
                 'macro_snapshot_id' => null,
-                'scoring_version' => self::SYSTEM_VERSIONS['scoring_version'],
-                'policy_version' => self::SYSTEM_VERSIONS['policy_version'],
-                'model_version' => self::SYSTEM_VERSIONS['model_version'],
-                'macro_version' => self::SYSTEM_VERSIONS['macro_version'],
+                'scoring_version' => $this->loadSystemVersions()['scoring_version'],
+                'policy_version' => $this->loadSystemVersions()['policy_version'],
+                'model_version' => $this->loadSystemVersions()['model_version'],
+                'macro_version' => $this->loadSystemVersions()['macro_version'],
                 'event_notes' => 'Legacy migration seed plan only - not applied',
             ],
             'warnings' => [
@@ -211,7 +233,7 @@ class TradeLegacySeedPlanCommand extends Command
         ];
     }
 
-    private function renderTextOutput(SymfonyStyle $io, array $plans): void
+    private function renderTextOutput(SymfonyStyle $io, array $plans, array $systemVersions): void
     {
         $io->title('v0.4 Legacy Seed Plan');
         $io->text(sprintf('Found %d legacy portfolio instrument(s) without trade campaigns.', count($plans)));
@@ -222,7 +244,7 @@ class TradeLegacySeedPlanCommand extends Command
         }
 
         $io->section('System Versions (for proposed events)');
-        foreach (self::SYSTEM_VERSIONS as $key => $value) {
+        foreach ($systemVersions as $key => $value) {
             $io->text(sprintf('  %s: %s', $key, $value));
         }
 
