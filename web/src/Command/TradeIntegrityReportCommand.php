@@ -188,7 +188,7 @@ class TradeIntegrityReportCommand extends Command
         $filter = $this->buildInstrumentFilter($instrumentId, 'tc');
         $sql = "SELECT tc.id as campaign_id, tc.instrument_id, tc.total_quantity, tc.avg_entry_price
             FROM trade_campaign tc
-            WHERE tc.total_quantity IS NULL OR tc.avg_entry_price IS NULL{$filter}";
+            WHERE (tc.total_quantity IS NULL OR tc.avg_entry_price IS NULL){$filter}";
 
         $rows = $this->connection->fetchAllAssociative($sql);
 
