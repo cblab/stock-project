@@ -47,6 +47,10 @@ final readonly class TradeOutcomeExtractor
         $instrumentId = (int) $campaign['instrument_id'];
         $state = (string) $campaign['state'];
         if (!in_array($state, self::TERMINAL_STATES, true)) return null;
+        $openedAt = $this->parseDateTime($campaign['opened_at']);
+        if ($openedAt === null) {
+            return null; // Skip samples with unparseable opened_at
+        }
         $entryEvent = $this->fetchEntryEvent($campaignId);
         $exitEvent = $this->fetchExitEvent($campaignId, $state);
         $seedSource = $this->determineSeedSource($campaignId, $entryEvent);
@@ -57,7 +61,7 @@ final readonly class TradeOutcomeExtractor
             instrumentId: $instrumentId,
             tradeType: (string) $campaign['trade_type'],
             campaignState: $state,
-            openedAt: $this->parseDateTime($campaign['opened_at']),
+            openedAt: $openedAt,
             closedAt: $this->parseDateTime($campaign['closed_at']),
             holdingDays: $holdingDays,
             totalQuantity: (string) $campaign['total_quantity'],
@@ -136,14 +140,19 @@ final readonly class TradeOutcomeExtractor
             $flags[] = EvidenceDataQualityFlag::containsSeedData();
             return ['status' => EvidenceEligibilityStatus::eligibleOutcomeOnly(), 'reason' => null, 'flags' => $flags];
         }
-        if ($entryEvent === null) {
+        if ($this->entryEventHasNoSnapshots($entryEvent)) {
             $flags[] = EvidenceDataQualityFlag::missingEntrySnapshot();
             $flags[] = EvidenceDataQualityFlag::snapshotIncomplete();
             return ['status' => EvidenceEligibilityStatus::eligibleOutcomeOnly(), 'reason' => null, 'flags' => $flags];
         }
         if ($exitEvent === null) {
-            $flags[] = EvidenceDataQualityFlag::missingExitSnapshot();
             $flags[] = EvidenceDataQualityFlag::snapshotIncomplete();
+            return ['status' => EvidenceEligibilityStatus::eligibleOutcomeOnly(), 'reason' => null, 'flags' => $flags];
+        }
+        if ($entryEvent === null) {
+            $flags[] = EvidenceDataQualityFlag::missingEntrySnapshot();
+            $flags[] = EvidenceDataQualityFlag::snapshotIncomplete();
+            return ['status' => EvidenceEligibilityStatus::eligibleOutcomeOnly(), 'reason' => null, 'flags' => $flags];
         }
         return ['status' => EvidenceEligibilityStatus::eligibleFull(), 'reason' => null, 'flags' => $flags];
     }
@@ -164,5 +173,13 @@ final readonly class TradeOutcomeExtractor
         } catch (\Exception $e) {
             return null;
         }
+    }
+
+    private function entryEventHasNoSnapshots(?array $entryEvent): bool
+    {
+        if ($entryEvent === null) return true;
+        return ($entryEvent['buy_signal_snapshot_id'] ?? null) === null
+            && ($entryEvent['sepa_snapshot_id'] ?? null) === null
+            && ($entryEvent['epa_snapshot_id'] ?? null) === null;
     }
 }

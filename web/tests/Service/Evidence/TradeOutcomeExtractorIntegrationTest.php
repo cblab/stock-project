@@ -116,7 +116,7 @@ final class TradeOutcomeExtractorIntegrationTest extends KernelTestCase
         ]);
         $this->createExitEvent($campaign1, 'hard_exit', [
             'event_timestamp' => '2024-01-15 10:00:00',
-            'exit_reason' => 'target_hit',
+            'exit_reason' => 'signal',
         ]);
         $this->createEntryEvent($campaign2, 'entry', [
             'event_timestamp' => '2024-02-01 10:00:00',
@@ -136,7 +136,7 @@ final class TradeOutcomeExtractorIntegrationTest extends KernelTestCase
         $this->assertSame('closed_profit', $profitSample->campaignState);
         $this->assertSame('0.05', $profitSample->realizedPnlPct);
         $this->assertSame(14, $profitSample->holdingDays);
-        $this->assertSame('target_hit', $profitSample->exitReason);
+        $this->assertSame('signal', $profitSample->exitReason);
 
         $returnSample = $this->findSampleByCampaignId($samples, $campaign2);
         $this->assertNotNull($returnSample);
@@ -420,12 +420,21 @@ final class TradeOutcomeExtractorIntegrationTest extends KernelTestCase
 
     private function createInstrument(string $symbol): int
     {
+        $now = date('Y-m-d H:i:s');
         $this->connection->insert('instrument', [
-            'symbol' => $symbol,
-            'name' => $symbol . ' Inc',
-            'sector' => 'Technology',
+            'input_ticker' => $symbol,
+            'provider_ticker' => $symbol,
+            'display_ticker' => $symbol,
+            'name' => $symbol . ' Test Instrument',
             'asset_class' => 'equity',
-            'active' => true,
+            'active' => 1,
+            'is_portfolio' => 0,
+            'region_exposure' => '[]',
+            'sector_profile' => '[]',
+            'top_holdings_profile' => '[]',
+            'macro_profile' => '[]',
+            'created_at' => $now,
+            'updated_at' => $now,
         ]);
 
         return (int) $this->connection->lastInsertId();
@@ -459,8 +468,10 @@ final class TradeOutcomeExtractorIntegrationTest extends KernelTestCase
 
     private function createEntryEvent(int $campaignId, string $type, array $data): void
     {
+        $instrumentId = $this->connection->fetchOne('SELECT instrument_id FROM trade_campaign WHERE id = ?', [$campaignId]);
         $defaults = [
             'trade_campaign_id' => $campaignId,
+            'instrument_id' => $instrumentId,
             'event_type' => $type,
             'event_timestamp' => date('Y-m-d H:i:s'),
             'exit_reason' => null,
@@ -471,7 +482,7 @@ final class TradeOutcomeExtractorIntegrationTest extends KernelTestCase
             'policy_version' => null,
             'model_version' => null,
             'macro_version' => null,
-            'note' => null,
+            'event_notes' => null,
             'created_at' => date('Y-m-d H:i:s'),
         ];
 
@@ -481,8 +492,10 @@ final class TradeOutcomeExtractorIntegrationTest extends KernelTestCase
 
     private function createExitEvent(int $campaignId, string $type, array $data): void
     {
+        $instrumentId = $this->connection->fetchOne('SELECT instrument_id FROM trade_campaign WHERE id = ?', [$campaignId]);
         $defaults = [
             'trade_campaign_id' => $campaignId,
+            'instrument_id' => $instrumentId,
             'event_type' => $type,
             'event_timestamp' => date('Y-m-d H:i:s'),
             'exit_reason' => null,
@@ -493,7 +506,7 @@ final class TradeOutcomeExtractorIntegrationTest extends KernelTestCase
             'policy_version' => null,
             'model_version' => null,
             'macro_version' => null,
-            'note' => null,
+            'event_notes' => null,
             'created_at' => date('Y-m-d H:i:s'),
         ];
 
@@ -503,10 +516,12 @@ final class TradeOutcomeExtractorIntegrationTest extends KernelTestCase
 
     private function createMigrationLog(int $campaignId, string $status): void
     {
+        $instrumentId = $this->connection->fetchOne('SELECT instrument_id FROM trade_campaign WHERE id = ?', [$campaignId]);
         $this->connection->insert('trade_migration_log', [
             'trade_campaign_id' => $campaignId,
+            'instrument_id' => $instrumentId,
             'migration_status' => $status,
-            'created_at' => date('Y-m-d H:i:s'),
+            'migrated_at' => date('Y-m-d H:i:s'),
         ]);
     }
 
