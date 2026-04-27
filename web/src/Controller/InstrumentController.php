@@ -116,6 +116,7 @@ class InstrumentController extends AbstractController
     ): Response
     {
         $openCampaigns = $this->findOpenCampaignsForInstrument($connection, $instrument->getId());
+        $auditCampaigns = $this->findAuditCampaignsForInstrument($connection, $instrument->getId());
 
         return $this->render('instrument/show.html.twig', [
             'instrument' => $instrument,
@@ -123,6 +124,7 @@ class InstrumentController extends AbstractController
             'sepaSnapshot' => $sepaSnapshotRepository->findLatestForInstrument($instrument),
             'epaSnapshot' => $epaSnapshotRepository->findLatestForInstrument($instrument),
             'open_campaigns' => $openCampaigns,
+            'audit_campaigns' => $auditCampaigns,
         ]);
     }
 
@@ -136,6 +138,24 @@ class InstrumentController extends AbstractController
             "SELECT * FROM trade_campaign WHERE instrument_id = ? AND state IN ($placeholders)",
             $params
         );
+    }
+
+    private function findAuditCampaignsForInstrument(Connection $connection, int $instrumentId): array
+    {
+        // Letzte 5 Campaigns (neueste zuerst), jeweils mit ihren Events
+        $campaigns = $connection->fetchAllAssociative(
+            "SELECT * FROM trade_campaign WHERE instrument_id = ? ORDER BY opened_at DESC LIMIT 5",
+            [$instrumentId]
+        );
+
+        foreach ($campaigns as &$campaign) {
+            $campaign['events'] = $connection->fetchAllAssociative(
+                "SELECT * FROM trade_event WHERE trade_campaign_id = ? ORDER BY event_timestamp ASC",
+                [$campaign['id']]
+            );
+        }
+
+        return $campaigns;
     }
 
     #[Route('/instrument/{id}/edit', name: 'app_instrument_edit', requirements: ['id' => '\d+'])]

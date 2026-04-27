@@ -16,5 +16,9 @@ services:
       - ./web/migrations:/app/web/migrations:ro
       - web_var:/app/web/var
 
+  phpmyadmin:
+    ports: !override
+      - "8082:80"
+    
 volumes:
   web_var:
