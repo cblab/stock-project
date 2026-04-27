@@ -53,6 +53,35 @@ final readonly class EvidenceEligibilityStatus
         return new self(self::EXCLUDED);
     }
 
+    /**
+     * Create from string value.
+     *
+     * @throws \InvalidArgumentException if value is invalid
+     */
+    public static function fromString(string $value): self
+    {
+        return match ($value) {
+            self::ELIGIBLE_FULL => new self(self::ELIGIBLE_FULL),
+            self::ELIGIBLE_OUTCOME_ONLY => new self(self::ELIGIBLE_OUTCOME_ONLY),
+            self::ELIGIBLE_SNAPSHOT_ONLY => new self(self::ELIGIBLE_SNAPSHOT_ONLY),
+            self::EXCLUDED => new self(self::EXCLUDED),
+            default => throw new \InvalidArgumentException("Invalid EvidenceEligibilityStatus: {$value}"),
+        };
+    }
+
+    /**
+     * Try to create from string value.
+     * Returns null if value is invalid.
+     */
+    public static function tryFromString(string $value): ?self
+    {
+        try {
+            return self::fromString($value);
+        } catch (\InvalidArgumentException) {
+            return null;
+        }
+    }
+
     private function __construct(
         private string $value,
     ) {

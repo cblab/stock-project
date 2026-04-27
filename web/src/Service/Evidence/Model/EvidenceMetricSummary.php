@@ -32,7 +32,7 @@ final readonly class EvidenceMetricSummary
      * @param string|null $medianReturnPct Median return as ratio
      * @param string|null $standardDeviation Standard deviation of returns as ratio
      * @param string|null $standardErrorOfMean Standard error of the mean as ratio
-     * @param float|null $confidenceLevel Confidence level for statistical measures (e.g., 0.95 for 95%)
+     * @param EvidenceConfidenceLevel|null $confidenceLevel Qualitative evidence confidence level (anecdotal, very_low, low, medium, high)
      * @param EvidenceDataQualityFlag[] $dataQualityFlags Quality flags affecting this summary
      */
     public function __construct(
@@ -50,7 +50,7 @@ final readonly class EvidenceMetricSummary
         public ?string $medianReturnPct,
         public ?string $standardDeviation,
         public ?string $standardErrorOfMean,
-        public ?float $confidenceLevel,
+        public ?EvidenceConfidenceLevel $confidenceLevel,
         public array $dataQualityFlags = [],
     ) {
     }

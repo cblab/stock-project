@@ -38,6 +38,33 @@ final readonly class EvidenceSource
         return new self(self::SIGNAL_FORWARD_RETURN);
     }
 
+    /**
+     * Create from string value.
+     *
+     * @throws \InvalidArgumentException if value is invalid
+     */
+    public static function fromString(string $value): self
+    {
+        return match ($value) {
+            self::TRADE_OUTCOME => new self(self::TRADE_OUTCOME),
+            self::SIGNAL_FORWARD_RETURN => new self(self::SIGNAL_FORWARD_RETURN),
+            default => throw new \InvalidArgumentException("Invalid EvidenceSource: {$value}"),
+        };
+    }
+
+    /**
+     * Try to create from string value.
+     * Returns null if value is invalid.
+     */
+    public static function tryFromString(string $value): ?self
+    {
+        try {
+            return self::fromString($value);
+        } catch (\InvalidArgumentException) {
+            return null;
+        }
+    }
+
     private function __construct(
         private string $value,
     ) {

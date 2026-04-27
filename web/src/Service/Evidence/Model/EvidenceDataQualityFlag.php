@@ -77,6 +77,40 @@ final readonly class EvidenceDataQualityFlag
         return new self(self::MIXED_PERIODS);
     }
 
+    /**
+     * Create from string value.
+     *
+     * @throws \InvalidArgumentException if value is invalid
+     */
+    public static function fromString(string $value): self
+    {
+        return match ($value) {
+            self::MIGRATION_SEED => new self(self::MIGRATION_SEED),
+            self::MANUAL_SEED => new self(self::MANUAL_SEED),
+            self::MISSING_ENTRY_SNAPSHOT => new self(self::MISSING_ENTRY_SNAPSHOT),
+            self::MISSING_EXIT_SNAPSHOT => new self(self::MISSING_EXIT_SNAPSHOT),
+            self::SNAPSHOT_INCOMPLETE => new self(self::SNAPSHOT_INCOMPLETE),
+            self::CONTAINS_SEED_DATA => new self(self::CONTAINS_SEED_DATA),
+            self::HIGH_VARIANCE => new self(self::HIGH_VARIANCE),
+            self::LOW_SAMPLE_SIZE => new self(self::LOW_SAMPLE_SIZE),
+            self::MIXED_PERIODS => new self(self::MIXED_PERIODS),
+            default => throw new \InvalidArgumentException("Invalid EvidenceDataQualityFlag: {$value}"),
+        };
+    }
+
+    /**
+     * Try to create from string value.
+     * Returns null if value is invalid.
+     */
+    public static function tryFromString(string $value): ?self
+    {
+        try {
+            return self::fromString($value);
+        } catch (\InvalidArgumentException) {
+            return null;
+        }
+    }
+
     private function __construct(
         private string $value,
     ) {

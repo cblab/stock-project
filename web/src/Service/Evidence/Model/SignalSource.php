@@ -55,6 +55,37 @@ final readonly class SignalSource
         return new self(self::CUSTOM);
     }
 
+    /**
+     * Create from string value.
+     *
+     * @throws \InvalidArgumentException if value is invalid
+     */
+    public static function fromString(string $value): self
+    {
+        return match ($value) {
+            self::SEPA => new self(self::SEPA),
+            self::EPA => new self(self::EPA),
+            self::BUY_SIGNAL => new self(self::BUY_SIGNAL),
+            self::KRONOS => new self(self::KRONOS),
+            self::SENTIMENT => new self(self::SENTIMENT),
+            self::CUSTOM => new self(self::CUSTOM),
+            default => throw new \InvalidArgumentException("Invalid SignalSource: {$value}"),
+        };
+    }
+
+    /**
+     * Try to create from string value.
+     * Returns null if value is invalid.
+     */
+    public static function tryFromString(string $value): ?self
+    {
+        try {
+            return self::fromString($value);
+        } catch (\InvalidArgumentException) {
+            return null;
+        }
+    }
+
     private function __construct(
         private string $value,
     ) {

@@ -55,6 +55,37 @@ final readonly class SignalFamily
         return new self(self::UNKNOWN);
     }
 
+    /**
+     * Create from string value.
+     *
+     * @throws \InvalidArgumentException if value is invalid
+     */
+    public static function fromString(string $value): self
+    {
+        return match ($value) {
+            self::STRUCTURE => new self(self::STRUCTURE),
+            self::EXECUTION => new self(self::EXECUTION),
+            self::RISK => new self(self::RISK),
+            self::SENTIMENT => new self(self::SENTIMENT),
+            self::COMPOSITE => new self(self::COMPOSITE),
+            self::UNKNOWN => new self(self::UNKNOWN),
+            default => throw new \InvalidArgumentException("Invalid SignalFamily: {$value}"),
+        };
+    }
+
+    /**
+     * Try to create from string value.
+     * Returns null if value is invalid.
+     */
+    public static function tryFromString(string $value): ?self
+    {
+        try {
+            return self::fromString($value);
+        } catch (\InvalidArgumentException) {
+            return null;
+        }
+    }
+
     private function __construct(
         private string $value,
     ) {

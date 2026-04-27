@@ -104,6 +104,44 @@ final readonly class EvidenceExclusionReason
         return new self(self::MISSING_SCORE);
     }
 
+    /**
+     * Create from string value.
+     *
+     * @throws \InvalidArgumentException if value is invalid
+     */
+    public static function fromString(string $value): self
+    {
+        return match ($value) {
+            self::OPEN_CAMPAIGN => new self(self::OPEN_CAMPAIGN),
+            self::INVALID_TIME_ORDER => new self(self::INVALID_TIME_ORDER),
+            self::MISSING_CLOSED_AT => new self(self::MISSING_CLOSED_AT),
+            self::MISSING_PNL => new self(self::MISSING_PNL),
+            self::MISSING_REQUIRED_SNAPSHOT => new self(self::MISSING_REQUIRED_SNAPSHOT),
+            self::SNAPSHOT_AFTER_EVENT => new self(self::SNAPSHOT_AFTER_EVENT),
+            self::SNAPSHOT_INSTRUMENT_MISMATCH => new self(self::SNAPSHOT_INSTRUMENT_MISMATCH),
+            self::MIGRATION_SEED_ENTRY_UNUSABLE => new self(self::MIGRATION_SEED_ENTRY_UNUSABLE),
+            self::MANUAL_SEED_WARNING => new self(self::MANUAL_SEED_WARNING),
+            self::UNKNOWN_STATE => new self(self::UNKNOWN_STATE),
+            self::UNSUPPORTED_TRADE_TYPE => new self(self::UNSUPPORTED_TRADE_TYPE),
+            self::MISSING_FORWARD_RETURN => new self(self::MISSING_FORWARD_RETURN),
+            self::MISSING_SCORE => new self(self::MISSING_SCORE),
+            default => throw new \InvalidArgumentException("Invalid EvidenceExclusionReason: {$value}"),
+        };
+    }
+
+    /**
+     * Try to create from string value.
+     * Returns null if value is invalid.
+     */
+    public static function tryFromString(string $value): ?self
+    {
+        try {
+            return self::fromString($value);
+        } catch (\InvalidArgumentException) {
+            return null;
+        }
+    }
+
     private function __construct(
         private string $value,
     ) {

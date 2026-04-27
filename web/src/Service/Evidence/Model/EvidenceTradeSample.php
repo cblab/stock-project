@@ -28,8 +28,8 @@ final readonly class EvidenceTradeSample
      * @param string $totalQuantity Total quantity transacted (as string for precision)
      * @param string|null $openQuantity Remaining open quantity (as string for precision)
      * @param string|null $avgEntryPrice Average entry price (as string for precision)
-     * @param string|null $realizedPnlGross Realized P&L gross of fees (ratio format, e.g., "0.30" = +30%)
-     * @param string|null $realizedPnlNet Realized P&L net of fees (ratio format)
+     * @param string|null $realizedPnlGross Realized P&L gross of fees (monetary amount, not ratio)
+     * @param string|null $realizedPnlNet Realized P&L net of fees (monetary amount, not ratio)
      * @param string|null $realizedPnlPct Realized P&L percentage (ratio format)
      * @param int|null $entryEventId Entry event ID
      * @param int|null $exitEventId Exit event ID
