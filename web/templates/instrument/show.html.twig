@@ -179,7 +179,7 @@
                             <div class="flex flex-wrap items-center justify-between gap-2">
                                 <div class="flex items-center gap-3">
                                     <span class="font-mono text-sm font-medium text-surface-600">#{{ campaign.id }}</span>
-                                    <span class="compact-badge {{ campaign.state == 'open' ? 'bg-primary-50 text-primary-700 ring-primary-600/20' : campaign.state == 'closed' ? 'bg-surface-100 text-surface-600 ring-surface-300' : 'bg-accent-50 text-accent-700 ring-accent-600/20' }}">
+                                    <span class="compact-badge {{ campaign.state == 'open' ? 'bg-primary-50 text-primary-700 ring-primary-600/20' : campaign.state starts with 'closed' ? 'bg-surface-100 text-surface-600 ring-surface-300' : 'bg-accent-50 text-accent-700 ring-accent-600/20' }}">
                                         {{ campaign.state|upper }}
                                     </span>
                                     <span class="compact-badge bg-surface-100 text-surface-600 ring-surface-300">{{ campaign.trade_type }}</span>
@@ -195,20 +195,20 @@
                             <div class="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-4">
                                 <div>
                                     <p class="text-xs text-surface-500">Total Quantity</p>
-                                    <p class="font-mono text-sm font-medium text-surface-900">{{ campaign.total_quantity ? campaign.total_quantity|number_format(4, ',', '.') : '–' }}</p>
+                                    <p class="font-mono text-sm font-medium text-surface-900">{{ campaign.total_quantity is not null ? campaign.total_quantity|number_format(4, ',', '.') : '–' }}</p>
                                 </div>
                                 <div>
                                     <p class="text-xs text-surface-500">Open Quantity</p>
-                                    <p class="font-mono text-sm font-medium text-surface-900">{{ campaign.open_quantity ? campaign.open_quantity|number_format(4, ',', '.') : '–' }}</p>
+                                    <p class="font-mono text-sm font-medium text-surface-900">{{ campaign.open_quantity is not null ? campaign.open_quantity|number_format(4, ',', '.') : '–' }}</p>
                                 </div>
                                 <div>
                                     <p class="text-xs text-surface-500">Avg Entry</p>
-                                    <p class="font-mono text-sm font-medium text-surface-900">{{ campaign.avg_entry_price ? campaign.avg_entry_price|number_format(4, ',', '.') : '–' }}</p>
+                                    <p class="font-mono text-sm font-medium text-surface-900">{{ campaign.avg_entry_price is not null ? campaign.avg_entry_price|number_format(4, ',', '.') : '–' }}</p>
                                 </div>
                                 <div>
                                     <p class="text-xs text-surface-500">Realized P&L</p>
                                     <p class="font-mono text-sm font-medium {{ campaign.realized_pnl_net > 0 ? 'text-primary-700' : campaign.realized_pnl_net < 0 ? 'text-danger-700' : 'text-surface-900' }}">
-                                        {{ campaign.realized_pnl_net ? campaign.realized_pnl_net|number_format(2, ',', '.') : '–' }} ({{ campaign.realized_pnl_pct ? campaign.realized_pnl_pct|number_format(2, ',', '.') : '–' }}%)
+                                        {{ campaign.realized_pnl_net is not null ? campaign.realized_pnl_net|number_format(2, ',', '.') : '–' }} ({{ campaign.realized_pnl_pct is not null ? campaign.realized_pnl_pct|number_format(2, ',', '.') : '–' }}%)
                                     </p>
                                 </div>
                             </div>
@@ -248,9 +248,9 @@
                                                         {{ event.event_type }}
                                                     </span>
                                                 </td>
-                                                <td class="px-4 py-2 text-right font-mono">{{ event.event_price ? event.event_price|number_format(4, ',', '.') : '–' }}</td>
-                                                <td class="px-4 py-2 text-right font-mono">{{ event.quantity ? event.quantity|number_format(4, ',', '.') : '–' }}</td>
-                                                <td class="px-4 py-2 text-right font-mono">{{ event.fees ? event.fees|number_format(2, ',', '.') : '–' }} {{ event.currency ?: '' }}</td>
+                                                <td class="px-4 py-2 text-right font-mono">{{ event.event_price is not null ? event.event_price|number_format(4, ',', '.') : '–' }}</td>
+                                                <td class="px-4 py-2 text-right font-mono">{{ event.quantity is not null ? event.quantity|number_format(4, ',', '.') : '–' }}</td>
+                                                <td class="px-4 py-2 text-right font-mono">{{ event.fees is not null ? event.fees|number_format(2, ',', '.') : '–' }} {{ event.currency ?: '' }}</td>
                                                 <td class="px-4 py-2">
                                                     <div class="flex flex-wrap gap-1 text-xs">
                                                         {% if event.buy_signal_snapshot_id %}<span class="text-surface-500" title="Buy Signal">BS:{{ event.buy_signal_snapshot_id }}</span>{% endif %}
