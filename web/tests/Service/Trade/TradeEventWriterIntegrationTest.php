@@ -49,12 +49,21 @@ final class TradeEventWriterIntegrationTest extends KernelTestCase
         $instrumentId = $this->testInstrumentId;
         $testDate = '2025-01-15';
 
-        // Insert test instrument
+        // Insert test instrument with all NOT NULL columns
         $this->connection->insert('instrument', [
             'id' => $instrumentId,
-            'symbol' => 'TEST' . $instrumentId,
+            'input_ticker' => 'TEST' . $instrumentId,
+            'provider_ticker' => 'TEST' . $instrumentId,
+            'display_ticker' => 'TEST' . $instrumentId,
             'name' => 'Test Instrument ' . $instrumentId,
             'isin' => 'TEST' . str_pad((string)$instrumentId, 6, '0', STR_PAD_LEFT),
+            'asset_class' => 'Equity',
+            'active' => 1,
+            'is_portfolio' => 1,
+            'region_exposure' => '[]',
+            'sector_profile' => '[]',
+            'top_holdings_profile' => '[]',
+            'macro_profile' => '[]',
             'created_at' => $testDate . ' 00:00:00',
             'updated_at' => $testDate . ' 00:00:00',
         ]);
