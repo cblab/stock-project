@@ -51,6 +51,14 @@ class TradeLegacySeedTemplateCommand extends Command
         $instruments = $this->findLegacyInstruments($instrumentFilter);
 
         if (empty($instruments)) {
+            if ($format === 'json') {
+                $output->writeln(json_encode([
+                    'count' => 0,
+                    'rows' => [],
+                ], JSON_PRETTY_PRINT));
+                return Command::SUCCESS;
+            }
+
             $io->success('No legacy portfolio instruments found (all portfolio instruments have trade campaigns).');
             return Command::SUCCESS;
         }
