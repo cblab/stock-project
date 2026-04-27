@@ -339,6 +339,7 @@ final class TradeEventWriterIntegrationTest extends KernelTestCase
             'event_timestamp' => $baseTime->modify('+2 hours')->format('Y-m-d H:i:s'),
             'event_price' => '8.00',
             'quantity' => '50',
+            'exit_reason' => 'manual',
         ]);
 
         // Verify: Campaign should be returned_to_watchlist
