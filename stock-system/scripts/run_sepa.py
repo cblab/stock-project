@@ -41,6 +41,9 @@ def run(args: argparse.Namespace) -> int:
         writer = SepaSnapshotWriter(connection)
         price_dao = PriceHistoryDAO(connection)
         snapshots = []
+        # Determine available_at after run success if tracking_run_id is provided
+        # For new snapshots, available_at = NOW() at write time (snapshot available immediately)
+        source_run_id = args.tracking_run_id
         for mapping in mappings:
             snapshot = engine.analyze(mapping)
             # Calculate forward returns from price history
@@ -50,7 +53,7 @@ def run(args: argparse.Namespace) -> int:
             snapshot.forward_return_5d = forward_returns.get(5)
             snapshot.forward_return_20d = forward_returns.get(20)
             snapshot.forward_return_60d = forward_returns.get(60)
-            writer.write(snapshot)
+            writer.write(snapshot, source_run_id=source_run_id)
             snapshots.append(snapshot)
 
         payload = {

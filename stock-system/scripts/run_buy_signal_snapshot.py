@@ -134,6 +134,10 @@ def create_snapshots_from_items(
                 except json.JSONDecodeError:
                     pass
             
+            # Use pipeline_run_id as source_run_id for provenance
+            # Use run_timestamp as available_at (when the snapshot data was available)
+            source_run_id = item.get("pipeline_run_id")
+            available_at = item.get("run_timestamp")
             writer.write_from_pipeline_item(
                 instrument_id=item["instrument_id"],
                 as_of_date=item["as_of_date"],
@@ -145,10 +149,12 @@ def create_snapshots_from_items(
                     "sentiment_label": item.get("sentiment_label"),
                     "kronos_raw_score": item.get("kronos_raw_score"),
                     "sentiment_raw_score": item.get("sentiment_raw_score"),
-                    "pipeline_run_id": item.get("pipeline_run_id"),
+                    "pipeline_run_id": source_run_id,
                     "pipeline_run_item_id": item.get("pipeline_run_item_id"),
                     "explain": explain,
                 },
+                source_run_id=source_run_id,
+                available_at=available_at.strftime("%Y-%m-%d %H:%M:%S") if available_at else None,
             )
             created += 1
         except Exception as exc:

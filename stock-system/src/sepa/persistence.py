@@ -11,8 +11,15 @@ class SepaSnapshotWriter:
     def __init__(self, connection) -> None:
         self.connection = connection
 
-    def write(self, snapshot: SepaSnapshot) -> None:
+    def write(
+        self,
+        snapshot: SepaSnapshot,
+        source_run_id: int | None = None,
+        available_at: str | None = None,
+    ) -> None:
         now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        # available_at defaults to NOW() if not provided (snapshot available from write time)
+        effective_available_at = available_at or now
         with self.connection.cursor() as cursor:
             cursor.execute(
                 """
@@ -21,8 +28,8 @@ class SepaSnapshotWriter:
                  volume_score, momentum_score, risk_score, superperformance_score, vcp_score, microstructure_score,
                  breakout_readiness_score, structure_score, execution_score, total_score, traffic_light,
                  kill_triggers_json, detail_json, forward_return_5d, forward_return_20d, forward_return_60d,
-                 created_at, updated_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                 source_run_id, available_at, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON DUPLICATE KEY UPDATE
                     market_score = VALUES(market_score),
                     stage_score = VALUES(stage_score),
@@ -44,6 +51,8 @@ class SepaSnapshotWriter:
                     forward_return_5d = VALUES(forward_return_5d),
                     forward_return_20d = VALUES(forward_return_20d),
                     forward_return_60d = VALUES(forward_return_60d),
+                    source_run_id = COALESCE(source_run_id, VALUES(source_run_id)),
+                    available_at = COALESCE(available_at, VALUES(available_at)),
                     updated_at = VALUES(updated_at)
                 """,
                 (
@@ -69,6 +78,8 @@ class SepaSnapshotWriter:
                     snapshot.forward_return_5d,
                     snapshot.forward_return_20d,
                     snapshot.forward_return_60d,
+                    source_run_id,
+                    effective_available_at,
                     now,
                     now,
                 ),

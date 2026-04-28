@@ -10,15 +10,23 @@ class EpaSnapshotWriter:
     def __init__(self, connection) -> None:
         self.connection = connection
 
-    def write(self, snapshot: EpaSnapshot) -> None:
+    def write(
+        self,
+        snapshot: EpaSnapshot,
+        source_run_id: int | None = None,
+        available_at: str | None = None,
+    ) -> None:
         now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        # available_at defaults to NOW() if not provided (snapshot available from write time)
+        effective_available_at = available_at or now
         with self.connection.cursor() as cursor:
             cursor.execute(
                 """
                 INSERT INTO instrument_epa_snapshot
                 (instrument_id, as_of_date, failure_score, trend_exit_score, climax_score, risk_score,
-                 total_score, action, hard_triggers_json, soft_warnings_json, detail_json, created_at, updated_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                 total_score, action, hard_triggers_json, soft_warnings_json, detail_json,
+                 source_run_id, available_at, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON DUPLICATE KEY UPDATE
                     failure_score = VALUES(failure_score),
                     trend_exit_score = VALUES(trend_exit_score),
@@ -29,6 +37,8 @@ class EpaSnapshotWriter:
                     hard_triggers_json = VALUES(hard_triggers_json),
                     soft_warnings_json = VALUES(soft_warnings_json),
                     detail_json = VALUES(detail_json),
+                    source_run_id = COALESCE(source_run_id, VALUES(source_run_id)),
+                    available_at = COALESCE(available_at, VALUES(available_at)),
                     updated_at = VALUES(updated_at)
                 """,
                 (
@@ -43,6 +53,8 @@ class EpaSnapshotWriter:
                     json.dumps(snapshot.hard_triggers, ensure_ascii=False),
                     json.dumps(snapshot.soft_warnings, ensure_ascii=False),
                     json.dumps(snapshot.detail, ensure_ascii=False, default=str),
+                    source_run_id,
+                    effective_available_at,
                     now,
                     now,
                 ),

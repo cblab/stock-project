@@ -39,9 +39,12 @@ def run(args: argparse.Namespace) -> int:
         engine = EpaEngine(connection, period=args.period, interval=args.interval)
         writer = EpaSnapshotWriter(connection)
         snapshots = []
+        # Determine available_at after run success if tracking_run_id is provided
+        # For new snapshots, available_at = NOW() at write time (snapshot available immediately)
+        source_run_id = args.tracking_run_id
         for mapping in mappings:
             snapshot = engine.analyze(mapping)
-            writer.write(snapshot)
+            writer.write(snapshot, source_run_id=source_run_id)
             snapshots.append(snapshot)
 
         payload = {
