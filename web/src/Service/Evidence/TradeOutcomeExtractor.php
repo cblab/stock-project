@@ -145,6 +145,10 @@ final readonly class TradeOutcomeExtractor
             $flags[] = EvidenceDataQualityFlag::snapshotIncomplete();
             return ['status' => EvidenceEligibilityStatus::eligibleOutcomeOnly(), 'reason' => null, 'flags' => $flags];
         }
+        if ($this->entryEventHasAnySnapshots($entryEvent)) {
+            $flags[] = EvidenceDataQualityFlag::snapshotIncomplete();
+            return ['status' => EvidenceEligibilityStatus::eligibleOutcomeOnly(), 'reason' => null, 'flags' => $flags];
+        }
         if ($exitEvent === null) {
             $flags[] = EvidenceDataQualityFlag::snapshotIncomplete();
             return ['status' => EvidenceEligibilityStatus::eligibleOutcomeOnly(), 'reason' => null, 'flags' => $flags];
@@ -181,5 +185,13 @@ final readonly class TradeOutcomeExtractor
         return ($entryEvent['buy_signal_snapshot_id'] ?? null) === null
             && ($entryEvent['sepa_snapshot_id'] ?? null) === null
             && ($entryEvent['epa_snapshot_id'] ?? null) === null;
+    }
+
+    private function entryEventHasAnySnapshots(?array $entryEvent): bool
+    {
+        if ($entryEvent === null) return false;
+        return ($entryEvent['buy_signal_snapshot_id'] ?? null) !== null
+            || ($entryEvent['sepa_snapshot_id'] ?? null) !== null
+            || ($entryEvent['epa_snapshot_id'] ?? null) !== null;
     }
 }

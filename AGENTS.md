@@ -28,7 +28,7 @@ Keine breiten Scans. Keine stillen Annahmen. Keine falschen Erfolgsmeldungen.
 Die bevorzugte Orientierungsdatei für Struktur-, Architektur-, Planungs- und Agentenaufgaben ist:
 
 ```text
-stock-project-project-map.md
+docs/stock-project-project-map.md
 ```
 
 Wenn Projektkarte, Dokumentation und Code widersprechen:
@@ -146,7 +146,23 @@ AGENTS.md
 ROADMAP.md
 ARCHITECTURE_v04.md
 ARCHITECTURE_v05.md
-stock-project-project-map.md
+docs/stock-project-project-map.md
+```
+
+Verbotene Suchmuster:
+
+```text
+kein Get-ChildItem -Recurse über das Repo-Root
+kein find/rg/fd über "." oder das gesamte Repository nur zur Orientierung
+keine Dateisuche, die Cache-/Artefaktpfade auch nur potenziell traversiert
+```
+
+Wenn Dateisuche nötig ist:
+
+```text
+immer mit dem kleinsten plausiblen Startpfad beginnen
+zuerst stock-system/ oder web/ eingrenzen
+dann höchstens den direkt betroffenen Unterpfad lesen
 ```
 
 Irrelevante Bereiche standardmäßig nicht lesen:
@@ -165,7 +181,24 @@ repos/
 runs/
 ```
 
+Diese Pfade gelten nicht nur als "irrelevant", sondern als technisch verbotene Suchfläche:
+
+```text
+nicht lesen
+nicht traversieren
+nicht per Rekursivsuche einschließen
+nicht zur Dateisuche, Orientierung oder Fehlersuche verwenden
+```
+
 Nur erweitern, wenn die Aufgabe diesen Bereich ausdrücklich betrifft oder ohne ihn nicht lösbar ist.
+
+Wenn eine Suche trotzdem auf einen verbotenen Pfad zulaufen würde:
+
+```text
+Suche abbrechen
+Startpfad enger setzen
+nicht mit Permission Errors durch Cache-Verzeichnisse weiterarbeiten
+```
 
 ---
 

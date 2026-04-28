@@ -63,7 +63,7 @@ ARCHITECTURE_v05.md
 Operativer Navigationsanker:
 
 ```text
-stock-project-project-map.md
+docs/stock-project-project-map.md
 ```
 
 ---

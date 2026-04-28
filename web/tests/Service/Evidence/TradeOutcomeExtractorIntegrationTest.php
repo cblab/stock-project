@@ -47,20 +47,20 @@ final class TradeOutcomeExtractorIntegrationTest extends KernelTestCase
             DELETE tml FROM trade_migration_log tml
             JOIN trade_campaign tc ON tml.trade_campaign_id = tc.id
             JOIN instrument i ON tc.instrument_id = i.id
-            WHERE i.symbol LIKE \'TST_C2_%\'
+            WHERE i.input_ticker LIKE \'TST_C2_%\'
         ');
         $this->connection->executeStatement('
             DELETE te FROM trade_event te
             JOIN trade_campaign tc ON te.trade_campaign_id = tc.id
             JOIN instrument i ON tc.instrument_id = i.id
-            WHERE i.symbol LIKE \'TST_C2_%\'
+            WHERE i.input_ticker LIKE \'TST_C2_%\'
         ');
         $this->connection->executeStatement('
             DELETE tc FROM trade_campaign tc
             JOIN instrument i ON tc.instrument_id = i.id
-            WHERE i.symbol LIKE \'TST_C2_%\'
+            WHERE i.input_ticker LIKE \'TST_C2_%\'
         ');
-        $this->connection->executeStatement('DELETE FROM instrument WHERE symbol LIKE \'TST_C2_%\'');
+        $this->connection->executeStatement('DELETE FROM instrument WHERE input_ticker LIKE \'TST_C2_%\'');
     }
 
     // =================================================================
@@ -319,7 +319,7 @@ final class TradeOutcomeExtractorIntegrationTest extends KernelTestCase
     public function test_extractClosedSamples_excludes_invalid_time_order(): void
     {
         // Given
-        $instrumentId = $this->createInstrument('AMD');
+        $instrumentId = $this->createInstrument('TST_C2_G');
         $campaign = $this->createCampaign([
             'instrument_id' => $instrumentId,
             'state' => 'closed_profit',
@@ -355,7 +355,7 @@ final class TradeOutcomeExtractorIntegrationTest extends KernelTestCase
     public function test_extractClosedSamples_excludes_missing_pnl(): void
     {
         // Given
-        $instrumentId = $this->createInstrument('META');
+        $instrumentId = $this->createInstrument('TST_C2_H');
         $campaign = $this->createCampaign([
             'instrument_id' => $instrumentId,
             'state' => 'closed_loss',
@@ -392,7 +392,7 @@ final class TradeOutcomeExtractorIntegrationTest extends KernelTestCase
     public function test_extractClosedSamples_missing_snapshots_outcome_only(): void
     {
         // Given
-        $instrumentId = $this->createInstrument('NFLX');
+        $instrumentId = $this->createInstrument('TST_C2_I');
         $campaign = $this->createCampaign([
             'instrument_id' => $instrumentId,
             'state' => 'closed_profit',
