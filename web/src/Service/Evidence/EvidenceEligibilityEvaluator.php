@@ -42,6 +42,11 @@ final readonly class EvidenceEligibilityEvaluator
         'paused',
     ];
 
+    public function __construct(
+        private ?SnapshotValidationService $snapshotValidationService = null,
+    ) {
+    }
+
     /**
      * Evaluate a trade sample for eligibility.
      *
@@ -120,14 +125,14 @@ final readonly class EvidenceEligibilityEvaluator
             return EvidenceEligibilityResult::eligibleOutcomeOnly($flags);
         }
 
-        // Rule 6: Unvalidated snapshot IDs
-        if ($this->hasUnvalidatedSnapshots($sample)) {
+        // Rule 6: Snapshot validation failed
+        if ($this->hasInvalidSnapshots($sample)) {
             $flags[] = EvidenceDataQualityFlag::snapshotIncomplete();
 
             return EvidenceEligibilityResult::eligibleOutcomeOnly($flags);
         }
 
-        // Rule 8: Default - fully eligible
+        // Rule 7: Default - fully eligible
         return EvidenceEligibilityResult::eligibleFull($flags);
     }
 
@@ -169,27 +174,55 @@ final readonly class EvidenceEligibilityEvaluator
             && $sample->epaSnapshotId === null;
     }
 
-    /**
-     * Check if any snapshot IDs exist but are not validated.
-     *
-     * Note: This is a placeholder for future DB-level snapshot validation.
-     * Currently assumes that if snapshot IDs are present but we don't have
-     * validated context, the sample cannot be eligible_full.
-     */
-    private function hasUnvalidatedSnapshots(EvidenceTradeSample $sample): bool
+    private function hasInvalidSnapshots(EvidenceTradeSample $sample): bool
     {
-        // If any snapshot ID exists but we haven't validated it through
-        // DB lookup (instrument match, timestamp check), mark as incomplete.
-        // For now, presence of IDs without full validation = incomplete.
-        $hasAnySnapshotId = $sample->buySignalSnapshotId !== null
-            || $sample->sepaSnapshotId !== null
-            || $sample->epaSnapshotId !== null;
+        // Stay conservative when the validator is not wired:
+        // any present snapshot IDs cannot produce eligible_full.
+        if ($this->snapshotValidationService === null) {
+            return $sample->buySignalSnapshotId !== null
+                || $sample->sepaSnapshotId !== null
+                || $sample->epaSnapshotId !== null;
+        }
 
-        // TODO: Add DB-level validation in follow-up:
-        // - Verify snapshot exists
-        // - Verify snapshot instrument_id matches campaign
-        // - Verify snapshot timestamp <= entry event timestamp
+        $entryTimestamp = $sample->openedAt;
+        $expectedInstrumentId = $sample->instrumentId;
 
-        return $hasAnySnapshotId;
+        if ($sample->buySignalSnapshotId !== null) {
+            $result = $this->snapshotValidationService->validateBuySignalSnapshot(
+                $sample->buySignalSnapshotId,
+                $expectedInstrumentId,
+                $entryTimestamp,
+            );
+
+            if (!$result->isValid()) {
+                return true;
+            }
+        }
+
+        if ($sample->sepaSnapshotId !== null) {
+            $result = $this->snapshotValidationService->validateSepaSnapshot(
+                $sample->sepaSnapshotId,
+                $expectedInstrumentId,
+                $entryTimestamp,
+            );
+
+            if (!$result->isValid()) {
+                return true;
+            }
+        }
+
+        if ($sample->epaSnapshotId !== null) {
+            $result = $this->snapshotValidationService->validateEpaSnapshot(
+                $sample->epaSnapshotId,
+                $expectedInstrumentId,
+                $entryTimestamp,
+            );
+
+            if (!$result->isValid()) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
