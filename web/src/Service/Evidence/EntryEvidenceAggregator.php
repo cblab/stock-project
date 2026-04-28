@@ -6,6 +6,7 @@ namespace App\Service\Evidence;
 
 use App\Service\Evidence\Model\EntryEvidenceBucketSummary;
 use App\Service\Evidence\Model\EvidenceConfidenceLevel;
+use App\Service\Evidence\Model\EvidenceEligibilityResult;
 use App\Service\Evidence\Model\EvidenceTradeSample;
 
 /**
@@ -57,6 +58,7 @@ final readonly class EntryEvidenceAggregator
                 $buckets[$bucketKey] = [
                     'tradeType' => $sample->tradeType,
                     'seedSource' => $sample->seedSource ?? 'live',
+                    'eligibilityStatus' => $evaluation->status->value(),
                     'eligibleFull' => [],
                     'eligibleOutcomeOnly' => [],
                     'excluded' => [],
@@ -85,12 +87,13 @@ final readonly class EntryEvidenceAggregator
     /**
      * Build a unique bucket key for grouping.
      */
-    private function buildBucketKey(EvidenceTradeSample $sample, mixed $evaluation): string
+    private function buildBucketKey(EvidenceTradeSample $sample, EvidenceEligibilityResult $evaluation): string
     {
         $tradeType = $sample->tradeType;
         $seedSource = $sample->seedSource ?? 'live';
+        $status = $evaluation->status->value();
 
-        return sprintf('%s|%s', $tradeType, $seedSource);
+        return sprintf('%s|%s|%s', $tradeType, $seedSource, $status);
     }
 
     /**
@@ -115,6 +118,7 @@ final readonly class EntryEvidenceAggregator
                 bucketKey: $bucketKey,
                 tradeType: $bucketData['tradeType'],
                 seedSource: $bucketData['seedSource'],
+                eligibilityStatus: $bucketData['eligibilityStatus'],
                 sampleCount: 0,
                 excludedCount: $excludedCount,
                 avgRealizedPnlPct: null,
@@ -162,6 +166,7 @@ final readonly class EntryEvidenceAggregator
             bucketKey: $bucketKey,
             tradeType: $bucketData['tradeType'],
             seedSource: $bucketData['seedSource'],
+            eligibilityStatus: $bucketData['eligibilityStatus'],
             sampleCount: $sampleCount,
             excludedCount: $excludedCount,
             avgRealizedPnlPct: $this->formatRatio($avgReturn),

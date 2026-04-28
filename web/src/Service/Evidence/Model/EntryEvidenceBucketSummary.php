@@ -20,9 +20,10 @@ namespace App\Service\Evidence\Model;
 final readonly class EntryEvidenceBucketSummary
 {
     /**
-     * @param string $bucketKey Technical bucket identifier (e.g., "live|live")
+     * @param string $bucketKey Technical bucket identifier (e.g., "live|live|eligible_outcome_only")
      * @param string $tradeType Trade type (live, paper, pseudo)
      * @param string $seedSource Seed source (live, migration, manual)
+     * @param string $eligibilityStatus Evaluated eligibility status for this bucket (eligible_full, eligible_outcome_only, excluded)
      * @param int $sampleCount Number of eligible samples in bucket (full + outcome_only)
      * @param int $excludedCount Number of excluded samples
      * @param string|null $avgRealizedPnlPct Average PnL as ratio, null if no samples
@@ -37,6 +38,7 @@ final readonly class EntryEvidenceBucketSummary
         public string $bucketKey,
         public string $tradeType,
         public string $seedSource,
+        public string $eligibilityStatus,
         public int $sampleCount,
         public int $excludedCount,
         public ?string $avgRealizedPnlPct,
