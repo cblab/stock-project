@@ -28,12 +28,20 @@ final class EvidenceConfidenceCalculatorTest extends TestCase
     // Base Confidence by Sample Count (Tests 1-8)
     // =================================================================
 
-    /** Test 1: n=0 → insufficient (very_low) */
-    public function testZeroSamplesReturnsVeryLow(): void
+    /** Test 1: n=0 → anecdotal (lowest available level, no evidence) */
+    public function testZeroSamplesReturnsAnecdotal(): void
     {
         $result = $this->calculator->calculate(0);
 
-        self::assertTrue($result->isVeryLow(), 'n=0 should return very_low (insufficient)');
+        self::assertTrue($result->isAnecdotal(), 'n=0 should return anecdotal as lowest available confidence level');
+    }
+
+    /** Test 1b: negative sample count → anecdotal (defensive) */
+    public function testNegativeSampleCountReturnsAnecdotal(): void
+    {
+        $result = $this->calculator->calculate(-1);
+
+        self::assertTrue($result->isAnecdotal(), 'negative sample count should return anecdotal defensively');
     }
 
     /** Test 2: n=1 → anecdotal */

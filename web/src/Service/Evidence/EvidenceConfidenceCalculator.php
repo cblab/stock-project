@@ -58,7 +58,7 @@ final readonly class EvidenceConfidenceCalculator
      * Calculate base confidence from sample count only.
      *
      * Mapping:
-     * - n = 0          → very_low (insufficient)
+     * - n <= 0         → anecdotal (lowest available level, no evidence)
      * - 1 <= n < 5     → anecdotal
      * - 5 <= n < 20    → low (weak)
      * - 20 <= n < 50   → medium (moderate)
@@ -66,8 +66,8 @@ final readonly class EvidenceConfidenceCalculator
      */
     private function calculateBaseConfidence(int $sampleCount): EvidenceConfidenceLevel
     {
-        if ($sampleCount === 0) {
-            return EvidenceConfidenceLevel::veryLow();
+        if ($sampleCount <= 0) {
+            return EvidenceConfidenceLevel::anecdotal();
         }
 
         if ($sampleCount < self::WEAK_THRESHOLD) {
