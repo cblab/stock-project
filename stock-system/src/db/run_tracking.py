@@ -20,7 +20,13 @@ def mark_pipeline_run_running(connection, run_id: int) -> None:
     connection.commit()
 
 
-def mark_pipeline_run_success(connection, run_id: int, *, notes: str | None = None) -> None:
+def mark_pipeline_run_success(connection, run_id: int, *, notes: str | None = None) -> str:
+    """Mark a pipeline run as successfully completed.
+
+    Returns:
+        The finished_at timestamp that was set (ISO format string).
+    """
+    finished_at = _now()
     with connection.cursor() as cursor:
         cursor.execute(
             """
@@ -32,9 +38,10 @@ def mark_pipeline_run_success(connection, run_id: int, *, notes: str | None = No
                 notes = COALESCE(%s, notes)
             WHERE id = %s
             """,
-            (_now(), notes, run_id),
+            (finished_at, notes, run_id),
         )
     connection.commit()
+    return finished_at
 
 
 def mark_pipeline_run_failed(connection, run_id: int, error: Exception | str, *, exit_code: int = 1) -> None:

@@ -30,8 +30,20 @@ class BuySignalSnapshotWriter:
     def __init__(self, connection) -> None:
         self.connection = connection
 
-    def write(self, snapshot: BuySignalSnapshot) -> None:
-        """Upsert a buy signal snapshot."""
+    def write(
+        self,
+        snapshot: BuySignalSnapshot,
+        source_run_id: int | None = None,
+        available_at: str | None = None,
+    ) -> None:
+        """Upsert a buy signal snapshot.
+
+        Args:
+            snapshot: The snapshot data to write
+            source_run_id: The pipeline_run.id that produced this snapshot
+            available_at: When the snapshot becomes available for validation.
+                         Only set when the source run is successfully completed.
+        """
         now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
         with self.connection.cursor() as cursor:
             cursor.execute(
@@ -39,18 +51,21 @@ class BuySignalSnapshotWriter:
                 INSERT INTO instrument_buy_signal_snapshot
                 (instrument_id, as_of_date, kronos_score, sentiment_score, merged_score,
                  decision, sentiment_label, kronos_raw_score, sentiment_raw_score, detail_json,
-                 forward_return_5d, forward_return_20d, forward_return_60d, created_at, updated_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                 forward_return_5d, forward_return_20d, forward_return_60d,
+                 source_run_id, available_at, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON DUPLICATE KEY UPDATE
-                    kronos_score = VALUES(kronos_score),
-                    sentiment_score = VALUES(sentiment_score),
-                    merged_score = VALUES(merged_score),
-                    decision = VALUES(decision),
-                    sentiment_label = VALUES(sentiment_label),
-                    kronos_raw_score = VALUES(kronos_raw_score),
-                    sentiment_raw_score = VALUES(sentiment_raw_score),
-                    detail_json = VALUES(detail_json),
-                    updated_at = VALUES(updated_at)
+                    kronos_score = CASE WHEN available_at IS NULL THEN VALUES(kronos_score) ELSE kronos_score END,
+                    sentiment_score = CASE WHEN available_at IS NULL THEN VALUES(sentiment_score) ELSE sentiment_score END,
+                    merged_score = CASE WHEN available_at IS NULL THEN VALUES(merged_score) ELSE merged_score END,
+                    decision = CASE WHEN available_at IS NULL THEN VALUES(decision) ELSE decision END,
+                    sentiment_label = CASE WHEN available_at IS NULL THEN VALUES(sentiment_label) ELSE sentiment_label END,
+                    kronos_raw_score = CASE WHEN available_at IS NULL THEN VALUES(kronos_raw_score) ELSE kronos_raw_score END,
+                    sentiment_raw_score = CASE WHEN available_at IS NULL THEN VALUES(sentiment_raw_score) ELSE sentiment_raw_score END,
+                    detail_json = CASE WHEN available_at IS NULL THEN VALUES(detail_json) ELSE detail_json END,
+                    source_run_id = CASE WHEN available_at IS NULL AND VALUES(source_run_id) IS NOT NULL THEN VALUES(source_run_id) ELSE source_run_id END,
+                    available_at = COALESCE(available_at, VALUES(available_at)),
+                    updated_at = CASE WHEN available_at IS NULL THEN VALUES(updated_at) ELSE updated_at END
                 """,
                 (
                     snapshot.instrument_id,
@@ -66,13 +81,22 @@ class BuySignalSnapshotWriter:
                     None,  # forward_return_5d - populated later by backfill
                     None,  # forward_return_20d
                     None,  # forward_return_60d
+                    source_run_id,
+                    available_at,
                     now,
                     now,
                 ),
             )
         self.connection.commit()
 
-    def write_from_pipeline_item(self, instrument_id: int, as_of_date: date, merged_payload: dict) -> None:
+    def write_from_pipeline_item(
+        self,
+        instrument_id: int,
+        as_of_date: date,
+        merged_payload: dict,
+        source_run_id: int | None = None,
+        available_at: str | None = None,
+    ) -> None:
         """Convenience method to write snapshot from pipeline_run_item merged payload."""
         snapshot = BuySignalSnapshot(
             instrument_id=instrument_id,
@@ -86,7 +110,7 @@ class BuySignalSnapshotWriter:
             sentiment_raw_score=merged_payload.get("sentiment_raw_score"),
             detail_json=json.dumps(merged_payload, ensure_ascii=False, default=str) if merged_payload else None,
         )
-        self.write(snapshot)
+        self.write(snapshot, source_run_id=source_run_id, available_at=available_at)
 
 
 class BuySignalForwardReturnBackfill:

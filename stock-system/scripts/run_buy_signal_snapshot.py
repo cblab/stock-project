@@ -66,14 +66,15 @@ def get_pipeline_items_for_date_range(
     connection, from_date: date, to_date: date
 ) -> list[dict]:
     """Get latest pipeline_run_item for each instrument within date range.
-    
-    Uses the finished_at timestamp of the pipeline_run to determine the date.
+
+    Only uses successfully completed pipeline runs (status='success', exit_code=0).
+    Uses finished_at timestamp for availability determination.
     When multiple runs exist for the same instrument on the same day, the latest
-    run (by COALESCE(finished_at, started_at, created_at)) wins.
+    run (by finished_at) wins.
     Tie-breaker: pri.id DESC ensures deterministic selection if timestamps are equal.
     """
     sql = """
-        SELECT 
+        SELECT
             pri.id AS pipeline_run_item_id,
             pri.instrument_id,
             pri.kronos_normalized_score,
@@ -84,22 +85,25 @@ def get_pipeline_items_for_date_range(
             pri.kronos_raw_score,
             pri.sentiment_raw_score,
             pri.explain_json,
-            DATE(COALESCE(pr.finished_at, pr.started_at, pr.created_at)) AS as_of_date,
+            DATE(pr.finished_at) AS as_of_date,
             pr.run_key,
             pr.id AS pipeline_run_id,
-            COALESCE(pr.finished_at, pr.started_at, pr.created_at) AS run_timestamp
+            pr.finished_at AS available_at
         FROM pipeline_run_item pri
         INNER JOIN pipeline_run pr ON pr.id = pri.pipeline_run_id
-        WHERE DATE(COALESCE(pr.finished_at, pr.started_at, pr.created_at)) BETWEEN %s AND %s
+        WHERE DATE(pr.finished_at) BETWEEN %s AND %s
+          AND pr.status = 'success'
+          AND pr.exit_code = 0
+          AND pr.finished_at IS NOT NULL
           AND pri.merged_score IS NOT NULL
-        ORDER BY pri.instrument_id ASC, as_of_date DESC, run_timestamp DESC, pri.id DESC
+        ORDER BY pri.instrument_id ASC, as_of_date DESC, pr.finished_at DESC, pri.id DESC
     """
     with connection.cursor() as cursor:
         cursor.execute(sql, (from_date, to_date))
         rows = cursor.fetchall()
     
     # Deduplicate: keep only the latest entry per instrument per day.
-    # Due to ORDER BY above (run_timestamp DESC, pri.id DESC), the first row per
+    # Due to ORDER BY above (finished_at DESC, pri.id DESC), the first row per
     # (instrument_id, as_of_date) is deterministically the latest run.
     seen = set()
     unique_items = []
@@ -134,6 +138,10 @@ def create_snapshots_from_items(
                 except json.JSONDecodeError:
                     pass
             
+            # Use pipeline_run_id as source_run_id for provenance
+            # available_at is finished_at from successful runs only
+            source_run_id = item.get("pipeline_run_id")
+            available_at = item.get("available_at")
             writer.write_from_pipeline_item(
                 instrument_id=item["instrument_id"],
                 as_of_date=item["as_of_date"],
@@ -145,10 +153,12 @@ def create_snapshots_from_items(
                     "sentiment_label": item.get("sentiment_label"),
                     "kronos_raw_score": item.get("kronos_raw_score"),
                     "sentiment_raw_score": item.get("sentiment_raw_score"),
-                    "pipeline_run_id": item.get("pipeline_run_id"),
+                    "pipeline_run_id": source_run_id,
                     "pipeline_run_item_id": item.get("pipeline_run_item_id"),
                     "explain": explain,
                 },
+                source_run_id=source_run_id,
+                available_at=available_at.strftime("%Y-%m-%d %H:%M:%S") if available_at else None,
             )
             created += 1
         except Exception as exc:

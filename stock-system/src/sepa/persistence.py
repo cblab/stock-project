@@ -11,7 +11,20 @@ class SepaSnapshotWriter:
     def __init__(self, connection) -> None:
         self.connection = connection
 
-    def write(self, snapshot: SepaSnapshot) -> None:
+    def write(
+        self,
+        snapshot: SepaSnapshot,
+        source_run_id: int | None = None,
+        available_at: str | None = None,
+    ) -> None:
+        """Write a SEPA snapshot with provenance tracking.
+
+        Args:
+            snapshot: The snapshot data to write
+            source_run_id: The pipeline_run.id that produced this snapshot
+            available_at: When the snapshot becomes available for validation.
+                         Pass None during write; finalize later after run success.
+        """
         now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
         with self.connection.cursor() as cursor:
             cursor.execute(
@@ -21,30 +34,32 @@ class SepaSnapshotWriter:
                  volume_score, momentum_score, risk_score, superperformance_score, vcp_score, microstructure_score,
                  breakout_readiness_score, structure_score, execution_score, total_score, traffic_light,
                  kill_triggers_json, detail_json, forward_return_5d, forward_return_20d, forward_return_60d,
-                 created_at, updated_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                 source_run_id, available_at, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON DUPLICATE KEY UPDATE
-                    market_score = VALUES(market_score),
-                    stage_score = VALUES(stage_score),
-                    relative_strength_score = VALUES(relative_strength_score),
-                    base_quality_score = VALUES(base_quality_score),
-                    volume_score = VALUES(volume_score),
-                    momentum_score = VALUES(momentum_score),
-                    risk_score = VALUES(risk_score),
-                    superperformance_score = VALUES(superperformance_score),
-                    vcp_score = VALUES(vcp_score),
-                    microstructure_score = VALUES(microstructure_score),
-                    breakout_readiness_score = VALUES(breakout_readiness_score),
-                    structure_score = VALUES(structure_score),
-                    execution_score = VALUES(execution_score),
-                    total_score = VALUES(total_score),
-                    traffic_light = VALUES(traffic_light),
-                    kill_triggers_json = VALUES(kill_triggers_json),
-                    detail_json = VALUES(detail_json),
-                    forward_return_5d = VALUES(forward_return_5d),
-                    forward_return_20d = VALUES(forward_return_20d),
-                    forward_return_60d = VALUES(forward_return_60d),
-                    updated_at = VALUES(updated_at)
+                    market_score = CASE WHEN available_at IS NULL THEN VALUES(market_score) ELSE market_score END,
+                    stage_score = CASE WHEN available_at IS NULL THEN VALUES(stage_score) ELSE stage_score END,
+                    relative_strength_score = CASE WHEN available_at IS NULL THEN VALUES(relative_strength_score) ELSE relative_strength_score END,
+                    base_quality_score = CASE WHEN available_at IS NULL THEN VALUES(base_quality_score) ELSE base_quality_score END,
+                    volume_score = CASE WHEN available_at IS NULL THEN VALUES(volume_score) ELSE volume_score END,
+                    momentum_score = CASE WHEN available_at IS NULL THEN VALUES(momentum_score) ELSE momentum_score END,
+                    risk_score = CASE WHEN available_at IS NULL THEN VALUES(risk_score) ELSE risk_score END,
+                    superperformance_score = CASE WHEN available_at IS NULL THEN VALUES(superperformance_score) ELSE superperformance_score END,
+                    vcp_score = CASE WHEN available_at IS NULL THEN VALUES(vcp_score) ELSE vcp_score END,
+                    microstructure_score = CASE WHEN available_at IS NULL THEN VALUES(microstructure_score) ELSE microstructure_score END,
+                    breakout_readiness_score = CASE WHEN available_at IS NULL THEN VALUES(breakout_readiness_score) ELSE breakout_readiness_score END,
+                    structure_score = CASE WHEN available_at IS NULL THEN VALUES(structure_score) ELSE structure_score END,
+                    execution_score = CASE WHEN available_at IS NULL THEN VALUES(execution_score) ELSE execution_score END,
+                    total_score = CASE WHEN available_at IS NULL THEN VALUES(total_score) ELSE total_score END,
+                    traffic_light = CASE WHEN available_at IS NULL THEN VALUES(traffic_light) ELSE traffic_light END,
+                    kill_triggers_json = CASE WHEN available_at IS NULL THEN VALUES(kill_triggers_json) ELSE kill_triggers_json END,
+                    detail_json = CASE WHEN available_at IS NULL THEN VALUES(detail_json) ELSE detail_json END,
+                    forward_return_5d = CASE WHEN available_at IS NULL THEN VALUES(forward_return_5d) ELSE forward_return_5d END,
+                    forward_return_20d = CASE WHEN available_at IS NULL THEN VALUES(forward_return_20d) ELSE forward_return_20d END,
+                    forward_return_60d = CASE WHEN available_at IS NULL THEN VALUES(forward_return_60d) ELSE forward_return_60d END,
+                    source_run_id = CASE WHEN available_at IS NULL AND VALUES(source_run_id) IS NOT NULL THEN VALUES(source_run_id) ELSE source_run_id END,
+                    available_at = COALESCE(available_at, VALUES(available_at)),
+                    updated_at = CASE WHEN available_at IS NULL THEN VALUES(updated_at) ELSE updated_at END
                 """,
                 (
                     snapshot.instrument_id,
@@ -69,11 +84,36 @@ class SepaSnapshotWriter:
                     snapshot.forward_return_5d,
                     snapshot.forward_return_20d,
                     snapshot.forward_return_60d,
+                    source_run_id,
+                    available_at,
                     now,
                     now,
                 ),
             )
         self.connection.commit()
+
+    def finalize_snapshots_for_run(self, source_run_id: int, finished_at: str) -> int:
+        """Finalize snapshots by setting available_at after successful run completion.
+
+        Only updates rows where:
+        - source_run_id matches the completed run
+        - available_at is still NULL (not yet finalized)
+
+        Returns:
+            Number of rows updated
+        """
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE instrument_sepa_snapshot
+                SET available_at = %s
+                WHERE source_run_id = %s
+                  AND available_at IS NULL
+                """,
+                (finished_at, source_run_id),
+            )
+            self.connection.commit()
+            return cursor.rowcount
 
 
 class SepaForwardReturnBackfill:
