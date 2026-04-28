@@ -16,7 +16,7 @@ use App\Service\Evidence\Model\EvidenceTradeSample;
  * while respecting eligibility rules.
  *
  * C4 Scope:
- * - Groups by tradeType, seedSource, eligibility status
+ * - Groups by tradeType and seedSource; tracks eligibility composition separately.
  * - Counts eligible_full and eligible_outcome_only for outcome metrics
  * - Separately tracks excluded samples
  * - Uses EvidenceConfidenceCalculator for confidence levels
