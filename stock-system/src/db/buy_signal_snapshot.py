@@ -55,17 +55,17 @@ class BuySignalSnapshotWriter:
                  source_run_id, available_at, created_at, updated_at)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON DUPLICATE KEY UPDATE
-                    kronos_score = VALUES(kronos_score),
-                    sentiment_score = VALUES(sentiment_score),
-                    merged_score = VALUES(merged_score),
-                    decision = VALUES(decision),
-                    sentiment_label = VALUES(sentiment_label),
-                    kronos_raw_score = VALUES(kronos_raw_score),
-                    sentiment_raw_score = VALUES(sentiment_raw_score),
-                    detail_json = VALUES(detail_json),
-                    source_run_id = CASE WHEN available_at IS NULL THEN VALUES(source_run_id) ELSE source_run_id END,
+                    kronos_score = CASE WHEN available_at IS NULL THEN VALUES(kronos_score) ELSE kronos_score END,
+                    sentiment_score = CASE WHEN available_at IS NULL THEN VALUES(sentiment_score) ELSE sentiment_score END,
+                    merged_score = CASE WHEN available_at IS NULL THEN VALUES(merged_score) ELSE merged_score END,
+                    decision = CASE WHEN available_at IS NULL THEN VALUES(decision) ELSE decision END,
+                    sentiment_label = CASE WHEN available_at IS NULL THEN VALUES(sentiment_label) ELSE sentiment_label END,
+                    kronos_raw_score = CASE WHEN available_at IS NULL THEN VALUES(kronos_raw_score) ELSE kronos_raw_score END,
+                    sentiment_raw_score = CASE WHEN available_at IS NULL THEN VALUES(sentiment_raw_score) ELSE sentiment_raw_score END,
+                    detail_json = CASE WHEN available_at IS NULL THEN VALUES(detail_json) ELSE detail_json END,
+                    source_run_id = CASE WHEN available_at IS NULL AND VALUES(source_run_id) IS NOT NULL THEN VALUES(source_run_id) ELSE source_run_id END,
                     available_at = COALESCE(available_at, VALUES(available_at)),
-                    updated_at = VALUES(updated_at)
+                    updated_at = CASE WHEN available_at IS NULL THEN VALUES(updated_at) ELSE updated_at END
                 """,
                 (
                     snapshot.instrument_id,

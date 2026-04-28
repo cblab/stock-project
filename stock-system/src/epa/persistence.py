@@ -34,18 +34,18 @@ class EpaSnapshotWriter:
                  source_run_id, available_at, created_at, updated_at)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON DUPLICATE KEY UPDATE
-                    failure_score = VALUES(failure_score),
-                    trend_exit_score = VALUES(trend_exit_score),
-                    climax_score = VALUES(climax_score),
-                    risk_score = VALUES(risk_score),
-                    total_score = VALUES(total_score),
-                    action = VALUES(action),
-                    hard_triggers_json = VALUES(hard_triggers_json),
-                    soft_warnings_json = VALUES(soft_warnings_json),
-                    detail_json = VALUES(detail_json),
-                    source_run_id = CASE WHEN available_at IS NULL THEN VALUES(source_run_id) ELSE source_run_id END,
+                    failure_score = CASE WHEN available_at IS NULL THEN VALUES(failure_score) ELSE failure_score END,
+                    trend_exit_score = CASE WHEN available_at IS NULL THEN VALUES(trend_exit_score) ELSE trend_exit_score END,
+                    climax_score = CASE WHEN available_at IS NULL THEN VALUES(climax_score) ELSE climax_score END,
+                    risk_score = CASE WHEN available_at IS NULL THEN VALUES(risk_score) ELSE risk_score END,
+                    total_score = CASE WHEN available_at IS NULL THEN VALUES(total_score) ELSE total_score END,
+                    action = CASE WHEN available_at IS NULL THEN VALUES(action) ELSE action END,
+                    hard_triggers_json = CASE WHEN available_at IS NULL THEN VALUES(hard_triggers_json) ELSE hard_triggers_json END,
+                    soft_warnings_json = CASE WHEN available_at IS NULL THEN VALUES(soft_warnings_json) ELSE soft_warnings_json END,
+                    detail_json = CASE WHEN available_at IS NULL THEN VALUES(detail_json) ELSE detail_json END,
+                    source_run_id = CASE WHEN available_at IS NULL AND VALUES(source_run_id) IS NOT NULL THEN VALUES(source_run_id) ELSE source_run_id END,
                     available_at = COALESCE(available_at, VALUES(available_at)),
-                    updated_at = VALUES(updated_at)
+                    updated_at = CASE WHEN available_at IS NULL THEN VALUES(updated_at) ELSE updated_at END
                 """,
                 (
                     snapshot.instrument_id,
