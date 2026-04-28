@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Evidence;
 
+use App\Service\Evidence\Model\EntryEvidenceBucketSummary;
 use App\Service\Evidence\Model\EvidenceConfidenceLevel;
 use App\Service\Evidence\Model\EvidenceTradeSample;
 
