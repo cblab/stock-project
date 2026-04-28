@@ -42,10 +42,25 @@ final class TradeOutcomeExtractorIntegrationTest extends KernelTestCase
 
     private function cleanFixtures(): void
     {
-        $this->connection->executeStatement('DELETE FROM trade_migration_log');
-        $this->connection->executeStatement('DELETE FROM trade_event');
-        $this->connection->executeStatement('DELETE FROM trade_campaign');
-        $this->connection->executeStatement('DELETE FROM instrument');
+        // Cleanup nur für Test-Daten mit Prefix TST_C2_
+        $this->connection->executeStatement('
+            DELETE tml FROM trade_migration_log tml
+            JOIN trade_campaign tc ON tml.trade_campaign_id = tc.id
+            JOIN instrument i ON tc.instrument_id = i.id
+            WHERE i.symbol LIKE \'TST_C2_%\'
+        ');
+        $this->connection->executeStatement('
+            DELETE te FROM trade_event te
+            JOIN trade_campaign tc ON te.trade_campaign_id = tc.id
+            JOIN instrument i ON tc.instrument_id = i.id
+            WHERE i.symbol LIKE \'TST_C2_%\'
+        ');
+        $this->connection->executeStatement('
+            DELETE tc FROM trade_campaign tc
+            JOIN instrument i ON tc.instrument_id = i.id
+            WHERE i.symbol LIKE \'TST_C2_%\'
+        ');
+        $this->connection->executeStatement('DELETE FROM instrument WHERE symbol LIKE \'TST_C2_%\'');
     }
 
     // =================================================================
@@ -54,7 +69,7 @@ final class TradeOutcomeExtractorIntegrationTest extends KernelTestCase
     public function test_extractClosedSamples_excludes_non_terminal_campaigns(): void
     {
         // Given: non-terminal campaigns
-        $instrumentId = $this->createInstrument('AAPL');
+        $instrumentId = $this->createInstrument('TST_C2_AAPL');
         $this->createCampaign([
             'instrument_id' => $instrumentId,
             'state' => 'open',
@@ -87,7 +102,7 @@ final class TradeOutcomeExtractorIntegrationTest extends KernelTestCase
     public function test_extractClosedSamples_returns_terminal_campaigns(): void
     {
         // Given: terminal campaigns
-        $instrumentId = $this->createInstrument('AAPL');
+        $instrumentId = $this->createInstrument('TST_C2_AAPL2');
         $campaign1 = $this->createCampaign([
             'instrument_id' => $instrumentId,
             'state' => 'closed_profit',
@@ -150,7 +165,7 @@ final class TradeOutcomeExtractorIntegrationTest extends KernelTestCase
     public function test_extractClosedSamples_populates_pnl_and_versions(): void
     {
         // Given
-        $instrumentId = $this->createInstrument('MSFT');
+        $instrumentId = $this->createInstrument('TST_C2_MSFT');
         $campaign = $this->createCampaign([
             'instrument_id' => $instrumentId,
             'state' => 'closed_profit',
@@ -165,9 +180,6 @@ final class TradeOutcomeExtractorIntegrationTest extends KernelTestCase
 
         $this->createEntryEvent($campaign, 'entry', [
             'event_timestamp' => '2024-03-01 09:30:00',
-            'buy_signal_snapshot_id' => 123,
-            'sepa_snapshot_id' => 456,
-            'epa_snapshot_id' => 789,
             'scoring_version' => '1.2.3',
             'policy_version' => '2.0.0',
             'model_version' => 'v3',
@@ -188,15 +200,16 @@ final class TradeOutcomeExtractorIntegrationTest extends KernelTestCase
         $this->assertSame('1200.50', $sample->realizedPnlGross);
         $this->assertSame('1150.25', $sample->realizedPnlNet);
         $this->assertSame('0.12', $sample->realizedPnlPct);
-        $this->assertSame(123, $sample->buySignalSnapshotId);
-        $this->assertSame(456, $sample->sepaSnapshotId);
-        $this->assertSame(789, $sample->epaSnapshotId);
+        $this->assertNull($sample->buySignalSnapshotId);
+        $this->assertNull($sample->sepaSnapshotId);
+        $this->assertNull($sample->epaSnapshotId);
         $this->assertSame('1.2.3', $sample->scoringVersion);
         $this->assertSame('2.0.0', $sample->policyVersion);
         $this->assertSame('v3', $sample->modelVersion);
         $this->assertSame('2024-Q1', $sample->macroVersion);
         $this->assertSame('live', $sample->seedSource);
-        $this->assertSame(EvidenceEligibilityStatus::eligibleFull(), $sample->eligibilityStatus);
+        $this->assertSame(EvidenceEligibilityStatus::eligibleOutcomeOnly(), $sample->eligibilityStatus);
+        $this->assertContains(EvidenceDataQualityFlag::snapshotIncomplete(), $sample->dataQualityFlags);
     }
 
     // =================================================================
@@ -205,7 +218,7 @@ final class TradeOutcomeExtractorIntegrationTest extends KernelTestCase
     public function test_extractClosedSamples_marks_migration_seed_outcome_only(): void
     {
         // Given
-        $instrumentId = $this->createInstrument('GOOGL');
+        $instrumentId = $this->createInstrument('TST_C2_GOOGL');
         $campaign = $this->createCampaign([
             'instrument_id' => $instrumentId,
             'state' => 'closed_profit',
@@ -244,7 +257,7 @@ final class TradeOutcomeExtractorIntegrationTest extends KernelTestCase
     public function test_extractClosedSamples_marks_manual_seed_outcome_only(): void
     {
         // Given
-        $instrumentId = $this->createInstrument('TSLA');
+        $instrumentId = $this->createInstrument('TST_C2_TSLA');
         $campaign = $this->createCampaign([
             'instrument_id' => $instrumentId,
             'state' => 'closed_loss',
@@ -282,7 +295,7 @@ final class TradeOutcomeExtractorIntegrationTest extends KernelTestCase
     public function test_extractClosedSamples_excludes_open_campaign(): void
     {
         // Given
-        $instrumentId = $this->createInstrument('NVDA');
+        $instrumentId = $this->createInstrument('TST_C2_NVDA');
         $this->createCampaign([
             'instrument_id' => $instrumentId,
             'state' => 'open',
@@ -449,11 +462,9 @@ final class TradeOutcomeExtractorIntegrationTest extends KernelTestCase
             'total_quantity' => '0',
             'open_quantity' => '0',
             'avg_entry_price' => null,
-            'avg_exit_price' => null,
             'realized_pnl_gross' => null,
             'realized_pnl_net' => null,
             'realized_pnl_pct' => null,
-            'max_position_value' => null,
             'opened_at' => null,
             'closed_at' => null,
             'created_at' => date('Y-m-d H:i:s'),
