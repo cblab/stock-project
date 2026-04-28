@@ -146,18 +146,13 @@ final class EntryEvidenceAggregatorTest extends TestCase
         ];
 
         $results = $this->aggregator->aggregateByEntryBucket($samples);
+        $bucket = $this->findBucket($results, 'live', 'live');
 
-        // Outcome bucket should only have closedProfit
-        $outcomeBucket = $this->findBucket($results, 'live', 'live', 'eligible_outcome_only');
-        self::assertNotNull($outcomeBucket);
-        self::assertSame(1, $outcomeBucket->sampleCount);
-        self::assertSame(0, $outcomeBucket->excludedCount);
-
-        // Excluded bucket should have openCampaign
-        $excludedBucket = $this->findBucket($results, 'live', 'live', 'excluded');
-        self::assertNotNull($excludedBucket);
-        self::assertSame(0, $excludedBucket->sampleCount);
-        self::assertSame(1, $excludedBucket->excludedCount);
+        self::assertNotNull($bucket);
+        self::assertSame(1, $bucket->sampleCount); // Only closedProfit
+        self::assertSame(0, $bucket->eligibleFullCount);
+        self::assertSame(1, $bucket->eligibleOutcomeOnlyCount); // closedProfit
+        self::assertSame(1, $bucket->excludedCount); // openCampaign
     }
 
     /** Test 7: invalidTimeOrder is excluded and not in outcome count */
@@ -172,15 +167,13 @@ final class EntryEvidenceAggregatorTest extends TestCase
         ];
 
         $results = $this->aggregator->aggregateByEntryBucket($samples);
+        $bucket = $this->findBucket($results, 'live', 'live');
 
-        $outcomeBucket = $this->findBucket($results, 'live', 'live', 'eligible_outcome_only');
-        self::assertNotNull($outcomeBucket);
-        self::assertSame(1, $outcomeBucket->sampleCount);
-
-        $excludedBucket = $this->findBucket($results, 'live', 'live', 'excluded');
-        self::assertNotNull($excludedBucket);
-        self::assertSame(0, $excludedBucket->sampleCount);
-        self::assertSame(1, $excludedBucket->excludedCount);
+        self::assertNotNull($bucket);
+        self::assertSame(1, $bucket->sampleCount); // Only closedProfit
+        self::assertSame(0, $bucket->eligibleFullCount);
+        self::assertSame(1, $bucket->eligibleOutcomeOnlyCount); // closedProfit
+        self::assertSame(1, $bucket->excludedCount); // invalidTimeOrder
     }
 
     /** Test 8: missingPnl is excluded and not in outcome count */
@@ -192,15 +185,13 @@ final class EntryEvidenceAggregatorTest extends TestCase
         ];
 
         $results = $this->aggregator->aggregateByEntryBucket($samples);
+        $bucket = $this->findBucket($results, 'live', 'live');
 
-        $outcomeBucket = $this->findBucket($results, 'live', 'live', 'eligible_outcome_only');
-        self::assertNotNull($outcomeBucket);
-        self::assertSame(1, $outcomeBucket->sampleCount);
-
-        $excludedBucket = $this->findBucket($results, 'live', 'live', 'excluded');
-        self::assertNotNull($excludedBucket);
-        self::assertSame(0, $excludedBucket->sampleCount);
-        self::assertSame(1, $excludedBucket->excludedCount);
+        self::assertNotNull($bucket);
+        self::assertSame(1, $bucket->sampleCount); // Only closedProfit
+        self::assertSame(0, $bucket->eligibleFullCount);
+        self::assertSame(1, $bucket->eligibleOutcomeOnlyCount); // closedProfit
+        self::assertSame(1, $bucket->excludedCount); // missingPnl
     }
 
     /** Test 9: migrationSeed is counted as eligible_outcome_only */
