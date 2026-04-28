@@ -194,15 +194,19 @@ final class SnapshotValidationServiceTest extends TestCase
         self::assertTrue($result->isValid());
     }
 
-    public function testAvailableAtBeforeEntryTimestamp(): void
+    public function testAvailableAtBeforeEntryButAfterRunFinishedAt(): void
     {
-        $this->insertPipelineRun(1, 'success', 0, '2024-01-10 12:00:00');
+        // This test isolates the entry-time rule:
+        // available_at <= entry_timestamp remains valid as long as
+        // available_at is not earlier than pipeline_run.finished_at.
+        $this->insertPipelineRun(1, 'success', 0, '2024-01-08 09:00:00');
         $this->insertSepaSnapshot(100, 1, 1, '2024-01-08 10:00:00');
 
         $entryTimestamp = new DateTimeImmutable('2024-01-15 10:00:00');
         $result = $this->service->validateSepaSnapshot(100, 1, $entryTimestamp);
 
         self::assertTrue($result->isValid());
+        self::assertNull($result->reasonCode());
     }
 
     public function testSourceRunSuccess(): void
