@@ -62,7 +62,15 @@ final readonly class EvidenceEligibilityEvaluator
             );
         }
 
-        // At this point we expect terminal state - validate terminal-specific requirements
+        // Rule 1b: Unknown state check - only allow explicitly known terminal states
+        if (!$this->isTerminalState($sample->campaignState)) {
+            return EvidenceEligibilityResult::excluded(
+                EvidenceExclusionReason::unknownState(),
+                $flags,
+            );
+        }
+
+        // At this point we have a valid terminal state - validate terminal-specific requirements
 
         // Rule 2: Time order validation
         if ($this->hasInvalidTimeOrder($sample)) {
@@ -129,6 +137,14 @@ final readonly class EvidenceEligibilityEvaluator
     private function isNonTerminalState(string $state): bool
     {
         return in_array($state, self::NON_TERMINAL_STATES, true);
+    }
+
+    /**
+     * Check if the campaign state is a valid terminal state.
+     */
+    private function isTerminalState(string $state): bool
+    {
+        return in_array($state, self::TERMINAL_STATES, true);
     }
 
     /**

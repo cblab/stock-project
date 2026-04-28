@@ -156,6 +156,19 @@ final class EvidenceEligibilityEvaluatorTest extends TestCase
         $this->assertEquals(EvidenceExclusionReason::missingClosedAt(), $result->exclusionReason);
     }
 
+    public function testUnknownCampaignStateIsExcluded(): void
+    {
+        $sample = $this->createSample([
+            'campaignState' => 'weird_state',
+            'realizedPnlPct' => '0.10',
+        ]);
+
+        $result = $this->evaluator->evaluateTradeSample($sample);
+
+        $this->assertEquals(EvidenceEligibilityStatus::excluded(), $result->status);
+        $this->assertEquals(EvidenceExclusionReason::unknownState(), $result->exclusionReason);
+    }
+
     private function createSample(array $overrides = []): EvidenceTradeSample
     {
         $data = array_merge([
