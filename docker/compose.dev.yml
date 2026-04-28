@@ -48,7 +48,7 @@ services:
     environment:
       DB_HOST: db
       DB_PORT: "3306"
-      DB_NAME: stock_project
+      DB_NAME: stock_project_test
       DB_USER: ${STOCK_DB_USER:-stock_app}
       DB_PASSWORD: ${STOCK_DB_PASSWORD:-stock_app}
       DATABASE_URL: "mysql://${STOCK_DB_USER:-stock_app}:${STOCK_DB_PASSWORD:-stock_app}@db:3306/stock_project?serverVersion=10.11.0-MariaDB&charset=utf8mb4"
