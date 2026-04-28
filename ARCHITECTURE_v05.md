@@ -1,7 +1,7 @@
 # ARCHITECTURE v0.5 – Evidence Engine Lite
 
 stock-project · v0.5 · Architekturvertrag  
-Status: **active planning**  
+Status: **active**  
 Stand: **2026-04-27**  
 Basiert auf: **abgeschlossenem v0.4 Truth Layer**
 
@@ -10,8 +10,6 @@ Basiert auf: **abgeschlossenem v0.4 Truth Layer**
 v0.5 baut keine Prognosemaschine.
 
 v0.5 baut eine read-only Evidence Engine, die ehrlich zählt, was aus vorhandenen Daten belastbar ableitbar ist.
-
-Der zentrale Satz:
 
 ```text
 Evidence Engine Lite darf nicht klug wirken.
@@ -25,17 +23,17 @@ Sie muss ehrlich zählen — und sichtbar machen, welche Zählung überhaupt zul
 v0.5 beantwortet:
 
 ```text
-Was lässt sich aus vergangenen Trade-Outcomes und vorhandenen Snapshots belastbar lernen?
+Was lässt sich aus vergangenen Trade-Outcomes und vorhandenen Signalzuständen belastbar lernen?
 ```
 
-Das System nutzt zwei Evidence-Quellen:
+Zwei Evidence-Arten:
 
 ```text
-1. Trade Evidence
+1. Trade Outcome Evidence
    aus abgeschlossenen trade_campaign / trade_event
 
-2. Snapshot Evidence
-   aus SEPA/EPA/Buy-Signal-Snapshots mit Forward Returns
+2. Signal Forward-Return Evidence
+   aus zeitlich bekannten Signalzuständen mit späterem Forward Return
 ```
 
 Diese Quellen werden nie still vermischt.
@@ -44,25 +42,24 @@ Diese Quellen werden nie still vermischt.
 
 ## 2. Nicht-Ziele
 
-v0.5 enthält ausdrücklich nicht:
+v0.5 enthält nicht:
 
-- kein ML
-- keine LLM-Entscheidung
-- keine automatische Kauf-/Verkaufsentscheidung
-- keine Sizing-Automation
-- keine Broker-Integration
-- keine automatische Live-Gewichtsänderung
-- keine Portfolio-Rebalancing-Engine
-- keine Makro-Schicht
-- keine Mutation an `trade_campaign` oder `trade_event`
-- keine Evidence-Persistenz als Pflicht
-- keine UI als Pflicht-Gate
+```text
+kein ML
+keine LLM-Entscheidung
+keine automatische Kauf-/Verkaufsentscheidung
+keine Sizing-Automation
+keine Broker-Integration
+keine automatische Live-Gewichtsänderung
+keine Portfolio-Rebalancing-Engine
+keine Makro-Schicht
+keine Mutation an trade_campaign oder trade_event
+keine UI als Pflicht-Gate
+```
 
 ---
 
 ## 3. Read-only Prinzip
-
-v0.5 ist read-only gegenüber dem Truth Layer.
 
 Erlaubt:
 
@@ -71,8 +68,8 @@ SELECT aus trade_campaign
 SELECT aus trade_event
 SELECT aus instrument_*_snapshot
 SELECT aus instrument
-Report-Dateien erzeugen
 Console-/Markdown-Ausgabe erzeugen
+Report-Dateien erzeugen
 ```
 
 Nicht erlaubt:
@@ -97,6 +94,7 @@ Quelle:
 ```text
 trade_campaign
 trade_event
+trade_migration_log
 instrument
 Snapshot-IDs auf trade_event
 ```
@@ -104,65 +102,99 @@ Snapshot-IDs auf trade_event
 Beantwortet:
 
 ```text
-Wie gut waren echte/paper/pseudo Entscheidungen?
+Wie gut waren live/paper/pseudo Entscheidungen?
 Welche Entry-/Exit-Pfade führten zu welchen Outcomes?
 Welche Exit Reasons waren teuer oder nützlich?
 ```
 
-### 4.2 `snapshot_forward_return`
+### 4.2 `signal_forward_return`
 
 Quelle:
 
 ```text
-instrument_sepa_snapshot
-instrument_epa_snapshot
-instrument_buy_signal_snapshot
+zeitlich bekannte Signalzustände
+spätere Forward Returns
+```
+
+Signalquellen:
+
+```text
+sepa
+epa
+buy_signal
+kronos
+sentiment
+custom
 ```
 
 Beantwortet:
 
 ```text
-Wie verhielten sich Snapshot-Zustände danach am Markt?
-Hatten bestimmte Score-Buckets bessere Forward Returns?
+Wie verhielten sich Signalzustände danach am Markt?
+Hatten bestimmte Score-/Signal-Buckets bessere Forward Returns?
 ```
 
-Startumfang v0.5:
+Startumfang:
 
 ```text
-instrument_sepa_snapshot
+sourceTable = instrument_sepa_snapshot
+signalSource = sepa
+horizonDays = 5
 forward_return_5d, falls vorhanden
-SEPA total_score Buckets
+Score-Bucket aus vorhandenen SEPA-Score-Feldern
 ```
 
-EPA und Buy-Signal Snapshot Evidence können folgen, aber sind nicht Startvoraussetzung.
+Die Architektur bleibt quellenagnostisch. Weitere Signalquellen werden durch neue Extractor-Chunks angeschlossen, nicht durch Umbau der Evidence Engine.
 
 ---
 
 ## 5. Zentrale Datenmodelle
 
-Die Implementierung soll kleine DTO-/Read-Model-Klassen verwenden, keine rohen DB-Arrays durch alle Services tragen.
-
-Mindestmodelle:
+Bereits angelegt in C1:
 
 ```text
 EvidenceSource
 EvidenceEligibilityStatus
 EvidenceExclusionReason
 EvidenceDataQualityFlag
+EvidenceConfidenceLevel
 EvidenceTradeSample
-EvidenceSnapshotSample
+EvidenceSignalSample
 EvidenceMetricSummary
-EvidenceReport
+SignalSource
+SignalFamily
 ```
 
-### 5.1 EvidenceSource
+### EvidenceSource
 
 ```text
 trade_outcome
-snapshot_forward_return
+signal_forward_return
 ```
 
-### 5.2 EvidenceTradeSample
+### SignalSource
+
+```text
+sepa
+epa
+buy_signal
+kronos
+sentiment
+custom
+```
+
+### SignalFamily
+
+```text
+structure
+execution
+risk
+sentiment
+composite
+unknown
+```
+
+### EvidenceTradeSample
 
 Mindestfelder:
 
@@ -199,24 +231,28 @@ dataQualityFlags[]
 Konvention:
 
 ```text
+realizedPnlGross und realizedPnlNet sind Geldbeträge.
 realizedPnlPct ist Ratio.
 0.30 = 30 %
 ```
 
-### 5.3 EvidenceSnapshotSample
+### EvidenceSignalSample
 
 Mindestfelder:
 
 ```text
-snapshotType: sepa | epa | buy_signal
-snapshotId
+signalSource
+signalFamily nullable
+sourceTable nullable
+sourceId
 instrumentId
-asOfDate
-horizonDays
+asOfAt
+horizonDays nullable
 forwardReturnPct nullable
+score nullable
 scoreBucket nullable
-totalScore nullable
-sourceVersion nullable
+signalVersion nullable
+detailRef nullable
 eligibilityStatus nullable
 exclusionReason nullable
 dataQualityFlags[]
@@ -233,7 +269,7 @@ forwardReturnPct ist Ratio.
 
 ## 6. Trade Outcome Extractor
 
-Der Trade Outcome Extractor erzeugt `EvidenceTradeSample` aus terminalen Campaigns.
+C2 erzeugt `EvidenceTradeSample` aus terminalen Campaigns.
 
 Terminale States:
 
@@ -252,26 +288,25 @@ trimmed
 paused
 ```
 
-Nicht-terminale Campaigns werden nicht als Outcome-Samples verwendet.
-
 Grundregeln:
 
 ```text
-1. closed_at muss vorhanden sein.
-2. closed_at >= opened_at.
-3. realized_pnl_pct wird als Ratio gelesen.
-4. trade_type bleibt erhalten.
-5. migration_seed/manual_seed werden markiert.
-6. returned_to_watchlist ist abgeschlossen, aber eigene Outcome-Klasse.
+closed_at muss vorhanden sein
+closed_at >= opened_at
+realized_pnl_pct wird als Ratio gelesen
+realized_pnl_gross/net bleiben Geldbeträge
+trade_type bleibt erhalten
+migration_seed/manual_seed werden markiert
+returned_to_watchlist ist abgeschlossen, aber eigene Outcome-Klasse
 ```
 
 ---
 
-## 7. Eligibility Rules + Anti-Hindsight Core
+## 7. Eligibility + Anti-Hindsight Core
 
-Anti-Hindsight ist kein späteres Report-Feature. Es gehört in Extractor und Eligibility.
+Anti-Hindsight gehört in Extractor und Eligibility, nicht erst in ein spätes Report-Gate.
 
-### 7.1 Eligibility Status
+Eligibility:
 
 ```text
 eligible_full
@@ -280,16 +315,7 @@ eligible_snapshot_only
 excluded
 ```
 
-Zusätzlich können `dataQualityFlags[]` mehrere Einschränkungen tragen.
-
-Beispiel:
-
-```text
-eligibility_status = eligible_outcome_only
-flags = [migration_seed, missing_entry_snapshot]
-```
-
-### 7.2 Exclusion Reasons
+Exclusion Reasons:
 
 ```text
 open_campaign
@@ -305,31 +331,17 @@ unknown_state
 unsupported_trade_type
 missing_forward_return
 missing_score
-invalid_as_of_date
 ```
 
-### 7.3 Anti-Hindsight-Regeln
-
-Trade Entry Evidence:
+Anti-Hindsight-Regeln:
 
 ```text
-entry_snapshot.as_of_date <= entry_event.event_timestamp
-entry_snapshot.instrument_id == campaign.instrument_id
+snapshot.as_of_date <= event_timestamp
+snapshot.instrument_id == trade.instrument_id
+Signal as_of_at <= measured outcome horizon start
 ```
 
-Trade Exit Evidence:
-
-```text
-exit_snapshot.as_of_date <= exit_event.event_timestamp
-exit_snapshot.instrument_id == campaign.instrument_id
-```
-
-Snapshot Evidence:
-
-```text
-forward_return_Xd darf nur genutzt werden, wenn vorhanden.
-v0.5 berechnet keine neuen Forward Returns nach, sofern keine vorhandene getestete Logik dafür existiert.
-```
+Wenn Snapshot-/Signal-Kontext nicht validiert wird, darf er nicht still `eligible_full` erzeugen.
 
 Legacy-Regel:
 
@@ -339,104 +351,78 @@ migration_seed mit Snapshot NULL darf nicht als normaler Entry-Evidence-Fall beh
 
 ---
 
-## 8. Snapshot Evidence Extractor
+## 8. Signal Evidence Extractor
 
-Startumfang:
+C2b heißt konzeptionell:
 
 ```text
-Source: instrument_sepa_snapshot
-Horizon: forward_return_5d, falls vorhanden
-Bucket: total_score
+Signal Snapshot Evidence Extractor
 ```
 
-Score-Buckets:
+Start-Scope:
 
 ```text
-0–39
-40–59
-60–74
-75–84
-85+
-unknown
+signalSource = sepa
+sourceTable = instrument_sepa_snapshot
+horizonDays = 5
+forward_return_5d lesen
+Score-Buckets bilden
 ```
 
-Exclusions:
+Nicht in C2b:
 
 ```text
-missing_forward_return
-missing_score
-invalid_as_of_date
+keine Kronos-Extraktion
+keine Sentiment-Extraktion
+keine neue generische Signal-Tabelle
+keine Berechnung neuer Forward Returns
+keine Campaign-Verknüpfung
 ```
 
-Nicht-Ziele:
+Spätere mögliche Extractor-Chunks:
 
 ```text
-Keine Campaign-Verknüpfung.
-Keine Entry/Exit-Auswertung.
-Keine Prognose.
-Keine UI.
-Keine Berechnung neuer Forward Returns.
+Kronos Signal Evidence Extractor
+Sentiment Signal Evidence Extractor
+Buy-Signal Evidence Extractor
+EPA Signal Evidence Extractor
+```
+
+Nur anschließen, wenn Signalquelle zeitlich sauber ist:
+
+```text
+instrument_id vorhanden
+as_of_at/as_of_date vorhanden
+Signalversion oder Herkunft nachvollziehbar
+kein Hindsight
+Forward Return vorhanden oder sauber berechenbar
 ```
 
 ---
 
 ## 9. Aggregation Rules
 
-Aggregatoren zählen Evidence-Samples. Sie entscheiden nicht.
+Aggregatoren zählen. Sie entscheiden nicht.
 
-### 9.1 Entry Evidence Aggregator
-
-Quelle:
+Pflicht pro Aggregation:
 
 ```text
-EvidenceTradeSample mit geeigneter Eligibility
+source
+signalSource nullable
+bucketKey
+bucketLabel
+timeWindow
+horizonDays nullable
+n
+avgReturn
+minReturn
+maxReturn
+confidenceLevel
+dataQualityFlags
+exclusion summary
 ```
 
-Start-Buckets:
-
-```text
-trade_type
-entry snapshot availability
-SEPA total bucket, falls vorhanden
-EPA action/bucket, falls vorhanden
-outcome class
-```
-
-### 9.2 Exit Evidence Aggregator
-
-Quelle:
-
-```text
-EvidenceTradeSample mit terminalem Exit-Event
-```
-
-Buckets:
-
-```text
-exit_reason
-final_state
-trade_type
-```
-
-### 9.3 Snapshot Evidence Aggregator
-
-Quelle:
-
-```text
-EvidenceSnapshotSample
-```
-
-Buckets:
-
-```text
-snapshot_type
-score_bucket
-horizon_days
-```
-
-### 9.4 Zeitdimension
-
-Jede Aggregation soll mindestens diese Zeitfenster unterstützen:
+Zeitfenster:
 
 ```text
 all_time
@@ -444,15 +430,11 @@ last_12_months
 before_last_12_months
 ```
 
-Quartals-Buckets sind optional und nicht v0.5-Pflicht.
-
 ---
 
 ## 10. Confidence Rules
 
-Confidence ist kein Schönfärber. Sie ist eine Bremse.
-
-Basis-Niveaus:
+Confidence ist eine Evidence-Stufe, kein statistischer 95%-Koeffizient.
 
 ```text
 n < 5      → anecdotal
@@ -490,23 +472,11 @@ mixed_periods
 snapshot_incomplete
 ```
 
-Keine Wahrscheinlichkeit ohne:
-
-```text
-n
-confidence_level
-source
-time_window
-exclusion_summary
-```
-
 ---
 
 ## 11. Report Architektur
 
-Report-Logik gehört nicht in den Symfony Command und nicht in einen Controller.
-
-Richtige Struktur:
+Report-Logik gehört nicht in Command oder Controller.
 
 ```text
 EvidenceReportService
@@ -519,20 +489,12 @@ EvidenceController später
   → dünner Adapter für UI
 ```
 
-C7 ist deshalb:
-
-```text
-Evidence Report Service + Command
-```
-
-Nicht nur Command.
-
-### Report-Inhalte
+Report-Inhalte:
 
 ```text
 Dataset Summary
 Trade Evidence
-Snapshot Evidence
+Signal Evidence
 Exclusions
 Confidence Warnings
 Time Windows
@@ -540,39 +502,23 @@ Anti-Hindsight Notes
 Evidence Run Fingerprint
 ```
 
-### Evidence Run Fingerprint
-
-Der Report soll einen Fingerprint enthalten.
-
-Hash-Basis:
-
-```text
-eligibility_rules_version
-confidence_rules_version
-aggregation_rules_version
-source_filters
-trade_type_filter
-report_generated_at
-```
-
-In v0.5 muss dieser Fingerprint nicht persistiert werden. Anzeige im Report reicht.
-
 ---
 
 ## 12. Validation Fixtures / Poison Pills
 
-Fixtures müssen vor den Aggregatoren belastbar sein.
+Fixtures müssen vor Aggregatoren belastbar sein.
 
 Pflichtszenarien:
 
 ```text
-3 live closed_profit
-2 live closed_loss
-1 returned_to_watchlist
-1 paper closed_profit
-1 migration_seed
-1 open campaign
-1 missing snapshot
+closed_profit
+closed_loss
+closed_neutral
+returned_to_watchlist
+paper closed_profit
+migration_seed
+open campaign
+missing snapshot
 ```
 
 Poison Pills:
@@ -594,174 +540,42 @@ Es muss ausschließen und begründen.
 
 ---
 
-## 13. UI-Entscheidung
-
-C9 Minimal UI ist optional.
-
-v0.5 ist nicht davon abhängig.
-
-Pflicht für v0.5:
+## 13. Chunk Plan
 
 ```text
-EvidenceReportService
-EvidenceReportCommand
-Markdown/Console Report
-```
-
-Optional später:
-
-```text
-/evidence
-read-only Twig-View
-```
-
-Keine UI darf anzeigen:
-
-```text
-Top Picks
-Buy Probability
-Sell Probability
-versteckte Empfehlungen
-Ampel, die Entscheidung simuliert
+C1  Evidence Read Models                         completed
+C2  Closed Trade Outcome Extractor               active
+C3  Eligibility + Anti-Hindsight Core            planned
+C6  Confidence Calculator                         planned
+C8  Validation Fixtures / Poison Pills           planned
+C2b Signal Snapshot Evidence Extractor           planned
+C4  Entry Evidence Aggregator                     planned
+C5  Exit Evidence Aggregator                      planned
+C7  Evidence Report Service + Command            planned
+C10 Evidence Audit Gate                           planned
+C9  Minimal UI                                    optional
 ```
 
 ---
 
-## 14. Chunk Plan
-
-### Phase 1 — Fundament
-
-```text
-C1 Evidence Read Models
-C2 Closed Trade Outcome Extractor
-C6 Confidence Calculator
-```
-
-C1 zuerst. Danach C2 und C6 parallel möglich.
-
-### Phase 2 — Filter und Testdaten
-
-```text
-C3 Eligibility Rules + Anti-Hindsight Core
-C8 Validation Fixtures
-```
-
-### Phase 3 — Snapshot Quickwin und Aggregatoren
-
-```text
-C2b SEPA Snapshot Evidence Extractor
-C4 Entry Evidence Aggregator
-C5 Exit Evidence Aggregator
-```
-
-### Phase 4 — Report
-
-```text
-C7 Evidence Report Service + Command
-```
-
-### Phase 5 — Audit Gate
-
-```text
-C10 Evidence Audit Gate
-```
-
-Optional:
-
-```text
-C9 Minimal Evidence UI
-```
-
----
-
-## 15. Risikogewichte
-
-```text
-C1  Evidence Read Models                         sehr wichtig
-C2  Closed Trade Outcome Extractor               extrem
-C3  Eligibility + Anti-Hindsight Core            extrem
-C6  Confidence Calculator                         sehr wichtig
-C8  Validation Fixtures / Poison Pills           sehr wichtig
-C2b SEPA Snapshot Evidence Extractor             sehr wichtig
-C4  Entry Evidence Aggregator                     extrem
-C5  Exit Evidence Aggregator                      extrem
-C7  Evidence Report Service + Command            wichtig
-C10 Evidence Audit Gate                           extrem
-C9  Minimal UI                                    optional / wichtig
-```
-
----
-
-## 16. Parallelisierungspfad
-
-```text
-🟢 v0.4 Truth Layer abgeschlossen
-  │
-  ▼
-⚪ C1 Evidence Read Models
-  │
-  ├───────────────┐
-  ▼               ▼
-⚪ C2 Trade Outcome Extractor     ⚪ C6 Confidence Calculator
-  │                               │
-  └───────────────┬───────────────┘
-                  ▼
-⚪ C3 Eligibility + Anti-Hindsight Core
-  │
-  ├───────────────┐
-  ▼               ▼
-⚪ C8 Validation Fixtures          ⚪ C2b SEPA Snapshot Evidence Extractor
-  │                               │
-  ├───────────────┬───────────────┘
-  ▼               ▼
-⚪ C4 Entry Aggregator             ⚪ C5 Exit Aggregator
-  │               │
-  └───────┬───────┘
-          ▼
-⚪ C7 Evidence Report Service + Command
-  │
-  ▼
-⚪ C10 Evidence Audit Gate
-  │
-  ▼
-🟢 v0.5 Evidence Engine Lite abgeschlossen
-
-Optional:
-⚪ C9 Minimal UI
-```
-
----
-
-## 17. Review-Regeln für v0.5 PRs
-
-Jeder PR wird geprüft gegen:
+## 14. Review-Regeln für v0.5 PRs
 
 ```text
 1. Ist der Chunk read-only?
 2. Werden trade types getrennt?
 3. Werden migration_seed/manual_seed korrekt behandelt?
 4. Werden offene Campaigns ausgeschlossen?
-5. Sind n und confidence sichtbar?
+5. Sind n und confidence sichtbar, wo aggregiert wird?
 6. Gibt es Exclusion Reasons?
-7. Wird Hindsight früh ausgeschlossen?
+7. Wird Hindsight früh ausgeschlossen oder konservativ begrenzt?
 8. Gibt es heimliche UI-/Migration-/Scope-Erweiterung?
-9. Sind Tests klein und deterministisch?
+9. Sind Tests schema-kompatibel und deterministisch?
 10. Bleibt der Diff eng?
-```
-
-Urteile:
-
-```text
-APPROVE
-REQUEST CHANGES
-COMMENT / CONDITIONAL APPROVE
 ```
 
 ---
 
-## 18. Abschlusskriterien für v0.5
-
-v0.5 gilt als abgeschlossen, wenn:
+## 15. Definition of Done v0.5
 
 ```text
 C1 grün
@@ -777,8 +591,6 @@ C10 grün
 ```
 
 C9 UI ist kein Abschlusskriterium.
-
-Finaler Satz:
 
 ```text
 v0.5 baut nicht den besseren Trader.
