@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Evidence;
 
-use App\Service\Evidence\Model\EvidenceDataQualityFlag;
-use App\Service\Evidence\Model\EvidenceEligibilityStatus;
-use App\Service\Evidence\Model\EvidenceExclusionReason;
+use App\Service\Evidence\Model\EvidenceEligibilityResult;
 use App\Service\Evidence\Model\EvidenceTradeSample;
 use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
@@ -15,7 +13,12 @@ final readonly class TradeOutcomeExtractor
 {
     private const TERMINAL_STATES = ['closed_profit', 'closed_loss', 'closed_neutral', 'returned_to_watchlist'];
 
-    public function __construct(private Connection $connection) {}
+    private EvidenceEligibilityEvaluator $eligibilityEvaluator;
+
+    public function __construct(private Connection $connection)
+    {
+        $this->eligibilityEvaluator = new EvidenceEligibilityEvaluator();
+    }
 
     public function extractClosedSamples(?string $tradeType = null): array
     {
@@ -23,7 +26,9 @@ final readonly class TradeOutcomeExtractor
         $samples = [];
         foreach ($campaigns as $campaign) {
             $sample = $this->mapCampaignToSample($campaign);
-            if ($sample !== null) $samples[] = $sample;
+            if ($sample !== null) {
+                $samples[] = $sample;
+            }
         }
         return $samples;
     }
@@ -46,17 +51,22 @@ final readonly class TradeOutcomeExtractor
         $campaignId = (int) $campaign['id'];
         $instrumentId = (int) $campaign['instrument_id'];
         $state = (string) $campaign['state'];
-        if (!in_array($state, self::TERMINAL_STATES, true)) return null;
+
+        if (!in_array($state, self::TERMINAL_STATES, true)) {
+            return null;
+        }
+
         $openedAt = $this->parseDateTime($campaign['opened_at']);
         if ($openedAt === null) {
-            return null; // Skip samples with unparseable opened_at
+            return null;
         }
+
         $entryEvent = $this->fetchEntryEvent($campaignId);
         $exitEvent = $this->fetchExitEvent($campaignId, $state);
         $seedSource = $this->determineSeedSource($campaignId, $entryEvent);
-        $eligibilityResult = $this->determineEligibility($campaign, $entryEvent, $exitEvent, $seedSource);
         $holdingDays = $this->calculateHoldingDays($campaign);
-        return new EvidenceTradeSample(
+
+        $rawSample = new EvidenceTradeSample(
             campaignId: $campaignId,
             instrumentId: $instrumentId,
             tradeType: (string) $campaign['trade_type'],
@@ -81,9 +91,46 @@ final readonly class TradeOutcomeExtractor
             modelVersion: $entryEvent !== null ? ($entryEvent['model_version'] ?? null) : null,
             macroVersion: $entryEvent !== null ? ($entryEvent['macro_version'] ?? null) : null,
             seedSource: $seedSource,
-            eligibilityStatus: $eligibilityResult['status'],
-            exclusionReason: $eligibilityResult['reason'],
-            dataQualityFlags: $eligibilityResult['flags'],
+            eligibilityStatus: null,
+            exclusionReason: null,
+            dataQualityFlags: [],
+        );
+
+        $eligibilityResult = $this->eligibilityEvaluator->evaluateTradeSample($rawSample);
+
+        return $this->applyEligibilityResult($rawSample, $eligibilityResult);
+    }
+
+    private function applyEligibilityResult(EvidenceTradeSample $rawSample, EvidenceEligibilityResult $result): EvidenceTradeSample
+    {
+        return new EvidenceTradeSample(
+            campaignId: $rawSample->campaignId,
+            instrumentId: $rawSample->instrumentId,
+            tradeType: $rawSample->tradeType,
+            campaignState: $rawSample->campaignState,
+            openedAt: $rawSample->openedAt,
+            closedAt: $rawSample->closedAt,
+            holdingDays: $rawSample->holdingDays,
+            totalQuantity: $rawSample->totalQuantity,
+            openQuantity: $rawSample->openQuantity,
+            avgEntryPrice: $rawSample->avgEntryPrice,
+            realizedPnlGross: $rawSample->realizedPnlGross,
+            realizedPnlNet: $rawSample->realizedPnlNet,
+            realizedPnlPct: $rawSample->realizedPnlPct,
+            entryEventId: $rawSample->entryEventId,
+            exitEventId: $rawSample->exitEventId,
+            exitReason: $rawSample->exitReason,
+            buySignalSnapshotId: $rawSample->buySignalSnapshotId,
+            sepaSnapshotId: $rawSample->sepaSnapshotId,
+            epaSnapshotId: $rawSample->epaSnapshotId,
+            scoringVersion: $rawSample->scoringVersion,
+            policyVersion: $rawSample->policyVersion,
+            modelVersion: $rawSample->modelVersion,
+            macroVersion: $rawSample->macroVersion,
+            seedSource: $rawSample->seedSource,
+            eligibilityStatus: $result->status,
+            exclusionReason: $result->exclusionReason,
+            dataQualityFlags: $result->dataQualityFlags,
         );
     }
 
@@ -111,87 +158,31 @@ final readonly class TradeOutcomeExtractor
             $migrationStatus = $this->connection->fetchOne("SELECT migration_status FROM trade_migration_log WHERE trade_campaign_id = ?", [$campaignId]);
             return $migrationStatus === 'manual_seed' ? 'manual' : 'migration';
         }
-        if ($entryEvent !== null && $entryEvent['event_type'] === 'entry') return 'live';
+        if ($entryEvent !== null && $entryEvent['event_type'] === 'entry') {
+            return 'live';
+        }
         return null;
-    }
-
-    private function determineEligibility(array $campaign, ?array $entryEvent, ?array $exitEvent, ?string $seedSource): array
-    {
-        $flags = [];
-        $openedAt = $this->parseDateTime($campaign['opened_at']);
-        $closedAt = $this->parseDateTime($campaign['closed_at']);
-        $realizedPnlPct = $campaign['realized_pnl_pct'];
-        if ($openedAt !== null && $closedAt !== null && $closedAt < $openedAt) {
-            return ['status' => EvidenceEligibilityStatus::excluded(), 'reason' => EvidenceExclusionReason::invalidTimeOrder(), 'flags' => $flags];
-        }
-        if ($closedAt === null) {
-            return ['status' => EvidenceEligibilityStatus::excluded(), 'reason' => EvidenceExclusionReason::missingClosedAt(), 'flags' => $flags];
-        }
-        if ($realizedPnlPct === null) {
-            return ['status' => EvidenceEligibilityStatus::excluded(), 'reason' => EvidenceExclusionReason::missingPnl(), 'flags' => $flags];
-        }
-        if ($seedSource === 'migration') {
-            $flags[] = EvidenceDataQualityFlag::migrationSeed();
-            $flags[] = EvidenceDataQualityFlag::containsSeedData();
-            return ['status' => EvidenceEligibilityStatus::eligibleOutcomeOnly(), 'reason' => null, 'flags' => $flags];
-        }
-        if ($seedSource === 'manual') {
-            $flags[] = EvidenceDataQualityFlag::manualSeed();
-            $flags[] = EvidenceDataQualityFlag::containsSeedData();
-            return ['status' => EvidenceEligibilityStatus::eligibleOutcomeOnly(), 'reason' => null, 'flags' => $flags];
-        }
-        if ($this->entryEventHasNoSnapshots($entryEvent)) {
-            $flags[] = EvidenceDataQualityFlag::missingEntrySnapshot();
-            $flags[] = EvidenceDataQualityFlag::snapshotIncomplete();
-            return ['status' => EvidenceEligibilityStatus::eligibleOutcomeOnly(), 'reason' => null, 'flags' => $flags];
-        }
-        if ($this->entryEventHasAnySnapshots($entryEvent)) {
-            $flags[] = EvidenceDataQualityFlag::snapshotIncomplete();
-            return ['status' => EvidenceEligibilityStatus::eligibleOutcomeOnly(), 'reason' => null, 'flags' => $flags];
-        }
-        if ($exitEvent === null) {
-            $flags[] = EvidenceDataQualityFlag::snapshotIncomplete();
-            return ['status' => EvidenceEligibilityStatus::eligibleOutcomeOnly(), 'reason' => null, 'flags' => $flags];
-        }
-        if ($entryEvent === null) {
-            $flags[] = EvidenceDataQualityFlag::missingEntrySnapshot();
-            $flags[] = EvidenceDataQualityFlag::snapshotIncomplete();
-            return ['status' => EvidenceEligibilityStatus::eligibleOutcomeOnly(), 'reason' => null, 'flags' => $flags];
-        }
-        return ['status' => EvidenceEligibilityStatus::eligibleFull(), 'reason' => null, 'flags' => $flags];
     }
 
     private function calculateHoldingDays(array $campaign): ?int
     {
         $openedAt = $this->parseDateTime($campaign['opened_at']);
         $closedAt = $this->parseDateTime($campaign['closed_at']);
-        if ($openedAt === null || $closedAt === null) return null;
+        if ($openedAt === null || $closedAt === null) {
+            return null;
+        }
         return $closedAt->diff($openedAt)->days;
     }
 
     private function parseDateTime(?string $value): ?DateTimeImmutable
     {
-        if ($value === null) return null;
+        if ($value === null) {
+            return null;
+        }
         try {
             return new DateTimeImmutable($value);
         } catch (\Exception $e) {
             return null;
         }
-    }
-
-    private function entryEventHasNoSnapshots(?array $entryEvent): bool
-    {
-        if ($entryEvent === null) return true;
-        return ($entryEvent['buy_signal_snapshot_id'] ?? null) === null
-            && ($entryEvent['sepa_snapshot_id'] ?? null) === null
-            && ($entryEvent['epa_snapshot_id'] ?? null) === null;
-    }
-
-    private function entryEventHasAnySnapshots(?array $entryEvent): bool
-    {
-        if ($entryEvent === null) return false;
-        return ($entryEvent['buy_signal_snapshot_id'] ?? null) !== null
-            || ($entryEvent['sepa_snapshot_id'] ?? null) !== null
-            || ($entryEvent['epa_snapshot_id'] ?? null) !== null;
     }
 }
