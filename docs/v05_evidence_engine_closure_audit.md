@@ -206,6 +206,20 @@ Each snapshot table needs nullable provenance fields:
 - `source_run_id` -> FK to `pipeline_run.id`
 - `available_at` -> the timestamp from which the snapshot is safe to use for anti-hindsight validation
 
+C9 adds these foundation columns to all three snapshot tables:
+
+- `instrument_buy_signal_snapshot`
+- `instrument_sepa_snapshot`
+- `instrument_epa_snapshot`
+
+Doctrine mapping status in the current codebase:
+
+- `instrument_sepa_snapshot` has a Doctrine entity mapping
+- `instrument_epa_snapshot` has a Doctrine entity mapping
+- `instrument_buy_signal_snapshot` is currently DBAL/table-only and has no Doctrine entity in this codebase
+
+That buy-signal asymmetry is intentional for now at the ORM layer, but the migration still adds `source_run_id` and `available_at` there as well so future DB-level validation can treat all three snapshot families consistently.
+
 These fields are intentionally nullable:
 
 - no backfill is required for old rows

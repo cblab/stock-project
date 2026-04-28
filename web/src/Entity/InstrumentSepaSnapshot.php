@@ -85,7 +85,7 @@ class InstrumentSepaSnapshot
     private ?float $forwardReturn60d = null;
 
     #[ORM\ManyToOne]
-    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    #[ORM\JoinColumn(name: 'source_run_id', referencedColumnName: 'id', nullable: true, onDelete: 'SET NULL')]
     private ?PipelineRun $sourceRun = null;
 
     #[ORM\Column(nullable: true)]
