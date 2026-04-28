@@ -6,7 +6,6 @@ namespace App\Service\Evidence;
 
 use App\Service\Evidence\Model\EntryEvidenceBucketSummary;
 use App\Service\Evidence\Model\EvidenceConfidenceLevel;
-use App\Service\Evidence\Model\EvidenceEligibilityResult;
 use App\Service\Evidence\Model\EvidenceTradeSample;
 
 /**
@@ -39,7 +38,9 @@ final readonly class EntryEvidenceAggregator
      * Groups samples by:
      * - tradeType (live, paper, pseudo)
      * - seedSource (live, migration, manual)
-     * - eligibilityStatus (after evaluation)
+     *
+     * eligible_full and eligible_outcome_only are combined for outcome metrics.
+     * excluded is tracked separately but not included in outcome metrics.
      *
      * @param EvidenceTradeSample[] $samples Raw trade samples to aggregate
      *
@@ -52,13 +53,12 @@ final readonly class EntryEvidenceAggregator
 
         foreach ($samples as $sample) {
             $evaluation = $this->eligibilityEvaluator->evaluateTradeSample($sample);
-            $bucketKey = $this->buildBucketKey($sample, $evaluation);
+            $bucketKey = $this->buildBucketKey($sample);
 
             if (!isset($buckets[$bucketKey])) {
                 $buckets[$bucketKey] = [
                     'tradeType' => $sample->tradeType,
                     'seedSource' => $sample->seedSource ?? 'live',
-                    'eligibilityStatus' => $evaluation->status->value(),
                     'eligibleFull' => [],
                     'eligibleOutcomeOnly' => [],
                     'excluded' => [],
@@ -87,13 +87,12 @@ final readonly class EntryEvidenceAggregator
     /**
      * Build a unique bucket key for grouping.
      */
-    private function buildBucketKey(EvidenceTradeSample $sample, EvidenceEligibilityResult $evaluation): string
+    private function buildBucketKey(EvidenceTradeSample $sample): string
     {
         $tradeType = $sample->tradeType;
         $seedSource = $sample->seedSource ?? 'live';
-        $status = $evaluation->status->value();
 
-        return sprintf('%s|%s|%s', $tradeType, $seedSource, $status);
+        return sprintf('%s|%s', $tradeType, $seedSource);
     }
 
     /**
@@ -104,13 +103,10 @@ final readonly class EntryEvidenceAggregator
      */
     private function calculateBucketSummary(string $bucketKey, array $bucketData): EntryEvidenceBucketSummary
     {
-        // Combine eligible samples for outcome metrics
-        $outcomeSamples = array_merge(
-            $bucketData['eligibleFull'],
-            $bucketData['eligibleOutcomeOnly'],
-        );
-
-        $sampleCount = count($outcomeSamples);
+        // Count by eligibility category
+        $eligibleFullCount = count($bucketData['eligibleFull']);
+        $eligibleOutcomeOnlyCount = count($bucketData['eligibleOutcomeOnly']);
+        $sampleCount = $eligibleFullCount + $eligibleOutcomeOnlyCount;
         $excludedCount = count($bucketData['excluded']);
 
         if ($sampleCount === 0) {
@@ -118,8 +114,9 @@ final readonly class EntryEvidenceAggregator
                 bucketKey: $bucketKey,
                 tradeType: $bucketData['tradeType'],
                 seedSource: $bucketData['seedSource'],
-                eligibilityStatus: $bucketData['eligibilityStatus'],
                 sampleCount: 0,
+                eligibleFullCount: 0,
+                eligibleOutcomeOnlyCount: 0,
                 excludedCount: $excludedCount,
                 avgRealizedPnlPct: null,
                 winRate: null,
@@ -131,6 +128,12 @@ final readonly class EntryEvidenceAggregator
             );
         }
 
+        // Combine eligible samples for outcome metrics
+        $outcomeSamples = array_merge(
+            $bucketData['eligibleFull'],
+            $bucketData['eligibleOutcomeOnly'],
+        );
+
         // Calculate outcome metrics
         $returns = [];
         $winCount = 0;
@@ -139,7 +142,13 @@ final readonly class EntryEvidenceAggregator
 
         foreach ($outcomeSamples as $item) {
             $sample = $item['sample'];
-            $pnl = (float) ($sample->realizedPnlPct ?? '0');
+
+            // Null PnL in eligible outcome samples is an invariant violation
+            if ($sample->realizedPnlPct === null) {
+                throw new \LogicException('Eligible outcome sample must have realizedPnlPct.');
+            }
+
+            $pnl = (float) $sample->realizedPnlPct;
             $returns[] = $pnl;
 
             if ($pnl > 0) {
@@ -166,8 +175,9 @@ final readonly class EntryEvidenceAggregator
             bucketKey: $bucketKey,
             tradeType: $bucketData['tradeType'],
             seedSource: $bucketData['seedSource'],
-            eligibilityStatus: $bucketData['eligibilityStatus'],
             sampleCount: $sampleCount,
+            eligibleFullCount: $eligibleFullCount,
+            eligibleOutcomeOnlyCount: $eligibleOutcomeOnlyCount,
             excludedCount: $excludedCount,
             avgRealizedPnlPct: $this->formatRatio($avgReturn),
             winRate: $this->formatRatio($winRate),

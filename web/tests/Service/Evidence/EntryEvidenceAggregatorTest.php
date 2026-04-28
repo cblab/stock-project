@@ -31,7 +31,7 @@ final class EntryEvidenceAggregatorTest extends TestCase
     // Core Aggregation Tests (1-11)
     // =================================================================
 
-    /** Test 1: Aggregator counts only eligible_full and eligible_outcome_only for outcome metrics */
+    /** Test 1: Aggregator counts eligible_full and eligible_outcome_only together for outcome metrics */
     public function testAggregatorCountsOnlyEligibleForOutcomeMetrics(): void
     {
         $samples = [
@@ -42,25 +42,23 @@ final class EntryEvidenceAggregatorTest extends TestCase
 
         $results = $this->aggregator->aggregateByEntryBucket($samples);
 
-        // Should have 3 buckets: live|live|eligible_outcome_only, live|live|excluded, live|migration|eligible_outcome_only
-        self::assertCount(3, $results);
+        // Should have 2 buckets: live|live and live|migration (excluded in same bucket as outcome samples)
+        self::assertCount(2, $results);
 
-        // Find the live|live|eligible_outcome_only bucket
-        $liveOutcomeBucket = $this->findBucket($results, 'live', 'live', 'eligible_outcome_only');
-        self::assertNotNull($liveOutcomeBucket);
-        self::assertSame(1, $liveOutcomeBucket->sampleCount); // closedProfit
-        self::assertSame(0, $liveOutcomeBucket->excludedCount);
+        // Find the live|live bucket (closedProfit + openCampaign)
+        $liveBucket = $this->findBucket($results, 'live', 'live');
+        self::assertNotNull($liveBucket);
+        self::assertSame(1, $liveBucket->sampleCount); // closedProfit only
+        self::assertSame(0, $liveBucket->eligibleFullCount); // C3: no full eligible without snapshots
+        self::assertSame(1, $liveBucket->eligibleOutcomeOnlyCount); // closedProfit
+        self::assertSame(1, $liveBucket->excludedCount); // openCampaign
 
-        // Find the live|live|excluded bucket
-        $liveExcludedBucket = $this->findBucket($results, 'live', 'live', 'excluded');
-        self::assertNotNull($liveExcludedBucket);
-        self::assertSame(0, $liveExcludedBucket->sampleCount);
-        self::assertSame(1, $liveExcludedBucket->excludedCount); // openCampaign
-
-        // Find the live|migration|eligible_outcome_only bucket
-        $migrationBucket = $this->findBucket($results, 'live', 'migration', 'eligible_outcome_only');
+        // Find the live|migration bucket
+        $migrationBucket = $this->findBucket($results, 'live', 'migration');
         self::assertNotNull($migrationBucket);
         self::assertSame(1, $migrationBucket->sampleCount);
+        self::assertSame(0, $migrationBucket->eligibleFullCount);
+        self::assertSame(1, $migrationBucket->eligibleOutcomeOnlyCount);
     }
 
     /** Test 2: Excluded samples are not counted in avg/win/loss/neutral */
@@ -72,19 +70,14 @@ final class EntryEvidenceAggregatorTest extends TestCase
         ];
 
         $results = $this->aggregator->aggregateByEntryBucket($samples);
+        $bucket = $this->findBucket($results, 'live', 'live');
 
-        // Outcome bucket should not include excluded
-        $outcomeBucket = $this->findBucket($results, 'live', 'live', 'eligible_outcome_only');
-        self::assertNotNull($outcomeBucket);
-        self::assertSame(1, $outcomeBucket->sampleCount); // Only the profit sample
-        self::assertSame(0, $outcomeBucket->excludedCount);
-        self::assertSame('0.2', $outcomeBucket->avgRealizedPnlPct); // Not affected by excluded
-
-        // Excluded bucket should track excluded separately
-        $excludedBucket = $this->findBucket($results, 'live', 'live', 'excluded');
-        self::assertNotNull($excludedBucket);
-        self::assertSame(0, $excludedBucket->sampleCount);
-        self::assertSame(1, $excludedBucket->excludedCount);
+        self::assertNotNull($bucket);
+        self::assertSame(1, $bucket->sampleCount); // Only the profit sample
+        self::assertSame(0, $bucket->eligibleFullCount);
+        self::assertSame(1, $bucket->eligibleOutcomeOnlyCount);
+        self::assertSame(1, $bucket->excludedCount); // The open campaign
+        self::assertSame('0.2', $bucket->avgRealizedPnlPct); // Not affected by excluded
     }
 
     /** Test 3: Profit + Loss + Neutral = correct counts and rates */
@@ -97,11 +90,12 @@ final class EntryEvidenceAggregatorTest extends TestCase
         ];
 
         $results = $this->aggregator->aggregateByEntryBucket($samples);
-        $bucket = $this->findBucket($results, 'live', 'live', 'eligible_outcome_only');
+        $bucket = $this->findBucket($results, 'live', 'live');
 
         self::assertNotNull($bucket);
         self::assertSame(3, $bucket->sampleCount);
-        self::assertSame('eligible_outcome_only', $bucket->eligibilityStatus);
+        self::assertSame(0, $bucket->eligibleFullCount); // C3: no full eligible
+        self::assertSame(3, $bucket->eligibleOutcomeOnlyCount);
 
         // Rates should be 1/3 each
         self::assertSame('0.3333333333', $bucket->winRate);
@@ -119,7 +113,7 @@ final class EntryEvidenceAggregatorTest extends TestCase
         ];
 
         $results = $this->aggregator->aggregateByEntryBucket($samples);
-        $bucket = $this->findBucket($results, 'live', 'live', 'eligible_outcome_only');
+        $bucket = $this->findBucket($results, 'live', 'live');
 
         self::assertNotNull($bucket);
         // (0.15 + (-0.08) + 0.00) / 3 = 0.023333...
@@ -136,7 +130,7 @@ final class EntryEvidenceAggregatorTest extends TestCase
         ];
 
         $results = $this->aggregator->aggregateByEntryBucket($samples);
-        $bucket = $this->findBucket($results, 'live', 'live', 'eligible_outcome_only');
+        $bucket = $this->findBucket($results, 'live', 'live');
 
         self::assertNotNull($bucket);
         self::assertSame('-0.08', $bucket->minRealizedPnlPct);
@@ -217,12 +211,13 @@ final class EntryEvidenceAggregatorTest extends TestCase
         ];
 
         $results = $this->aggregator->aggregateByEntryBucket($samples);
-        $bucket = $this->findBucket($results, 'live', 'migration', 'eligible_outcome_only');
+        $bucket = $this->findBucket($results, 'live', 'migration');
 
         self::assertNotNull($bucket);
         self::assertSame(1, $bucket->sampleCount);
+        self::assertSame(0, $bucket->eligibleFullCount);
+        self::assertSame(1, $bucket->eligibleOutcomeOnlyCount);
         self::assertSame(0, $bucket->excludedCount);
-        self::assertSame('eligible_outcome_only', $bucket->eligibilityStatus);
     }
 
     /** Test 10: confidenceLevel calculated from sampleCount (n=3 → anecdotal) */
@@ -235,7 +230,7 @@ final class EntryEvidenceAggregatorTest extends TestCase
         ];
 
         $results = $this->aggregator->aggregateByEntryBucket($samples);
-        $bucket = $this->findBucket($results, 'live', 'live', 'eligible_outcome_only');
+        $bucket = $this->findBucket($results, 'live', 'live');
 
         self::assertNotNull($bucket);
         self::assertSame(3, $bucket->sampleCount);
@@ -252,11 +247,11 @@ final class EntryEvidenceAggregatorTest extends TestCase
 
         $results = $this->aggregator->aggregateByEntryBucket($samples);
 
-        // Should be 2 separate buckets (different seedSource, both eligible_outcome_only)
+        // Should be 2 separate buckets (different seedSource)
         self::assertCount(2, $results);
 
-        $liveBucket = $this->findBucket($results, 'live', 'live', 'eligible_outcome_only');
-        $migrationBucket = $this->findBucket($results, 'live', 'migration', 'eligible_outcome_only');
+        $liveBucket = $this->findBucket($results, 'live', 'live');
+        $migrationBucket = $this->findBucket($results, 'live', 'migration');
 
         self::assertNotNull($liveBucket);
         self::assertNotNull($migrationBucket);
@@ -287,13 +282,14 @@ final class EntryEvidenceAggregatorTest extends TestCase
         $results = $this->aggregator->aggregateByEntryBucket($samples);
 
         self::assertCount(1, $results);
-        self::assertSame('excluded', $results[0]->eligibilityStatus);
         self::assertSame(0, $results[0]->sampleCount);
+        self::assertSame(0, $results[0]->eligibleFullCount);
+        self::assertSame(0, $results[0]->eligibleOutcomeOnlyCount);
         self::assertSame(2, $results[0]->excludedCount);
     }
 
-    /** Test 12: eligible_outcome_only and excluded are separate buckets */
-    public function testEligibleAndExcludedAreSeparateBuckets(): void
+    /** Test 12: eligible_outcome_only and excluded are in same bucket but tracked separately */
+    public function testEligibleAndExcludedAreInSameBucket(): void
     {
         $samples = [
             EvidenceTradeSampleFixture::closedProfit(), // eligible_outcome_only
@@ -302,22 +298,15 @@ final class EntryEvidenceAggregatorTest extends TestCase
 
         $results = $this->aggregator->aggregateByEntryBucket($samples);
 
-        // Should have 2 separate buckets for same tradeType|seedSource
-        self::assertCount(2, $results);
+        // Should have only 1 bucket for live|live (both eligible and excluded together)
+        self::assertCount(1, $results);
 
-        // Outcome bucket
-        $outcomeBucket = $this->findBucket($results, 'live', 'live', 'eligible_outcome_only');
-        self::assertNotNull($outcomeBucket);
-        self::assertSame(1, $outcomeBucket->sampleCount);
-        self::assertSame(0, $outcomeBucket->excludedCount);
-        self::assertSame('eligible_outcome_only', $outcomeBucket->eligibilityStatus);
-
-        // Excluded bucket
-        $excludedBucket = $this->findBucket($results, 'live', 'live', 'excluded');
-        self::assertNotNull($excludedBucket);
-        self::assertSame(0, $excludedBucket->sampleCount);
-        self::assertSame(1, $excludedBucket->excludedCount);
-        self::assertSame('excluded', $excludedBucket->eligibilityStatus);
+        $bucket = $this->findBucket($results, 'live', 'live');
+        self::assertNotNull($bucket);
+        self::assertSame(1, $bucket->sampleCount); // Only the profit sample
+        self::assertSame(0, $bucket->eligibleFullCount);
+        self::assertSame(1, $bucket->eligibleOutcomeOnlyCount); // closedProfit
+        self::assertSame(1, $bucket->excludedCount); // openCampaign
     }
 
     // =================================================================
@@ -325,21 +314,18 @@ final class EntryEvidenceAggregatorTest extends TestCase
     // =================================================================
 
     /**
-     * Find a bucket by tradeType, seedSource, and optional eligibilityStatus.
+     * Find a bucket by tradeType and seedSource.
      *
      * @param array<EntryEvidenceBucketSummary> $results
      */
     private function findBucket(
         array $results,
         string $tradeType,
-        string $seedSource,
-        ?string $eligibilityStatus = null
+        string $seedSource
     ): ?object {
         foreach ($results as $result) {
             if ($result->tradeType === $tradeType && $result->seedSource === $seedSource) {
-                if ($eligibilityStatus === null || $result->eligibilityStatus === $eligibilityStatus) {
-                    return $result;
-                }
+                return $result;
             }
         }
 
