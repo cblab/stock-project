@@ -132,6 +132,20 @@ Für nicht-triviale Aufgaben gilt:
 
 ---
 
+## Code-Navigation
+
+Bei nicht-trivialen Codeänderungen zuerst vorhandene Struktur und betroffene Dateien über die verfügbare Code-Navigation ermitteln.
+
+Vor Dateiänderungen:
+- relevante Dateien finden
+- bestehende Patterns prüfen
+- Abhängigkeiten grob einschätzen
+- Scope klein halten
+
+Keine Änderung auf Basis bloßer Dateinamen-Annahme.
+
+---
+
 ## Scan-Regeln
 
 Scanne niemals breit das gesamte Repository.
@@ -152,20 +166,14 @@ docs/stock-project-project-map.md
 Verbotene Suchmuster:
 
 ```text
-kein Get-ChildItem -Recurse über das Repo-Root
-kein find/rg/fd über "." oder das gesamte Repository nur zur Orientierung
-keine Dateisuche, die Cache-/Artefaktpfade auch nur potenziell traversiert
+rekursive Suche ab Repo-Root ohne Excludes
+Get-ChildItem -Recurse . ohne Excludes
+find . ohne Excludes
+grep -R . ohne Excludes
+rg/fd über das gesamte Repository ohne Excludes
 ```
 
-Wenn Dateisuche nötig ist:
-
-```text
-immer mit dem kleinsten plausiblen Startpfad beginnen
-zuerst stock-system/ oder web/ eingrenzen
-dann höchstens den direkt betroffenen Unterpfad lesen
-```
-
-Irrelevante Bereiche standardmäßig nicht lesen:
+Verbotene Suchflächen:
 
 ```text
 .aider.tags.cache.v4/
@@ -179,25 +187,26 @@ backups/
 models/
 repos/
 runs/
+vendor/
+node_modules/
 ```
 
-Diese Pfade gelten nicht nur als "irrelevant", sondern als technisch verbotene Suchfläche:
+Diese Pfade nicht lesen, nicht traversieren und nicht als Kontextquelle verwenden.
+
+Wenn eine Suche nötig ist:
 
 ```text
-nicht lesen
-nicht traversieren
-nicht per Rekursivsuche einschließen
-nicht zur Dateisuche, Orientierung oder Fehlersuche verwenden
+kleinsten plausiblen Startpfad wählen
+Excludes setzen
+gezielt Quellcode-, Konfigurations- oder Dokumentationspfade prüfen
+bei Treffer in verbotenen Pfaden abbrechen und enger neu suchen
 ```
 
-Nur erweitern, wenn die Aufgabe diesen Bereich ausdrücklich betrifft oder ohne ihn nicht lösbar ist.
-
-Wenn eine Suche trotzdem auf einen verbotenen Pfad zulaufen würde:
+Ausnahme:
 
 ```text
-Suche abbrechen
-Startpfad enger setzen
-nicht mit Permission Errors durch Cache-Verzeichnisse weiterarbeiten
+Ein verbotener Pfad darf nur gelesen werden, wenn der Nutzer genau diesen Pfad ausdrücklich nennt oder die Aufgabe exakt diesen Pfad betrifft.
+Dann nur die konkret genannte Datei oder den konkret genannten Unterpfad lesen, keine rekursive Suche.
 ```
 
 ---
