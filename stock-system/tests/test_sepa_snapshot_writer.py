@@ -1,7 +1,9 @@
-"""Tests for SepaSnapshotWriter immutability invariants.
+"""SQL-shape unit tests for SepaSnapshotWriter.
 
-C10d: Proves finalized snapshot rows cannot be overwritten by later upserts.
-Uses FakeConnection pattern (no real database required).
+These tests verify SQL CASE/COALESCE patterns using FakeConnection/FakeCursor.
+They guard against accidental SQL changes but do NOT prove MariaDB behavior.
+
+For real DB behavior proof (C10d invariants), see test_sepa_snapshot_integration.py.
 """
 
 import pytest
