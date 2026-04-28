@@ -45,11 +45,11 @@ final class EntryEvidenceAggregatorTest extends TestCase
         // Should have 2 buckets: live|live (closedProfit) and live|migration
         self::assertCount(2, $results);
 
-        // Find the live|live bucket (full eligibility)
+        // Find the live|live bucket (full eligibility + excluded)
         $liveBucket = $this->findBucket($results, 'live', 'live');
         self::assertNotNull($liveBucket);
-        self::assertSame(1, $liveBucket->sampleCount);
-        self::assertSame(0, $liveBucket->excludedCount);
+        self::assertSame(1, $liveBucket->sampleCount); // only closedProfit
+        self::assertSame(1, $liveBucket->excludedCount); // openCampaign is also in live|live
 
         // Find the live|migration bucket (outcome_only)
         $migrationBucket = $this->findBucket($results, 'live', 'migration');
