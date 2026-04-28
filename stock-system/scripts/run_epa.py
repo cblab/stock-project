@@ -39,12 +39,11 @@ def run(args: argparse.Namespace) -> int:
         engine = EpaEngine(connection, period=args.period, interval=args.interval)
         writer = EpaSnapshotWriter(connection)
         snapshots = []
-        # Determine available_at after run success if tracking_run_id is provided
-        # For new snapshots, available_at = NOW() at write time (snapshot available immediately)
+        # Pass source_run_id for provenance, but available_at remains NULL until run success
         source_run_id = args.tracking_run_id
         for mapping in mappings:
             snapshot = engine.analyze(mapping)
-            writer.write(snapshot, source_run_id=source_run_id)
+            writer.write(snapshot, source_run_id=source_run_id, available_at=None)
             snapshots.append(snapshot)
 
         payload = {
@@ -71,7 +70,11 @@ def run(args: argparse.Namespace) -> int:
         if not args.quiet:
             print(json.dumps(payload, indent=2, ensure_ascii=False))
         if args.tracking_run_id:
-            mark_pipeline_run_success(connection, args.tracking_run_id, notes=f"EPA snapshots written: {len(snapshots)}.")
+            finished_at = mark_pipeline_run_success(connection, args.tracking_run_id, notes=f"EPA snapshots written: {len(snapshots)}.")
+            # Finalize snapshots: set available_at only after successful run completion
+            finalized = writer.finalize_snapshots_for_run(args.tracking_run_id, finished_at)
+            if not args.quiet:
+                print(f"Finalized {finalized} snapshots with available_at={finished_at}")
         return 0
     except Exception as exc:
         if args.tracking_run_id:

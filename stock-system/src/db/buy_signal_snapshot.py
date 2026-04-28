@@ -36,10 +36,15 @@ class BuySignalSnapshotWriter:
         source_run_id: int | None = None,
         available_at: str | None = None,
     ) -> None:
-        """Upsert a buy signal snapshot."""
+        """Upsert a buy signal snapshot.
+
+        Args:
+            snapshot: The snapshot data to write
+            source_run_id: The pipeline_run.id that produced this snapshot
+            available_at: When the snapshot becomes available for validation.
+                         Only set when the source run is successfully completed.
+        """
         now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-        # available_at defaults to NOW() if not provided (snapshot available from write time)
-        effective_available_at = available_at or now
         with self.connection.cursor() as cursor:
             cursor.execute(
                 """
@@ -58,7 +63,7 @@ class BuySignalSnapshotWriter:
                     kronos_raw_score = VALUES(kronos_raw_score),
                     sentiment_raw_score = VALUES(sentiment_raw_score),
                     detail_json = VALUES(detail_json),
-                    source_run_id = COALESCE(source_run_id, VALUES(source_run_id)),
+                    source_run_id = CASE WHEN available_at IS NULL THEN VALUES(source_run_id) ELSE source_run_id END,
                     available_at = COALESCE(available_at, VALUES(available_at)),
                     updated_at = VALUES(updated_at)
                 """,
@@ -77,7 +82,7 @@ class BuySignalSnapshotWriter:
                     None,  # forward_return_20d
                     None,  # forward_return_60d
                     source_run_id,
-                    effective_available_at,
+                    available_at,
                     now,
                     now,
                 ),

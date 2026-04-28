@@ -17,9 +17,15 @@ class SepaSnapshotWriter:
         source_run_id: int | None = None,
         available_at: str | None = None,
     ) -> None:
+        """Write a SEPA snapshot with provenance tracking.
+
+        Args:
+            snapshot: The snapshot data to write
+            source_run_id: The pipeline_run.id that produced this snapshot
+            available_at: When the snapshot becomes available for validation.
+                         Pass None during write; finalize later after run success.
+        """
         now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-        # available_at defaults to NOW() if not provided (snapshot available from write time)
-        effective_available_at = available_at or now
         with self.connection.cursor() as cursor:
             cursor.execute(
                 """
@@ -51,7 +57,7 @@ class SepaSnapshotWriter:
                     forward_return_5d = VALUES(forward_return_5d),
                     forward_return_20d = VALUES(forward_return_20d),
                     forward_return_60d = VALUES(forward_return_60d),
-                    source_run_id = COALESCE(source_run_id, VALUES(source_run_id)),
+                    source_run_id = CASE WHEN available_at IS NULL THEN VALUES(source_run_id) ELSE source_run_id END,
                     available_at = COALESCE(available_at, VALUES(available_at)),
                     updated_at = VALUES(updated_at)
                 """,
@@ -79,12 +85,35 @@ class SepaSnapshotWriter:
                     snapshot.forward_return_20d,
                     snapshot.forward_return_60d,
                     source_run_id,
-                    effective_available_at,
+                    available_at,
                     now,
                     now,
                 ),
             )
         self.connection.commit()
+
+    def finalize_snapshots_for_run(self, source_run_id: int, finished_at: str) -> int:
+        """Finalize snapshots by setting available_at after successful run completion.
+
+        Only updates rows where:
+        - source_run_id matches the completed run
+        - available_at is still NULL (not yet finalized)
+
+        Returns:
+            Number of rows updated
+        """
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE instrument_sepa_snapshot
+                SET available_at = %s
+                WHERE source_run_id = %s
+                  AND available_at IS NULL
+                """,
+                (finished_at, source_run_id),
+            )
+            self.connection.commit()
+            return cursor.rowcount
 
 
 class SepaForwardReturnBackfill:
