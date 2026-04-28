@@ -11,7 +11,7 @@ use Doctrine\DBAL\Connection;
 /**
  * DB-level snapshot validation service.
  *
- * Validates snapshots against the 10-point rule set:
+ * Validates snapshots against the 11-point rule set:
  * 1. snapshot_id is not NULL
  * 2. snapshot row exists
  * 3. snapshot.instrument_id = expected instrument_id
@@ -22,6 +22,7 @@ use Doctrine\DBAL\Connection;
  * 8. pipeline_run.status = 'success'
  * 9. pipeline_run.exit_code = 0
  * 10. pipeline_run.finished_at IS NOT NULL
+ * 11. snapshot.available_at >= pipeline_run.finished_at (anti-hindsight)
  */
 final readonly class SnapshotValidationService
 {
@@ -187,6 +188,18 @@ final readonly class SnapshotValidationService
             return SnapshotValidationResult::invalid('source_run_missing_finished_at', [
                 'snapshot_id' => $snapshotId,
                 'source_run_id' => (int) $row['snapshot_source_run_id'],
+            ]);
+        }
+
+        // Rule 11: snapshot.available_at >= pipeline_run.finished_at
+        // Anti-hindsight: snapshot cannot be "available" before the pipeline run actually finished
+        $finishedAt = new DateTimeImmutable($row['pipeline_run_finished_at']);
+        if ($availableAt < $finishedAt) {
+            return SnapshotValidationResult::invalid('available_at_before_run_finished_at', [
+                'snapshot_id' => $snapshotId,
+                'source_run_id' => (int) $row['snapshot_source_run_id'],
+                'available_at' => $availableAt->format('Y-m-d H:i:s'),
+                'pipeline_run_finished_at' => $finishedAt->format('Y-m-d H:i:s'),
             ]);
         }
 

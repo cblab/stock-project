@@ -358,6 +358,48 @@ final class SnapshotValidationServiceTest extends TestCase
         self::assertSame('source_run_missing_finished_at', $result->reasonCode());
     }
 
+    public function testAvailableAtBeforeRunFinishedAt(): void
+    {
+        // Anti-hindsight: snapshot available_at is BEFORE pipeline_run finished_at
+        // This should be invalid because the snapshot was "available" before the run actually finished
+        $this->insertPipelineRun(1, 'success', 0, '2024-01-10 18:00:00'); // run finished at 18:00
+        $this->insertSepaSnapshot(100, 1, 1, '2024-01-10 09:00:00'); // snapshot available at 09:00 (impossible!)
+
+        $entryTimestamp = new DateTimeImmutable('2024-01-10 20:00:00'); // entry after both
+        $result = $this->service->validateSepaSnapshot(100, 1, $entryTimestamp);
+
+        self::assertFalse($result->isValid());
+        self::assertSame('available_at_before_run_finished_at', $result->reasonCode());
+        self::assertSame('2024-01-10 09:00:00', $result->details()['available_at']);
+        self::assertSame('2024-01-10 18:00:00', $result->details()['pipeline_run_finished_at']);
+    }
+
+    public function testAvailableAtEqualsRunFinishedAt(): void
+    {
+        // available_at == finished_at should be valid
+        $this->insertPipelineRun(1, 'success', 0, '2024-01-10 12:00:00');
+        $this->insertSepaSnapshot(100, 1, 1, '2024-01-10 12:00:00');
+
+        $entryTimestamp = new DateTimeImmutable('2024-01-10 14:00:00');
+        $result = $this->service->validateSepaSnapshot(100, 1, $entryTimestamp);
+
+        self::assertTrue($result->isValid());
+        self::assertNull($result->reasonCode());
+    }
+
+    public function testAvailableAtAfterRunFinishedAt(): void
+    {
+        // available_at > finished_at should be valid (snapshot finalized after run finished)
+        $this->insertPipelineRun(1, 'success', 0, '2024-01-10 12:00:00'); // run finished at 12:00
+        $this->insertSepaSnapshot(100, 1, 1, '2024-01-10 15:00:00'); // snapshot available at 15:00
+
+        $entryTimestamp = new DateTimeImmutable('2024-01-10 18:00:00');
+        $result = $this->service->validateSepaSnapshot(100, 1, $entryTimestamp);
+
+        self::assertTrue($result->isValid());
+        self::assertNull($result->reasonCode());
+    }
+
     // =========================================================================
     // HELPER METHODS
     // =========================================================================
