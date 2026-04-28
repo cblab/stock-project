@@ -59,7 +59,7 @@ final class EvidenceTradeSampleFixture
 
     /**
      * Create a closed neutral sample.
-     * Terminal state with near-zero PnL.
+     * Terminal state with exactly zero PnL.
      *
      * @param array<string, mixed> $overrides Field overrides
      */
@@ -67,8 +67,8 @@ final class EvidenceTradeSampleFixture
     {
         return self::createSample([
             'campaignState' => 'closed_neutral',
-            'realizedPnlPct' => '0.001',
-            'realizedPnlGross' => '5.00',
+            'realizedPnlPct' => '0.00',
+            'realizedPnlGross' => '0.00',
             'realizedPnlNet' => '0.00',
             ...$overrides,
         ]);
@@ -178,8 +178,9 @@ final class EvidenceTradeSampleFixture
     }
 
     /**
-     * Create a sample with complete snapshot IDs.
-     * All entry context available for full eligibility.
+     * Create a sample with snapshot IDs present.
+     * IDs are intentionally unvalidated; C3 should keep this outcome_only
+     * until DB-level snapshot validation exists.
      *
      * @param array<string, mixed> $overrides Field overrides
      */

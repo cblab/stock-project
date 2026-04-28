@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Service\Evidence\Fixture;
 
 use App\Service\Evidence\EvidenceEligibilityEvaluator;
+use App\Service\Evidence\Model\EvidenceDataQualityFlag;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -50,8 +51,8 @@ final class EvidenceTradeSampleFixtureTest extends TestCase
         $sample = EvidenceTradeSampleFixture::closedNeutral();
 
         self::assertSame('closed_neutral', $sample->campaignState);
-        // neutral has near-zero, not exactly 0, due to fixture using 0.001
-        self::assertLessThan(0.01, abs((float) $sample->realizedPnlPct));
+        self::assertSame('0.00', $sample->realizedPnlPct);
+        self::assertSame(0.0, (float) $sample->realizedPnlPct);
     }
 
     /** Test 4: migrationSeed() sets seedSource = migration */
@@ -164,11 +165,17 @@ final class EvidenceTradeSampleFixtureTest extends TestCase
 
         $result = $this->evaluator->evaluateTradeSample($sample);
 
-        // Currently with snapshot IDs but without full DB validation
-        // results in eligible_outcome_only (not eligible_full)
+        self::assertTrue(
+            $result->status->isEligible(),
+            'Sample with snapshot IDs should be eligible (outcome_only)'
+        );
         self::assertFalse(
             $result->status->isEligibleFull(),
             'Sample with only snapshot IDs (unvalidated) should not be eligible_full'
+        );
+        self::assertContainsEquals(
+            EvidenceDataQualityFlag::snapshotIncomplete(),
+            $result->dataQualityFlags
         );
     }
 
