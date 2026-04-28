@@ -11,9 +11,10 @@
 
 // Konfiguration
 const TIMEOUT_SECONDS = 60;
+const PHPUNIT_TIMEOUT_SECONDS = 900;
 const MAX_OUTPUT_LENGTH = 20000;
-const REPO_ROOT = '/app';
-const WEB_ROOT = '/app/web';
+const REPO_ROOT = __DIR__ . '/../..';
+const WEB_ROOT = __DIR__ . '/../../web';
 
 // Allowlist der erlaubten Commands
 // Format: method => [path => [name, workingDir, commandArray]]
@@ -26,6 +27,7 @@ $ALLOWED_COMMANDS = [
         '/run/git-diff' => ['git-diff', REPO_ROOT, ['git', 'diff', '--stat']],
         '/run/composer-validate' => ['composer-validate', WEB_ROOT, ['composer', 'validate', '--no-check-publish']],
         '/run/php-lint' => ['php-lint', WEB_ROOT, null], // Wird dynamisch gebaut
+        '/run/phpunit' => ['phpunit', REPO_ROOT, null], // Nutzt kanonischen Runner
         '/run/doctrine-status' => ['doctrine-status', WEB_ROOT, ['php', 'bin/console', 'doctrine:migrations:status']],
         '/run/doctrine-dry-run' => ['doctrine-dry-run', WEB_ROOT, ['php', 'bin/console', 'doctrine:migrations:migrate', '--dry-run', '--no-interaction']],
         '/run/lint-container' => ['lint-container', WEB_ROOT, ['php', 'bin/console', 'lint:container']],
@@ -46,7 +48,7 @@ function jsonResponse(int $httpCode, array $data): void {
 /**
  * Führt ein Command aus und gibt das Ergebnis zurück
  */
-function runCommand(string $name, string $workingDir, array $command): array {
+function runCommand(string $name, string $workingDir, array $command, int $timeoutSeconds = TIMEOUT_SECONDS): array {
     $startTime = hrtime(true);
 
     $descriptors = [
@@ -76,7 +78,7 @@ function runCommand(string $name, string $workingDir, array $command): array {
 
     $stdout = '';
     $stderr = '';
-    $timeoutAt = microtime(true) + TIMEOUT_SECONDS;
+    $timeoutAt = microtime(true) + $timeoutSeconds;
 
     while (true) {
         $status = proc_get_status($process);
@@ -109,7 +111,7 @@ function runCommand(string $name, string $workingDir, array $command): array {
         // Timeout prüfen
         if (microtime(true) > $timeoutAt) {
             proc_terminate($process, 9);
-            $stderr .= "\n[TIMEOUT - process killed after " . TIMEOUT_SECONDS . "s]";
+            $stderr .= "\n[TIMEOUT - process killed after " . $timeoutSeconds . "s]";
             break;
         }
 
@@ -258,6 +260,30 @@ function normalizeLintPath(string $inputPath): ?string {
 }
 
 /**
+ * Validiert einen optionalen PHPUnit-Testpfad relativ zu web/tests.
+ *
+ * @return string|false|null Null = alle Tests, false = ungültig, string = validierter relativer Pfad
+ */
+function normalizePhpUnitPath(?string $inputPath): string|false|null {
+    if ($inputPath === null || $inputPath === '') {
+        return null;
+    }
+
+    $cleanPath = str_replace(["\0", "\r", "\n"], '', $inputPath);
+    $cleanPath = str_replace('\\', '/', $cleanPath);
+
+    if ($cleanPath === '' || str_starts_with($cleanPath, '/') || strpos($cleanPath, '..') !== false) {
+        return false;
+    }
+
+    if (!str_starts_with($cleanPath, 'tests/')) {
+        return false;
+    }
+
+    return $cleanPath;
+}
+
+/**
  * Liest den JSON-Request-Body
  */
 function getJsonInput(): ?array {
@@ -317,6 +343,37 @@ if ($name === 'php-lint') {
 
     // Command mit dem validierten Pfad bauen
     $command = ['php', '-l', $filePath];
+}
+
+// Spezialfall: phpunit nutzt den kanonischen Test-Runner
+if ($name === 'phpunit') {
+    $input = getJsonInput() ?? [];
+    $requestedPath = isset($input['path']) && is_string($input['path']) ? $input['path'] : null;
+    $normalizedPath = normalizePhpUnitPath($requestedPath);
+
+    if ($normalizedPath === false) {
+        jsonResponse(400, [
+            'error' => 'Invalid "path". Only relative paths under tests/ are allowed; no absolute paths, "..", or free shell arguments.',
+            'requested' => $requestedPath,
+        ]);
+    }
+
+    $psScript = REPO_ROOT . '/tools/dev/test-web.ps1';
+    $shScript = REPO_ROOT . '/tools/dev/test-web.sh';
+
+    if (DIRECTORY_SEPARATOR === '\\') {
+        $command = ['powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', $psScript];
+    } else {
+        $command = ['sh', $shScript];
+    }
+
+    if ($normalizedPath !== null) {
+        $command[] = $normalizedPath;
+    }
+
+    $result = runCommand($name, $workingDir, $command, PHPUNIT_TIMEOUT_SECONDS);
+    jsonResponse(200, $result);
+    exit;
 }
 
 // Spezialfall: composer-dump-autoload + Cache-Löschung

@@ -86,6 +86,7 @@ POST /run/git-status
 POST /run/git-diff
 POST /run/composer-validate
 POST /run/php-lint
+POST /run/phpunit
 POST /run/lint-container
 POST /run/composer-dump-autoload
 ```
@@ -99,6 +100,25 @@ POST /run/composer-dump-autoload
 ```
 
 `composer-dump-autoload` nur bei neuen PHP-Klassen oder Autoload-/Classmap-Problemen nutzen.
+`/run/phpunit` akzeptiert optional einen relativen Pfad unter `tests/` und muss intern immer den kanonischen Runner nutzen.
+
+Dev-Testlauf:
+
+```text
+.\tools\dev\test-web.ps1
+.\tools\dev\test-web.ps1 tests/Service/Evidence/TradeOutcomeExtractorIntegrationTest.php
+```
+
+GitNexus:
+
+```text
+.\tools\dev\gitnexus-status.ps1
+.\tools\dev\gitnexus-index.ps1
+Host ist Index-Owner.
+Container lesen denselben repo-lokalen Index unter /work/stock-project.
+```
+
+Wenn ein Agent über den Proxy PHPUnit auslöst, soll der Proxy den kanonischen Runner verwenden statt freie Docker- oder Shell-Kommandos anzunehmen.
 
 ---
 
