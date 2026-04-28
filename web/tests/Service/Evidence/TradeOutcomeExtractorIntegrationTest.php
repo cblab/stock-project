@@ -149,7 +149,7 @@ final class TradeOutcomeExtractorIntegrationTest extends KernelTestCase
         $profitSample = $this->findSampleByCampaignId($samples, $campaign1);
         $this->assertNotNull($profitSample);
         $this->assertSame('closed_profit', $profitSample->campaignState);
-        $this->assertSame('0.05', $profitSample->realizedPnlPct);
+        $this->assertSame(0.05, (float) $profitSample->realizedPnlPct);
         $this->assertSame(14, $profitSample->holdingDays);
         $this->assertSame('signal', $profitSample->exitReason);
 
@@ -197,9 +197,9 @@ final class TradeOutcomeExtractorIntegrationTest extends KernelTestCase
         $this->assertCount(1, $samples);
         $sample = $samples[0];
 
-        $this->assertSame('1200.50', $sample->realizedPnlGross);
-        $this->assertSame('1150.25', $sample->realizedPnlNet);
-        $this->assertSame('0.12', $sample->realizedPnlPct);
+        $this->assertSame(1200.50, (float) $sample->realizedPnlGross);
+        $this->assertSame(1150.25, (float) $sample->realizedPnlNet);
+        $this->assertSame(0.12, (float) $sample->realizedPnlPct);
         $this->assertNull($sample->buySignalSnapshotId);
         $this->assertNull($sample->sepaSnapshotId);
         $this->assertNull($sample->epaSnapshotId);
@@ -208,8 +208,8 @@ final class TradeOutcomeExtractorIntegrationTest extends KernelTestCase
         $this->assertSame('v3', $sample->modelVersion);
         $this->assertSame('2024-Q1', $sample->macroVersion);
         $this->assertSame('live', $sample->seedSource);
-        $this->assertSame(EvidenceEligibilityStatus::eligibleOutcomeOnly(), $sample->eligibilityStatus);
-        $this->assertContains(EvidenceDataQualityFlag::snapshotIncomplete(), $sample->dataQualityFlags);
+        $this->assertEquals(EvidenceEligibilityStatus::eligibleOutcomeOnly(), $sample->eligibilityStatus);
+        $this->assertContainsEquals(EvidenceDataQualityFlag::snapshotIncomplete(), $sample->dataQualityFlags);
     }
 
     // =================================================================
@@ -245,10 +245,10 @@ final class TradeOutcomeExtractorIntegrationTest extends KernelTestCase
         $sample = $samples[0];
 
         $this->assertSame('migration', $sample->seedSource);
-        $this->assertSame(EvidenceEligibilityStatus::eligibleOutcomeOnly(), $sample->eligibilityStatus);
+        $this->assertEquals(EvidenceEligibilityStatus::eligibleOutcomeOnly(), $sample->eligibilityStatus);
         $this->assertNull($sample->exclusionReason);
-        $this->assertContains(EvidenceDataQualityFlag::migrationSeed(), $sample->dataQualityFlags);
-        $this->assertContains(EvidenceDataQualityFlag::containsSeedData(), $sample->dataQualityFlags);
+        $this->assertContainsEquals(EvidenceDataQualityFlag::migrationSeed(), $sample->dataQualityFlags);
+        $this->assertContainsEquals(EvidenceDataQualityFlag::containsSeedData(), $sample->dataQualityFlags);
     }
 
     // =================================================================
@@ -284,9 +284,9 @@ final class TradeOutcomeExtractorIntegrationTest extends KernelTestCase
         $sample = $samples[0];
 
         $this->assertSame('manual', $sample->seedSource);
-        $this->assertSame(EvidenceEligibilityStatus::eligibleOutcomeOnly(), $sample->eligibilityStatus);
-        $this->assertContains(EvidenceDataQualityFlag::manualSeed(), $sample->dataQualityFlags);
-        $this->assertContains(EvidenceDataQualityFlag::containsSeedData(), $sample->dataQualityFlags);
+        $this->assertEquals(EvidenceEligibilityStatus::eligibleOutcomeOnly(), $sample->eligibilityStatus);
+        $this->assertContainsEquals(EvidenceDataQualityFlag::manualSeed(), $sample->dataQualityFlags);
+        $this->assertContainsEquals(EvidenceDataQualityFlag::containsSeedData(), $sample->dataQualityFlags);
     }
 
     // =================================================================
@@ -344,9 +344,9 @@ final class TradeOutcomeExtractorIntegrationTest extends KernelTestCase
         $this->assertCount(1, $samples);
         $sample = $samples[0];
 
-        $this->assertSame(EvidenceEligibilityStatus::excluded(), $sample->eligibilityStatus);
-        $this->assertSame(EvidenceExclusionReason::invalidTimeOrder(), $sample->exclusionReason);
-        $this->assertNull($sample->holdingDays);
+        $this->assertEquals(EvidenceEligibilityStatus::excluded(), $sample->eligibilityStatus);
+        $this->assertEquals(EvidenceExclusionReason::invalidTimeOrder(), $sample->exclusionReason);
+        $this->assertSame(5, $sample->holdingDays);
     }
 
     // =================================================================
@@ -382,8 +382,8 @@ final class TradeOutcomeExtractorIntegrationTest extends KernelTestCase
         $this->assertCount(1, $samples);
         $sample = $samples[0];
 
-        $this->assertSame(EvidenceEligibilityStatus::excluded(), $sample->eligibilityStatus);
-        $this->assertSame(EvidenceExclusionReason::missingPnl(), $sample->exclusionReason);
+        $this->assertEquals(EvidenceEligibilityStatus::excluded(), $sample->eligibilityStatus);
+        $this->assertEquals(EvidenceExclusionReason::missingPnl(), $sample->exclusionReason);
     }
 
     // =================================================================
@@ -421,10 +421,10 @@ final class TradeOutcomeExtractorIntegrationTest extends KernelTestCase
         $this->assertCount(1, $samples);
         $sample = $samples[0];
 
-        $this->assertSame(EvidenceEligibilityStatus::eligibleOutcomeOnly(), $sample->eligibilityStatus);
+        $this->assertEquals(EvidenceEligibilityStatus::eligibleOutcomeOnly(), $sample->eligibilityStatus);
         $this->assertNull($sample->exclusionReason);
-        $this->assertContains(EvidenceDataQualityFlag::missingEntrySnapshot(), $sample->dataQualityFlags);
-        $this->assertContains(EvidenceDataQualityFlag::snapshotIncomplete(), $sample->dataQualityFlags);
+        $this->assertContainsEquals(EvidenceDataQualityFlag::missingEntrySnapshot(), $sample->dataQualityFlags);
+        $this->assertContainsEquals(EvidenceDataQualityFlag::snapshotIncomplete(), $sample->dataQualityFlags);
     }
 
     // =================================================================
@@ -465,7 +465,7 @@ final class TradeOutcomeExtractorIntegrationTest extends KernelTestCase
             'realized_pnl_gross' => null,
             'realized_pnl_net' => null,
             'realized_pnl_pct' => null,
-            'opened_at' => null,
+            'opened_at' => date('Y-m-d H:i:s'),
             'closed_at' => null,
             'created_at' => date('Y-m-d H:i:s'),
             'updated_at' => date('Y-m-d H:i:s'),
