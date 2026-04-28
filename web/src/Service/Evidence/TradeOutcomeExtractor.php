@@ -15,9 +15,13 @@ final readonly class TradeOutcomeExtractor
 
     private EvidenceEligibilityEvaluator $eligibilityEvaluator;
 
-    public function __construct(private Connection $connection)
+    public function __construct(
+        private Connection $connection,
+        ?EvidenceEligibilityEvaluator $eligibilityEvaluator = null,
+    )
     {
-        $this->eligibilityEvaluator = new EvidenceEligibilityEvaluator();
+        $this->eligibilityEvaluator = $eligibilityEvaluator
+            ?? new EvidenceEligibilityEvaluator(new SnapshotValidationService($this->connection));
     }
 
     public function extractClosedSamples(?string $tradeType = null): array
