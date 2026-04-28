@@ -50,8 +50,14 @@ final class ExitEvidenceAggregatorTest extends TestCase
         self::assertNotNull($this->findBucket($results, 'signal', 'closed_loss', 'live', 'live'));
     }
 
-    public function testOutcomeMetricsCountEligibleFullAndOutcomeOnlyTogether(): void
+    public function testOutcomeOnlySamplesAreCountedWithComposition(): void
     {
+        // C3 produces practically eligible_outcome_only samples here because
+        // DB-level snapshot validation for eligible_full is not available yet.
+        // This test verifies that C5 counts outcome-only samples correctly and
+        // exposes the composition via eligibleFullCount / eligibleOutcomeOnlyCount.
+        // TODO: Add explicit eligible_full + eligible_outcome_only same-bucket test
+        // once DB-level snapshot validation can produce eligible_full samples.
         $samples = [
             EvidenceTradeSampleFixture::migrationSeed([
                 'campaignState' => 'closed_profit',
