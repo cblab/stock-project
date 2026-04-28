@@ -1,4 +1,8 @@
 services:
+  agent-runner:
+    volumes:
+      - .:/work/stock-project:ro
+
   web:
     environment:
       APP_ENV: prod
@@ -16,9 +20,58 @@ services:
       - ./web/migrations:/app/web/migrations:ro
       - web_var:/app/web/var
 
+  test-db-setup:
+    image: mariadb:10.11
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      MARIADB_ROOT_PASSWORD: ${STOCK_DB_ROOT_PASSWORD:-stock_root}
+      STOCK_DB_USER: ${STOCK_DB_USER:-stock_app}
+    entrypoint: []
+    command:
+      - sh
+      - -lc
+      - >
+        mariadb -h db -uroot -p"$$MARIADB_ROOT_PASSWORD" -e
+        "CREATE DATABASE IF NOT EXISTS stock_project_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+        GRANT ALL PRIVILEGES ON stock_project_test.* TO '${STOCK_DB_USER:-stock_app}'@'%';
+        FLUSH PRIVILEGES;"
+    profiles: ["test"]
+
+  web-test:
+    image: ${STOCK_WEB_CLI_IMAGE:-stock-project-migrate:latest}
+    build:
+      context: .
+      dockerfile: docker/web-cli/Dockerfile
+    working_dir: /app/web
+    environment:
+      DB_HOST: db
+      DB_PORT: "3306"
+      DB_NAME: stock_project
+      DB_USER: ${STOCK_DB_USER:-stock_app}
+      DB_PASSWORD: ${STOCK_DB_PASSWORD:-stock_app}
+      DATABASE_URL: "mysql://${STOCK_DB_USER:-stock_app}:${STOCK_DB_PASSWORD:-stock_app}@db:3306/stock_project?serverVersion=10.11.0-MariaDB&charset=utf8mb4"
+      APP_ENV: test
+      APP_DEBUG: "1"
+      APP_SECRET: ${STOCK_APP_SECRET:-dev-local-secret-change-me}
+      PROJECT_ROOT: /app
+      PYTHON_BIN: python3
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./web:/app/web
+      - .:/work/stock-project:ro
+      - web_test_vendor:/app/web/vendor
+      - web_test_var:/app/web/var
+    profiles: ["test"]
+
   phpmyadmin:
     ports: !override
       - "8082:80"
     
 volumes:
   web_var:
+  web_test_var:
+  web_test_vendor:

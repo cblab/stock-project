@@ -72,6 +72,35 @@ curl -X POST http://localhost:8787/run/php-lint \
 
 ---
 
+### POST /run/phpunit
+Führt den kanonischen Dev-Test-Runner aus.
+
+```bash
+curl -X POST http://localhost:8787/run/phpunit \
+  -H "Content-Type: application/json" \
+  -d '{"path": "tests/Service/Evidence/TradeOutcomeExtractorIntegrationTest.php"}'
+```
+
+Request-Regeln:
+
+```text
+path ist optional
+ohne path: kompletter PHPUnit-Lauf
+mit path: nur relativer Pfad unter tests/
+keine absoluten Pfade
+kein ..
+keine freien Shell-Argumente
+```
+
+Der Proxy ruft intern den kanonischen Runner auf:
+
+```text
+tools/dev/test-web.ps1   (Windows/Host)
+tools/dev/test-web.sh    (POSIX)
+```
+
+---
+
 ### POST /run/doctrine-status
 Zeigt Migration-Status.
 
