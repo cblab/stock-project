@@ -51,6 +51,13 @@ class InstrumentEpaSnapshot
     #[ORM\Column(type: Types::JSON)]
     private array $detailJson = [];
 
+    #[ORM\ManyToOne]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?PipelineRun $sourceRun = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?\DateTimeImmutable $availableAt = null;
+
     #[ORM\Column]
     private \DateTimeImmutable $createdAt;
 
@@ -87,6 +94,10 @@ class InstrumentEpaSnapshot
     public function setSoftWarningsJson(array $value): self { $this->softWarningsJson = $value; return $this; }
     public function getDetailJson(): array { return $this->detailJson; }
     public function setDetailJson(array $value): self { $this->detailJson = $value; return $this; }
+    public function getSourceRun(): ?PipelineRun { return $this->sourceRun; }
+    public function setSourceRun(?PipelineRun $sourceRun): self { $this->sourceRun = $sourceRun; return $this; }
+    public function getAvailableAt(): ?\DateTimeImmutable { return $this->availableAt; }
+    public function setAvailableAt(?\DateTimeImmutable $availableAt): self { $this->availableAt = $availableAt; return $this; }
     public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
     public function getUpdatedAt(): \DateTimeImmutable { return $this->updatedAt; }
     public function touch(): self { $this->updatedAt = new \DateTimeImmutable(); return $this; }

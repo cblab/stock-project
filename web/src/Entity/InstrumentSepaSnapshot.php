@@ -84,6 +84,13 @@ class InstrumentSepaSnapshot
     #[ORM\Column(type: Types::FLOAT, nullable: true)]
     private ?float $forwardReturn60d = null;
 
+    #[ORM\ManyToOne]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?PipelineRun $sourceRun = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?\DateTimeImmutable $availableAt = null;
+
     #[ORM\Column]
     private \DateTimeImmutable $createdAt;
 
@@ -142,6 +149,10 @@ class InstrumentSepaSnapshot
     public function setForwardReturn20d(?float $value): self { $this->forwardReturn20d = $value; return $this; }
     public function getForwardReturn60d(): ?float { return $this->forwardReturn60d; }
     public function setForwardReturn60d(?float $value): self { $this->forwardReturn60d = $value; return $this; }
+    public function getSourceRun(): ?PipelineRun { return $this->sourceRun; }
+    public function setSourceRun(?PipelineRun $sourceRun): self { $this->sourceRun = $sourceRun; return $this; }
+    public function getAvailableAt(): ?\DateTimeImmutable { return $this->availableAt; }
+    public function setAvailableAt(?\DateTimeImmutable $availableAt): self { $this->availableAt = $availableAt; return $this; }
     public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
     public function getUpdatedAt(): \DateTimeImmutable { return $this->updatedAt; }
     public function touch(): self { $this->updatedAt = new \DateTimeImmutable(); return $this; }
