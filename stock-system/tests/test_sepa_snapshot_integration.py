@@ -106,10 +106,10 @@ def create_test_pipeline_run(conn, run_id: int):
         cursor.execute(
             """
             INSERT INTO pipeline_run
-            (id, run_id, run_key, run_path, created_at, status,
+            (id, run_id, run_key, run_path, created_at, status, run_scope,
              summary_generated, decision_entry_count, decision_watch_count,
              decision_hold_count, decision_no_trade_count)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 run_id,
@@ -118,6 +118,7 @@ def create_test_pipeline_run(conn, run_id: int):
                 "/tmp/test",
                 now,
                 "success",
+                "c10d_test",
                 0,
                 0,
                 0,
