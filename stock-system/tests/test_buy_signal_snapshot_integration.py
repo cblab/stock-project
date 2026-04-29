@@ -194,6 +194,7 @@ class TestBuySignalSnapshotImmutabilityIntegration:
         instrument_id = 999991
         as_of_date = "2024-01-25"
         finalized_at = "2024-01-25 18:00:00"
+        expected_finalized_at = datetime(2024, 1, 25, 18, 0, 0)
         run_ids = [991001, 991002]  # High IDs aligned with instrument 999991
 
         try:
@@ -216,7 +217,7 @@ class TestBuySignalSnapshotImmutabilityIntegration:
 
             row_v1 = fetch_snapshot_row(conn, instrument_id, as_of_date)
             assert float(row_v1["merged_score"]) == pytest.approx(0.65, rel=1e-6)
-            assert row_v1["available_at"] == finalized_at
+            assert row_v1["available_at"] == expected_finalized_at
 
             # Attempt upsert v2 with different values
             snapshot2 = create_test_snapshot(
@@ -232,7 +233,7 @@ class TestBuySignalSnapshotImmutabilityIntegration:
             assert float(row_after["merged_score"]) == pytest.approx(0.65, rel=1e-6)
             assert float(row_after["kronos_score"]) == pytest.approx(0.60, rel=1e-6)
             assert row_after["source_run_id"] == 991001
-            assert row_after["available_at"] == finalized_at
+            assert row_after["available_at"] == expected_finalized_at
 
         finally:
             cleanup_test_data(conn, instrument_id, as_of_date, run_ids)
