@@ -215,7 +215,7 @@ class TestBuySignalSnapshotImmutabilityIntegration:
             writer.write(snapshot1, source_run_id=991001, available_at=finalized_at)
 
             row_v1 = fetch_snapshot_row(conn, instrument_id, as_of_date)
-            assert row_v1["merged_score"] == pytest.approx(0.65, rel=1e-6)
+            assert float(row_v1["merged_score"]) == pytest.approx(0.65, rel=1e-6)
             assert row_v1["available_at"] == finalized_at
 
             # Attempt upsert v2 with different values
@@ -229,8 +229,8 @@ class TestBuySignalSnapshotImmutabilityIntegration:
 
             # Verify immutability: v1 should remain unchanged
             row_after = fetch_snapshot_row(conn, instrument_id, as_of_date)
-            assert row_after["merged_score"] == pytest.approx(0.65, rel=1e-6)
-            assert row_after["kronos_score"] == pytest.approx(0.60, rel=1e-6)
+            assert float(row_after["merged_score"]) == pytest.approx(0.65, rel=1e-6)
+            assert float(row_after["kronos_score"]) == pytest.approx(0.60, rel=1e-6)
             assert row_after["source_run_id"] == 991001
             assert row_after["available_at"] == finalized_at
 
@@ -272,7 +272,7 @@ class TestBuySignalSnapshotImmutabilityIntegration:
 
             # Verify repairability
             row = fetch_snapshot_row(conn, instrument_id, as_of_date)
-            assert row["merged_score"] == pytest.approx(0.80, rel=1e-6)
+            assert float(row["merged_score"]) == pytest.approx(0.80, rel=1e-6)
             assert row["source_run_id"] == 991002
             assert row["available_at"] is None
 
@@ -349,9 +349,9 @@ class TestBuySignalSnapshotImmutabilityIntegration:
             )
 
             row = fetch_snapshot_row(conn, instrument_id, as_of_date.isoformat())
-            assert row["kronos_score"] == pytest.approx(0.6, rel=1e-6)
-            assert row["sentiment_score"] == pytest.approx(0.7, rel=1e-6)
-            assert row["merged_score"] == pytest.approx(0.65, rel=1e-6)
+            assert float(row["kronos_score"]) == pytest.approx(0.6, rel=1e-6)
+            assert float(row["sentiment_score"]) == pytest.approx(0.7, rel=1e-6)
+            assert float(row["merged_score"]) == pytest.approx(0.65, rel=1e-6)
             assert row["source_run_id"] == 994001
             assert row["available_at"] is None
 
