@@ -63,6 +63,68 @@ def get_test_connection():
     )
 
 
+def create_test_instrument(conn, instrument_id: int):
+    """Create instrument row with specified ID for FK compliance."""
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    with conn.cursor() as cursor:
+        cursor.execute(
+            """
+            INSERT IGNORE INTO instrument
+            (id, input_ticker, provider_ticker, display_ticker, name, asset_class,
+             active, is_portfolio, region_exposure, sector_profile, top_holdings_profile,
+             macro_profile, created_at, updated_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (
+                instrument_id,
+                f"TEST{instrument_id}",
+                f"TEST{instrument_id}.US",
+                f"TEST{instrument_id}",
+                f"Test Instrument {instrument_id}",
+                "equity",
+                1,
+                0,
+                "[]",
+                "[]",
+                "[]",
+                "[]",
+                now,
+                now,
+            ),
+        )
+    conn.commit()
+
+
+def create_test_pipeline_run(conn, run_id: int):
+    """Create pipeline_run row with specified ID for FK compliance."""
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    run_key = f"test-run-{run_id}"
+    with conn.cursor() as cursor:
+        cursor.execute(
+            """
+            INSERT IGNORE INTO pipeline_run
+            (id, run_id, run_key, run_path, created_at, status,
+             summary_generated, decision_entry_count, decision_watch_count,
+             decision_hold_count, decision_no_trade_count)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (
+                run_id,
+                run_key,
+                run_key,
+                "/tmp/test",
+                now,
+                "completed",
+                0,
+                0,
+                0,
+                0,
+                0,
+            ),
+        )
+    conn.commit()
+
+
 def create_test_snapshot(**overrides) -> SepaSnapshot:
     """Create a SepaSnapshot with default test values."""
     defaults = {
@@ -95,12 +157,26 @@ def create_test_snapshot(**overrides) -> SepaSnapshot:
     return SepaSnapshot(**defaults)
 
 
-def cleanup_test_data(conn, instrument_id: int, as_of_date: str):
-    """Remove test data for clean state."""
+def cleanup_test_data(conn, instrument_id: int, as_of_date: str, run_ids: list = None):
+    """Remove test data for clean state.
+
+    Cleanup order: snapshots -> pipeline_run -> instrument
+    to respect FK constraints.
+    """
     with conn.cursor() as cursor:
         cursor.execute(
             "DELETE FROM instrument_sepa_snapshot WHERE instrument_id = %s AND as_of_date = %s",
             (instrument_id, as_of_date)
+        )
+        if run_ids:
+            placeholders = ",".join(["%s"] * len(run_ids))
+            cursor.execute(
+                f"DELETE FROM pipeline_run WHERE id IN ({placeholders})",
+                tuple(run_ids)
+            )
+        cursor.execute(
+            "DELETE FROM instrument WHERE id = %s",
+            (instrument_id,)
         )
     conn.commit()
 
@@ -128,10 +204,15 @@ class TestSepaSnapshotImmutabilityIntegration:
         conn = get_test_connection()
         instrument_id = 999991
         as_of_date = "2024-01-15"
+        run_ids = [100, 200]
 
         try:
-            cleanup_test_data(conn, instrument_id, as_of_date)
+            # Create fixtures for FK compliance
+            create_test_instrument(conn, instrument_id)
+            for rid in run_ids:
+                create_test_pipeline_run(conn, rid)
 
+            cleanup_test_data(conn, instrument_id, as_of_date)
             writer = SepaSnapshotWriter(conn)
 
             # Step 1: Insert unfinalized snapshot
@@ -179,7 +260,7 @@ class TestSepaSnapshotImmutabilityIntegration:
                 "available_at should be stable after finalize"
 
         finally:
-            cleanup_test_data(conn, instrument_id, as_of_date)
+            cleanup_test_data(conn, instrument_id, as_of_date, run_ids)
             conn.close()
 
     def test_unfinalized_row_remains_repairable(self):
@@ -192,10 +273,15 @@ class TestSepaSnapshotImmutabilityIntegration:
         conn = get_test_connection()
         instrument_id = 999992
         as_of_date = "2024-01-16"
+        run_ids = [100, 200]
 
         try:
-            cleanup_test_data(conn, instrument_id, as_of_date)
+            # Create fixtures for FK compliance
+            create_test_instrument(conn, instrument_id)
+            for rid in run_ids:
+                create_test_pipeline_run(conn, rid)
 
+            cleanup_test_data(conn, instrument_id, as_of_date)
             writer = SepaSnapshotWriter(conn)
 
             # Step 1: Insert unfinalized snapshot
@@ -238,7 +324,7 @@ class TestSepaSnapshotImmutabilityIntegration:
                 "available_at should remain NULL until finalize"
 
         finally:
-            cleanup_test_data(conn, instrument_id, as_of_date)
+            cleanup_test_data(conn, instrument_id, as_of_date, run_ids)
             conn.close()
 
     def test_source_run_id_not_deleted_by_null_upsert(self):
@@ -249,10 +335,15 @@ class TestSepaSnapshotImmutabilityIntegration:
         conn = get_test_connection()
         instrument_id = 999993
         as_of_date = "2024-01-17"
+        run_ids = [100]
 
         try:
-            cleanup_test_data(conn, instrument_id, as_of_date)
+            # Create fixtures for FK compliance
+            create_test_instrument(conn, instrument_id)
+            for rid in run_ids:
+                create_test_pipeline_run(conn, rid)
 
+            cleanup_test_data(conn, instrument_id, as_of_date)
             writer = SepaSnapshotWriter(conn)
 
             # Step 1: Insert with source_run_id=100
@@ -279,5 +370,5 @@ class TestSepaSnapshotImmutabilityIntegration:
                 "source_run_id should NOT be deleted by NULL upsert"
 
         finally:
-            cleanup_test_data(conn, instrument_id, as_of_date)
+            cleanup_test_data(conn, instrument_id, as_of_date, run_ids)
             conn.close()
