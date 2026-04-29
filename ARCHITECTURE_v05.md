@@ -1,8 +1,8 @@
 # ARCHITECTURE v0.5 – Evidence Engine Lite
 
 stock-project · v0.5 · Architekturvertrag  
-Status: **active**  
-Stand: **2026-04-27**  
+Status: **completed**  
+Stand: **2026-04-29**  
 Basiert auf: **abgeschlossenem v0.4 Truth Layer**
 
 ## Leitprinzip
@@ -16,6 +16,12 @@ Evidence Engine Lite darf nicht klug wirken.
 Sie muss ehrlich zählen — und sichtbar machen, welche Zählung überhaupt zulässig ist.
 ```
 
+Der Abschluss von v0.5 ist dokumentiert in:
+
+```text
+docs/v05_evidence_engine_closure_audit.md
+```
+
 ---
 
 ## 1. Ziel
@@ -23,20 +29,19 @@ Sie muss ehrlich zählen — und sichtbar machen, welche Zählung überhaupt zul
 v0.5 beantwortet:
 
 ```text
-Was lässt sich aus vergangenen Trade-Outcomes und vorhandenen Signalzuständen belastbar lernen?
+Welche historischen Trade-Entscheidungssituationen hatten welche Outcomes?
+Welche Samples sind voll anti-hindsight-validiert?
+Welche Samples sind nur outcome-only?
+Welche Samples sind auszuschließen?
 ```
 
-Zwei Evidence-Arten:
+Kernmodell:
 
 ```text
-1. Trade Outcome Evidence
-   aus abgeschlossenen trade_campaign / trade_event
-
-2. Signal Forward-Return Evidence
-   aus zeitlich bekannten Signalzuständen mit späterem Forward Return
+Trade = Entry-Kontext + späteres Outcome
 ```
 
-Diese Quellen werden nie still vermischt.
+Die Engine aggregiert Klassen von Situationen, keine Einzelfall-Anekdoten.
 
 ---
 
@@ -55,6 +60,8 @@ keine Portfolio-Rebalancing-Engine
 keine Makro-Schicht
 keine Mutation an trade_campaign oder trade_event
 keine UI als Pflicht-Gate
+keine Recommendation Engine
+keine Forward-Return-Signal-Bucket-Entscheidungsebene
 ```
 
 ---
@@ -68,8 +75,8 @@ SELECT aus trade_campaign
 SELECT aus trade_event
 SELECT aus instrument_*_snapshot
 SELECT aus instrument
-Console-/Markdown-Ausgabe erzeugen
-Report-Dateien erzeugen
+SELECT aus pipeline_run
+EvidenceReadout als neutrale Datenstruktur erzeugen
 ```
 
 Nicht erlaubt:
@@ -79,124 +86,109 @@ UPDATE trade_campaign
 UPDATE trade_event
 DELETE/INSERT in Truth-Layer-Tabellen
 Instrument-State ändern
-Migrationen
+Migrationen aus Evidence heraus starten
 Apply-Kommandos
 ```
 
----
-
-## 4. Evidence Sources
-
-### 4.1 `trade_outcome`
-
-Quelle:
-
-```text
-trade_campaign
-trade_event
-trade_migration_log
-instrument
-Snapshot-IDs auf trade_event
-```
-
-Beantwortet:
-
-```text
-Wie gut waren live/paper/pseudo Entscheidungen?
-Welche Entry-/Exit-Pfade führten zu welchen Outcomes?
-Welche Exit Reasons waren teuer oder nützlich?
-```
-
-### 4.2 `signal_forward_return`
-
-Quelle:
-
-```text
-zeitlich bekannte Signalzustände
-spätere Forward Returns
-```
-
-Signalquellen:
-
-```text
-sepa
-epa
-buy_signal
-kronos
-sentiment
-custom
-```
-
-Beantwortet:
-
-```text
-Wie verhielten sich Signalzustände danach am Markt?
-Hatten bestimmte Score-/Signal-Buckets bessere Forward Returns?
-```
-
-Startumfang:
-
-```text
-sourceTable = instrument_sepa_snapshot
-signalSource = sepa
-horizonDays = 5
-forward_return_5d, falls vorhanden
-Score-Bucket aus vorhandenen SEPA-Score-Feldern
-```
-
-Die Architektur bleibt quellenagnostisch. Weitere Signalquellen werden durch neue Extractor-Chunks angeschlossen, nicht durch Umbau der Evidence Engine.
+Evidence liest. Evidence entscheidet nicht. Evidence mutiert nicht.
 
 ---
 
-## 5. Zentrale Datenmodelle
+## 4. Evidence-Klassen
 
-Bereits angelegt in C1:
+### `eligible_full`
+
+Bedeutung:
 
 ```text
-EvidenceSource
+Trade-Outcome valide.
+Entry-Snapshots DB-level gegen Anti-Hindsight und Run-Provenance validiert.
+```
+
+Nur `eligible_full` darf später Eingang für signalbasierte Entry-Evidence werden.
+
+### `eligible_outcome_only`
+
+Bedeutung:
+
+```text
+Trade-Outcome valide.
+Entry-Kontext fehlt, ist seed-basiert oder nicht vollständig anti-hindsight-validiert.
+```
+
+Darf in Outcome-Aggregationen erscheinen, aber nicht als vollwertige Signal-Evidence gelten.
+
+### `excluded`
+
+Bedeutung:
+
+```text
+Sample ist für Aggregation unzulässig.
+```
+
+Beispiele:
+
+```text
+open campaign
+invalid_time_order
+missing_closed_at
+missing_pnl
+unknown_state
+```
+
+---
+
+## 5. Anti-Hindsight-Invarianten
+
+Ein Snapshot darf nur `eligible_full` stützen, wenn alle Bedingungen erfüllt sind:
+
+```text
+snapshot_id vorhanden
+snapshot row existiert
+snapshot.instrument_id == sample.instrument_id
+snapshot.source_run_id vorhanden
+snapshot.available_at vorhanden
+snapshot.available_at <= entry timestamp
+pipeline_run existiert
+pipeline_run.status = success
+pipeline_run.exit_code = 0
+pipeline_run.finished_at vorhanden
+snapshot.available_at >= pipeline_run.finished_at
+```
+
+Wenn eine Bedingung fehlschlägt:
+
+```text
+eligible_outcome_only oder excluded
+niemals eligible_full
+```
+
+Die technische Prüfung liegt in:
+
+```text
+web/src/Service/Evidence/SnapshotValidationService.php
+```
+
+---
+
+## 6. Zentrale Datenmodelle
+
+Kernmodelle:
+
+```text
+EvidenceTradeSample
 EvidenceEligibilityStatus
 EvidenceExclusionReason
 EvidenceDataQualityFlag
 EvidenceConfidenceLevel
-EvidenceTradeSample
-EvidenceSignalSample
 EvidenceMetricSummary
-SignalSource
-SignalFamily
-```
-
-### EvidenceSource
-
-```text
-trade_outcome
-signal_forward_return
-```
-
-### SignalSource
-
-```text
-sepa
-epa
-buy_signal
-kronos
-sentiment
-custom
-```
-
-### SignalFamily
-
-```text
-structure
-execution
-risk
-sentiment
-composite
-unknown
+EvidenceReadout
+SnapshotValidationResult
 ```
 
 ### EvidenceTradeSample
 
-Mindestfelder:
+Wichtige Felder:
 
 ```text
 campaignId
@@ -206,9 +198,6 @@ campaignState
 openedAt
 closedAt nullable
 holdingDays nullable
-totalQuantity
-openQuantity
-avgEntryPrice
 realizedPnlGross nullable
 realizedPnlNet nullable
 realizedPnlPct nullable
@@ -236,40 +225,11 @@ realizedPnlPct ist Ratio.
 0.30 = 30 %
 ```
 
-### EvidenceSignalSample
-
-Mindestfelder:
-
-```text
-signalSource
-signalFamily nullable
-sourceTable nullable
-sourceId
-instrumentId
-asOfAt
-horizonDays nullable
-forwardReturnPct nullable
-score nullable
-scoreBucket nullable
-signalVersion nullable
-detailRef nullable
-eligibilityStatus nullable
-exclusionReason nullable
-dataQualityFlags[]
-```
-
-Konvention:
-
-```text
-forwardReturnPct ist Ratio.
-0.08 = 8 %
-```
-
 ---
 
-## 6. Trade Outcome Extractor
+## 7. Trade Outcome Extractor
 
-C2 erzeugt `EvidenceTradeSample` aus terminalen Campaigns.
+`TradeOutcomeExtractor` erzeugt `EvidenceTradeSample` aus terminalen Campaigns.
 
 Terminale States:
 
@@ -300,141 +260,153 @@ migration_seed/manual_seed werden markiert
 returned_to_watchlist ist abgeschlossen, aber eigene Outcome-Klasse
 ```
 
+Wichtig:
+
+```text
+TradeOutcomeExtractor liest.
+TradeOutcomeExtractor schreibt nicht.
+```
+
 ---
 
-## 7. Eligibility + Anti-Hindsight Core
+## 8. Eligibility Evaluator
 
-Anti-Hindsight gehört in Extractor und Eligibility, nicht erst in ein spätes Report-Gate.
-
-Eligibility:
+`EvidenceEligibilityEvaluator` klassifiziert Samples in:
 
 ```text
 eligible_full
 eligible_outcome_only
-eligible_snapshot_only
 excluded
 ```
 
-Exclusion Reasons:
+Regelreihenfolge:
 
 ```text
-open_campaign
-invalid_time_order
-missing_closed_at
-missing_pnl
-missing_required_snapshot
-snapshot_after_event
-snapshot_instrument_mismatch
-migration_seed_entry_unusable
-manual_seed_warning
-unknown_state
-unsupported_trade_type
-missing_forward_return
-missing_score
+1. State-/Terminal-Prüfung
+2. Zeitreihenfolge
+3. Pflichtfelder closed_at / realized_pnl_pct
+4. Seed-Downgrade
+5. Missing-Snapshot-Downgrade
+6. SnapshotValidationService-Downgrade bei invaliden Snapshots
+7. nur dann eligible_full
 ```
 
-Anti-Hindsight-Regeln:
+Seeds bleiben konservativ:
 
 ```text
-snapshot.as_of_date <= event_timestamp
-snapshot.instrument_id == trade.instrument_id
-Signal as_of_at <= measured outcome horizon start
+migration_seed → eligible_outcome_only
+manual seed    → eligible_outcome_only
 ```
 
-Wenn Snapshot-/Signal-Kontext nicht validiert wird, darf er nicht still `eligible_full` erzeugen.
+Auch wenn Snapshots später validierbar wären, machen Seeds keine vollwertige Entry-Evidence.
 
-Legacy-Regel:
+---
+
+## 9. Snapshot Validation Foundation
+
+Snapshot-Tabellen:
 
 ```text
-migration_seed mit Snapshot NULL darf nicht als normaler Entry-Evidence-Fall behandelt werden.
+instrument_buy_signal_snapshot
+instrument_sepa_snapshot
+instrument_epa_snapshot
+```
+
+v0.5-Provenance-Felder:
+
+```text
+source_run_id → pipeline_run.id
+available_at → Zeitpunkt, ab dem der Snapshot verfügbar ist
+```
+
+`pipeline_run` bleibt die kanonische Run-Provenance. Es gibt keine zweite Evidence-spezifische Run-Tabelle.
+
+### SEPA / EPA
+
+SEPA und EPA schreiben `source_run_id` beim Write und finalisieren `available_at` erst nach erfolgreichem Run:
+
+```text
+finalize_snapshots_for_run(source_run_id, finished_at)
+```
+
+### BuySignal
+
+BuySignal schreibt `source_run_id` und `available_at` direkt aus dem Run-Kontext.
+
+Der Writer allein ist nicht das Eligibility-Gate. Die finale Freigabe erfolgt immer über `SnapshotValidationService`.
+
+---
+
+## 10. Writer-Immutability
+
+Finalisierte Snapshot-Zeilen sind immutable.
+
+Wenn `available_at IS NOT NULL` gilt:
+
+```text
+Business-Felder dürfen nicht mehr überschrieben werden.
+source_run_id darf nicht mehr wechseln.
+available_at bleibt stabil.
+updated_at bleibt stabil.
+```
+
+Wenn `available_at IS NULL` gilt:
+
+```text
+Business-Felder bleiben reparierbar.
+source_run_id darf auf neuen non-null Run wechseln.
+NULL source_run_id darf bestehende source_run_id nicht löschen.
+```
+
+Diese Invariante verhindert:
+
+```text
+neuer Inhalt + alte Verfügbarkeit = Hindsight-Korruption
+```
+
+Abgesichert durch:
+
+```text
+stock-system/tests/test_sepa_snapshot_writer.py
+stock-system/tests/test_epa_snapshot_writer.py
+stock-system/tests/test_buy_signal_snapshot_writer.py
+stock-system/tests/test_sepa_snapshot_integration.py
+stock-system/tests/test_epa_snapshot_integration.py
+stock-system/tests/test_buy_signal_snapshot_integration.py
 ```
 
 ---
 
-## 8. Signal Evidence Extractor
-
-C2b heißt konzeptionell:
-
-```text
-Signal Snapshot Evidence Extractor
-```
-
-Start-Scope:
-
-```text
-signalSource = sepa
-sourceTable = instrument_sepa_snapshot
-horizonDays = 5
-forward_return_5d lesen
-Score-Buckets bilden
-```
-
-Nicht in C2b:
-
-```text
-keine Kronos-Extraktion
-keine Sentiment-Extraktion
-keine neue generische Signal-Tabelle
-keine Berechnung neuer Forward Returns
-keine Campaign-Verknüpfung
-```
-
-Spätere mögliche Extractor-Chunks:
-
-```text
-Kronos Signal Evidence Extractor
-Sentiment Signal Evidence Extractor
-Buy-Signal Evidence Extractor
-EPA Signal Evidence Extractor
-```
-
-Nur anschließen, wenn Signalquelle zeitlich sauber ist:
-
-```text
-instrument_id vorhanden
-as_of_at/as_of_date vorhanden
-Signalversion oder Herkunft nachvollziehbar
-kein Hindsight
-Forward Return vorhanden oder sauber berechenbar
-```
-
----
-
-## 9. Aggregation Rules
+## 11. Aggregation Rules
 
 Aggregatoren zählen. Sie entscheiden nicht.
 
 Pflicht pro Aggregation:
 
 ```text
-source
-signalSource nullable
 bucketKey
 bucketLabel
-timeWindow
-horizonDays nullable
 n
+winRate
 avgReturn
 minReturn
 maxReturn
 confidenceLevel
+eligibleFullCount
+outcomeOnlyCount
+excludedCount
 dataQualityFlags
-exclusion summary
 ```
 
-Zeitfenster:
+Entry- und Exit-Aggregatoren dürfen Outcome-Metriken über `eligible_full` und `eligible_outcome_only` bilden, müssen die Zusammensetzung aber sichtbar halten.
 
-```text
-all_time
-last_12_months
-before_last_12_months
-```
+Signalbasierte Entry-Evidence in v0.6 darf dagegen nur `eligible_full` verwenden.
 
 ---
 
-## 10. Confidence Rules
+## 12. Confidence Rules
 
-Confidence ist eine Evidence-Stufe, kein statistischer 95%-Koeffizient.
+Confidence ist eine Evidence-Stufe, kein statistisches Wahrheitszertifikat.
 
 ```text
 n < 5      → anecdotal
@@ -464,135 +436,144 @@ standard_error_of_mean
 Warnflags:
 
 ```text
-low_sample_size
-high_variance
-wide_min_max_range
-contains_seed_data
-mixed_periods
-snapshot_incomplete
+low_confidence_evidence
+contains_outcome_only_samples
+no_full_entry_evidence
+contains_excluded_samples
 ```
 
 ---
 
-## 11. Report Architektur
+## 13. Readout Architektur
 
-Report-Logik gehört nicht in Command oder Controller.
+`EvidenceReadoutBuilder` erzeugt neutrale Readouts.
+
+Erlaubt:
 
 ```text
-EvidenceReportService
-  → liefert reine Report-Datenstruktur
-
-EvidenceReportCommand
-  → dünner Adapter für Console/Markdown
-
-EvidenceController später
-  → dünner Adapter für UI
+Warnings
+Counts
+Aggregierte Metriken
+Data-Quality-Codes
 ```
 
-Report-Inhalte:
+Nicht erlaubt:
 
 ```text
-Dataset Summary
-Trade Evidence
-Signal Evidence
-Exclusions
-Confidence Warnings
-Time Windows
-Anti-Hindsight Notes
-Evidence Run Fingerprint
+Kaufen
+Verkaufen
+Trimmen
+Rating
+Score-Empfehlung
+```
+
+Der Readout bleibt maschinenlesbar und recommendation-frei.
+
+---
+
+## 14. Implemented Chunks
+
+```text
+C1   Evidence Read Models                         completed
+C2   TradeOutcomeExtractor                        completed
+C3   EvidenceEligibilityEvaluator                 completed
+C4   EntryEvidenceAggregator                      completed
+C5   ExitEvidenceAggregator                       completed
+C6   EvidenceConfidenceCalculator                 completed
+C7   EvidenceReadoutBuilder                       completed
+C8   Validation Fixtures / Poison Pills           completed
+C9   Snapshot Validation Foundation               completed
+C10a Writer Provenance + Immutability             completed
+C10b SnapshotValidationService                    completed
+C10c Eligibility Integration                      completed
+C10d Writer-Immutability Tests                    completed
 ```
 
 ---
 
-## 12. Validation Fixtures / Poison Pills
+## 15. Tests
 
-Fixtures müssen vor Aggregatoren belastbar sein.
-
-Pflichtszenarien:
+Relevante PHP-Testgruppen:
 
 ```text
-closed_profit
-closed_loss
-closed_neutral
-returned_to_watchlist
-paper closed_profit
-migration_seed
-open campaign
-missing snapshot
+web/tests/Service/Evidence/EvidenceEligibilityEvaluatorTest.php
+web/tests/Service/Evidence/SnapshotValidationServiceTest.php
+web/tests/Service/Evidence/EvidenceReadoutBuilderTest.php
+web/tests/Service/Evidence/EntryEvidenceAggregatorTest.php
+web/tests/Service/Evidence/ExitEvidenceAggregatorTest.php
+web/tests/Service/Evidence/TradeOutcomeExtractorIntegrationTest.php
 ```
 
-Poison Pills:
+Relevante Python-Testgruppen:
 
 ```text
-opened_at > closed_at
-snapshot.as_of_date > event_timestamp
-snapshot.instrument_id != campaign.instrument_id
-terminal campaign ohne realized_pnl_pct
-migration_seed mit Snapshot NULL
+stock-system/tests/test_sepa_snapshot_writer.py
+stock-system/tests/test_epa_snapshot_writer.py
+stock-system/tests/test_buy_signal_snapshot_writer.py
+stock-system/tests/test_sepa_snapshot_integration.py
+stock-system/tests/test_epa_snapshot_integration.py
+stock-system/tests/test_buy_signal_snapshot_integration.py
 ```
 
-Anforderung:
+MariaDB-Integrationstests müssen gegen `stock_project_test` laufen und verweigern andere Datenbanken.
+
+---
+
+## 16. Known Non-Blockers
 
 ```text
-System darf nicht crashen.
-Es muss ausschließen und begründen.
+EvidenceTradeSample nutzt openedAt als Entry-Zeitpunkt.
+Der kanonische TradeEventWriter setzt opened_at aus event_timestamp.
+Langfristig kann ein expliziter entryEventTimestamp sinnvoll sein.
+
+BuySignal Snapshot bleibt DBAL/table-only ohne Doctrine Entity.
+SnapshotValidationService validiert BuySignal bewusst direkt per DBAL.
+
+Alte Snapshots ohne Provenance bleiben eligible_outcome_only.
+Kein Backfill ist für v0.5 erforderlich.
+
+Snapshot-Versionierung für Policy/Scoring bleibt v0.6/v0.7-Follow-up.
 ```
 
 ---
 
-## 13. Chunk Plan
+## 17. v0.5 Definition of Done
 
 ```text
-C1  Evidence Read Models                         completed
-C2  Closed Trade Outcome Extractor               active
-C3  Eligibility + Anti-Hindsight Core            planned
-C6  Confidence Calculator                         planned
-C8  Validation Fixtures / Poison Pills           planned
-C2b Signal Snapshot Evidence Extractor           planned
-C4  Entry Evidence Aggregator                     planned
-C5  Exit Evidence Aggregator                      planned
-C7  Evidence Report Service + Command            planned
-C10 Evidence Audit Gate                           planned
-C9  Minimal UI                                    optional
+Trade Evidence read-only
+Eligibility/Exclusion sichtbar
+eligible_full nur über DB-validierte Snapshots
+Anti-Hindsight DB-level validiert
+Confidence mit n und Streuung
+Readout mit Warning-Codes
+Keine Mutation am Truth Layer
+Keine Recommendation-Semantik
+Writer-Provenance vorhanden
+Writer-Immutability getestet
+```
+
+Status:
+
+```text
+v0.5 closed = yes
 ```
 
 ---
 
-## 14. Review-Regeln für v0.5 PRs
+## 18. Gate zu v0.6
+
+v0.6 darf starten.
+
+Zwingende Regeln:
 
 ```text
-1. Ist der Chunk read-only?
-2. Werden trade types getrennt?
-3. Werden migration_seed/manual_seed korrekt behandelt?
-4. Werden offene Campaigns ausgeschlossen?
-5. Sind n und confidence sichtbar, wo aggregiert wird?
-6. Gibt es Exclusion Reasons?
-7. Wird Hindsight früh ausgeschlossen oder konservativ begrenzt?
-8. Gibt es heimliche UI-/Migration-/Scope-Erweiterung?
-9. Sind Tests schema-kompatibel und deterministisch?
-10. Bleibt der Diff eng?
+eligible_full bleibt einziger Eingang für signalbasierte Entry-Evidence.
+eligible_outcome_only darf nicht still als Signal-Evidence behandelt werden.
+Keine Buy/Sell-UI.
+Keine Recommendation Engine.
+Keine Forward-Return-Leakage.
+Keine Rücknahme der C10d-Immutability-Regeln.
 ```
 
----
-
-## 15. Definition of Done v0.5
-
-```text
-C1 grün
-C2 grün
-C3 grün
-C6 grün
-C8 grün
-C2b grün
-C4 grün
-C5 grün
-C7 grün
-C10 grün
-```
-
-C9 UI ist kein Abschlusskriterium.
-
-```text
-v0.5 baut nicht den besseren Trader.
-v0.5 baut die erste ehrliche Lernschicht.
-```
+v0.6 baut nicht den Trader.  
+v0.6 baut die erste echte Signal-Bucket-Evidence-Schicht.

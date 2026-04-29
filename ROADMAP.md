@@ -1,10 +1,13 @@
 # ROADMAP.md
 
+Stand: 2026-04-29  
+Status: v0.5 abgeschlossen, v0.6 nächster aktiver Entwicklungsabschnitt
+
 ## Nordstern
 
-**stock-project v1.0** ist ein lokaler, erklärbarer Decision Assistant für Aktien, der Signale, Trade-History, Snapshot-Evidence, Makro-Regime und Portfolio-Risiko zu auditierbaren Kauf-, Halte-, Trim- und Exit-Entscheidungen verbindet.
+**stock-project v1.0** ist ein lokaler, erklärbarer Decision Assistant für Aktien. Das System verbindet Signalzustände, Trade-History, Snapshot-Evidence, Makro-Kontext und Portfolio-Risiko zu auditierbaren Entscheidungshilfen.
 
-Das System ist kein autonomer Trader.
+Das System ist **kein autonomer Trader**.
 
 ```text
 Keine Broker-Anbindung.
@@ -22,35 +25,39 @@ Der Nutzer entscheidet final.
    - Erst echte Trade-History, dann Evidence, dann Decision Workbench.
 
 2. **Evidence before probability**
-   - Immer mit `n`, Return-Verteilung, Zeithorizont, Datenquelle und Evidenzstufe arbeiten.
+   - Jede Aussage braucht `n`, Return-Verteilung, Zeithorizont, Datenquelle und Evidenzklasse.
 
 3. **No fake certainty**
    - Kleine Fallzahlen erzeugen Hinweise, keine Regeln.
 
 4. **Snapshot timing is law**
-   - Kein Snapshot nach dem Event darf als damalige Wahrheit verwendet werden.
+   - Kein Snapshot darf als damalige Wahrheit gelten, wenn seine Verfügbarkeit zum Entry-Zeitpunkt nicht nachweisbar ist.
 
 5. **Version everything**
-   - `scoring_version`, `policy_version`, `model_version`, `macro_version` gehören in den Kontext.
+   - `scoring_version`, `policy_version`, `model_version`, `macro_version` bleiben Teil des Kontexts.
 
 6. **Live/Paper/Pseudo getrennt**
-   - Keine stille Vermischung.
+   - Keine stille Vermischung von Datenregimen.
 
 7. **Macro is a filter, not an oracle**
 
 8. **LLMs explain, they do not decide**
 
 9. **Read-only Evidence**
-   - Evidence Engine liest den Truth Layer und mutiert keine Trade-Wahrheit.
+   - Evidence liest Truth Layer und Snapshots. Evidence verändert keine Trade-Wahrheit.
 
 ---
 
 ## Aktueller Status
 
 ```text
-v0.4 Truth Layer: completed
-v0.5 Evidence Engine Lite: active
-v0.6 Exit Engine & Portfolio Core: planned
+v0.4 Truth Layer:                 completed
+v0.5 Evidence Engine Lite:        completed
+v0.6 Signal Evidence Layer:       next
+v0.7 Exit Engine & Portfolio Core planned
+v0.8 Macro Layer:                 planned
+v0.9 LLM / Analyst Layer:         planned
+v1.0 Decision Workbench:          target
 ```
 
 Kanonische Architekturdateien:
@@ -58,6 +65,7 @@ Kanonische Architekturdateien:
 ```text
 ARCHITECTURE_v04.md
 ARCHITECTURE_v05.md
+docs/v05_evidence_engine_closure_audit.md
 ```
 
 Operativer Navigationsanker:
@@ -121,161 +129,187 @@ ARCHITECTURE_v04.md
 
 ## v0.5 – Evidence Engine Lite
 
-Status: **active**
+Status: **completed**
 
-Canonical architecture:
+Canonical architecture and closure audit:
 
 ```text
 ARCHITECTURE_v05.md
+docs/v05_evidence_engine_closure_audit.md
 ```
 
 ### Ziel
 
-Read-only Evidence Engine, die aus vorhandenen Daten ehrlich zählt:
+v0.5 baut die erste ehrliche Lernschicht über abgeschlossene Trade-Entscheidungen.
+
+Kernmodell:
 
 ```text
-1. Trade Outcome Evidence
-2. Signal Forward-Return Evidence
+Trade = Signalzustand zum Entry + späteres Outcome
 ```
 
-### Nicht-Ziele
+v0.5 beantwortet nicht „Was soll ich kaufen?“, sondern:
 
 ```text
-kein ML
-keine LLM-Entscheidung
+Welche Klassen historischer Entscheidungssituationen hatten welche Outcomes?
+Welche Samples sind voll validiert?
+Welche Samples sind nur outcome-only?
+Welche Samples sind auszuschließen?
+```
+
+### Evidenzklassen
+
+```text
+eligible_full
+  Outcome valide und Entry-Snapshots DB-level anti-hindsight-validiert.
+
+eligible_outcome_only
+  Outcome valide, aber Entry-Kontext nicht voll validiert, seed-basiert oder unvollständig.
+
+excluded
+  Sample darf nicht aggregiert werden.
+```
+
+### Anti-Hindsight-Invarianten
+
+Ein Snapshot darf nur `eligible_full` stützen, wenn:
+
+```text
+snapshot_id vorhanden
+snapshot row existiert
+snapshot.instrument_id == sample.instrument_id
+snapshot.source_run_id vorhanden
+snapshot.available_at vorhanden
+snapshot.available_at <= entry timestamp
+pipeline_run existiert
+pipeline_run.status = success
+pipeline_run.exit_code = 0
+pipeline_run.finished_at vorhanden
+snapshot.available_at >= pipeline_run.finished_at
+```
+
+Wenn eine dieser Bedingungen nicht erfüllt ist:
+
+```text
+eligible_outcome_only oder excluded
+niemals eligible_full
+```
+
+### Umgesetzte Chunks
+
+```text
+C1   Evidence Read Models                         completed
+C2   TradeOutcomeExtractor                        completed
+C3   EvidenceEligibilityEvaluator                 completed
+C4   EntryEvidenceAggregator                      completed
+C5   ExitEvidenceAggregator                       completed
+C6   EvidenceConfidenceCalculator                 completed
+C7   EvidenceReadoutBuilder                       completed
+C8   Test Fixtures / Poison Pills                 completed
+C9   Snapshot Validation Foundation               completed
+C10a Writer Provenance + Immutability             completed
+C10b SnapshotValidationService                    completed
+C10c Eligibility Integration                      completed
+C10d Writer-Immutability Tests                    completed
+```
+
+### Nicht-Ziele von v0.5
+
+```text
+keine Buy/Sell-Empfehlungen
+keine Recommendation Engine
+keine UI/API als Pflicht-Gate
+keine DB-Persistenz der Readouts
+kein Backfill alter Snapshots zu eligible_full
+keine Forward-Return-Signal-Buckets als aktive Entscheidungsebene
 keine Broker-Automation
 keine Sizing-Automation
-keine Write-Operationen auf Trade-Truth-Tabellen
 keine automatische Live-Gewichtsänderung
-UI nicht als Pflicht-Gate
 ```
 
-### Grundregel
+### Definition of Done
 
 ```text
-Evidence Engine Lite darf nicht klug wirken.
-Sie muss ehrlich zählen — und sichtbar machen, welche Zählung überhaupt zulässig ist.
-```
-
-### Evidence Sources
-
-```text
-trade_outcome
-signal_forward_return
-```
-
-Signalquellen:
-
-```text
-sepa
-epa
-buy_signal
-kronos
-sentiment
-custom
-```
-
-Die Evidence Engine bleibt quellenagnostisch. Eine Signalquelle darf ausgewertet werden, aber die Architektur darf nicht von einer einzelnen Quelle abhängen.
-
-### Chunk Plan
-
-```text
-C1  Evidence Read Models                         completed
-C2  Closed Trade Outcome Extractor               active
-C3  Eligibility + Anti-Hindsight Core            planned
-C6  Confidence Calculator                         planned
-C8  Validation Fixtures / Poison Pills           planned
-C2b Signal Snapshot Evidence Extractor           planned
-C4  Entry Evidence Aggregator                     planned
-C5  Exit Evidence Aggregator                      planned
-C7  Evidence Report Service + Command            planned
-C10 Evidence Audit Gate                           planned
-C9  Minimal UI                                    optional
-```
-
-### Parallelisierung
-
-```text
-🟢 C1 Evidence Read Models
-  │
-  ▼
-⚪ C2 Trade Outcome Extractor
-  │
-  ├───────────────┐
-  ▼               ▼
-⚪ C6 Confidence Calculator     ⚪ C8 Validation Fixtures
-```
-
-### Confidence Standard
-
-```text
-n < 5      → anecdotal
-5–19       → very_low
-20–49      → low
-50–99      → medium
-100+       → high
-```
-
-Immer zeigen:
-
-```text
-n
-avg_return
-min_return
-max_return
-confidence_level
-source
-time_window
-exclusion_summary
-```
-
-Ab `n >= 5` zusätzlich:
-
-```text
-standard_deviation
-standard_error_of_mean
-```
-
-### Anti-Hindsight
-
-Anti-Hindsight ist Teil von Extractor/Eligibility.
-
-```text
-snapshot.as_of_date <= event_timestamp
-snapshot.instrument_id == trade.instrument_id
-```
-
-Wenn Kontext nicht validiert wird, darf er nicht still voll belastbare Evidence erzeugen.
-
-### v0.5 Definition of Done
-
-```text
-Trade Evidence read-only
-Signal Evidence read-only
-Eligibility/Exclusion sichtbar
-Anti-Hindsight früh
+Truth-Layer read-only
+Outcome-Samples extrahierbar
+Eligibility sichtbar
+eligible_full nur mit DB-validierten Snapshots
+eligible_outcome_only konservativ für unvollständige/alte/Seed-Kontexte
+excluded für invalide Samples
+Aggregation nach Entry/Exit-Kontext
 Confidence mit n und Streuung
-Report Service + Command
-Keine Mutation am Truth Layer
+Readout mit maschinenlesbaren Warning-Codes
+Writer-Provenance vorhanden
+Finalisierte Snapshot-Zeilen immutable
+```
+
+v0.5 ist geschlossen.
+
+---
+
+## v0.6 – Signal Evidence Layer
+
+Status: **next**
+
+### Ziel
+
+v0.6 baut auf v0.5 auf und aggregiert **Signal-Klassen** aus voll validierten Entry-Kontexten.
+
+Nicht exakte Einzelzustände werden verglichen, sondern Buckets:
+
+```text
+SEPA >= 75
+EPA >= 70
+BuySignal decision = ENTRY/WATCH
+kombinierte Signalprofile
+```
+
+Die zentrale Regel:
+
+```text
+Nur eligible_full darf Eingang für signalbasierte Entry-Evidence sein.
+eligible_outcome_only darf nicht still als Signal-Evidence verwendet werden.
+```
+
+### v0.6 Scope
+
+```text
+Signal Bucket Read Models
+SEPA Bucket Aggregation
+EPA Bucket Aggregation
+optional BuySignal Bucket Aggregation
+Bucket-Key-Normalisierung
+n / winRate / avgReturn / min / max / confidence
+Warnings bei niedrigem n und gemischter Datenqualität
+```
+
+### Nicht enthalten
+
+```text
+keine Recommendation Engine
+keine Buy/Sell-UI
+keine automatische Trades
+keine Forward-Return-Leakage in Entry-Evidence
+keine Hindsight-Rückvalidierung alter Snapshots
 ```
 
 ---
 
-## v0.6 – Exit Engine & Portfolio Core
+## v0.7 – Exit Engine & Portfolio Core
 
 Status: **planned**
 
 Ziel:
 
 ```text
-v0.4 Truth Layer + v0.5 Evidence als Kontext für Exit-/Trim-/Hold-Entscheidungslogik nutzen.
+v0.4 Truth Layer + v0.5/v0.6 Evidence als Kontext für Exit-/Trim-/Hold-Entscheidungslogik nutzen.
 ```
 
-Bauen:
+Mögliche Bausteine:
 
 ```text
 hold / watch_tightly / trim / hard_exit / pause
-Positionsgrößen-Vorschlag
+Positionsgrößen-Hinweise
 Konzentrationswarnungen
 Cluster-/Korrelationswarnungen
 Add/Trim-Rebalancing-Logik
@@ -293,7 +327,7 @@ automatische Verkäufe
 
 ---
 
-## v0.7 – Macro Layer
+## v0.8 – Macro Layer
 
 Status: **planned**
 
@@ -318,7 +352,7 @@ Makro nur mit zum Trade-Zeitpunkt verfügbaren Daten.
 
 ---
 
-## v0.8 – LLM / Analyst Layer
+## v0.9 – LLM / Analyst Layer
 
 Status: **planned**
 
@@ -342,27 +376,7 @@ LLM entscheidet nicht numerisch.
 
 ---
 
-## v0.9 – Decision Workbench & Validation
-
-Status: **planned**
-
-Bauen:
-
-```text
-Candidate → Thesis → Entry → Monitoring → Exit
-Trade Journal
-Evidence Panel
-Sizing Panel
-Macro Context
-Robustness Checks
-Live vs Paper vs Pseudo Vergleich
-QuantStats-Reports
-Exit-Reason-Analysen
-```
-
----
-
-## v1.0 – Closed Decision Loop / Decision Dashboard
+## v1.0 – Decision Workbench / Closed Decision Loop
 
 Status: **target**
 
@@ -423,17 +437,18 @@ unlocked
    abgeschlossen
 
 2. v0.5 Evidence Engine Lite
-   aktiv
+   abgeschlossen
 
-3. v0.6 Exit Engine & Portfolio Core
+3. v0.6 Signal Evidence Layer
+   nächster Schritt
 
-4. v0.7 Macro Layer
+4. v0.7 Exit Engine & Portfolio Core
 
-5. v0.8 LLM / Analyst Layer
+5. v0.8 Macro Layer
 
-6. v0.9 Decision Workbench & Validation
+6. v0.9 LLM / Analyst Layer
 
-7. v1.0 Closed Decision Loop
+7. v1.0 Decision Workbench
 ```
 
 ---
@@ -443,6 +458,7 @@ unlocked
 ```text
 Evidence vor Truth bauen
 Trade Evidence und Signal Evidence vermischen
+eligible_outcome_only als eligible_full behandeln
 Live / Paper / Pseudo vermischen
 Hindsight-Snapshots zulassen
 LLM-Text wichtiger machen als deterministische Zahlen
@@ -457,11 +473,11 @@ Durchschnittswerte ohne Streuung und Zeitfenster überschätzen
 
 ```text
 Jetzt:
-v0.5 C2 fertigstellen
+v0.5 ist geschlossen.
 
-Morgen:
-C6 Confidence Calculator und C8 Validation Fixtures parallel
+Als Nächstes:
+v0.6 Signal Evidence Layer starten.
 
-Danach:
-Eligibility, Signal Evidence, Aggregatoren, Report
+Unverrückbare Regel:
+Signal Evidence darf nur auf eligible_full basieren.
 ```
