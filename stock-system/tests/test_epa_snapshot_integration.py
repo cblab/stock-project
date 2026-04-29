@@ -94,13 +94,16 @@ def create_test_instrument(conn, instrument_id: int):
 
 
 def create_test_pipeline_run(conn, run_id: int):
-    """Create pipeline_run row with specified ID for FK compliance."""
+    """Create pipeline_run row with specified ID for FK compliance.
+
+    Cleanup runs before this, so we can use plain INSERT (not INSERT IGNORE).
+    """
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     run_key = f"test-run-{run_id}"
     with conn.cursor() as cursor:
         cursor.execute(
             """
-            INSERT IGNORE INTO pipeline_run
+            INSERT INTO pipeline_run
             (id, run_id, run_key, run_path, created_at, status,
              summary_generated, decision_entry_count, decision_watch_count,
              decision_hold_count, decision_no_trade_count)
@@ -112,7 +115,7 @@ def create_test_pipeline_run(conn, run_id: int):
                 run_key,
                 "/tmp/test",
                 now,
-                "completed",
+                "success",
                 0,
                 0,
                 0,
@@ -186,7 +189,7 @@ class TestEpaSnapshotImmutabilityIntegration:
         conn = get_test_connection()
         instrument_id = 999991
         as_of_date = "2024-01-20"
-        run_ids = [100, 200]
+        run_ids = [991001, 991002]
 
         try:
             # Clean up first, then create fixtures for FK compliance
@@ -204,8 +207,8 @@ class TestEpaSnapshotImmutabilityIntegration:
                 total_score=0.25,
                 failure_score=0.10,
             )
-            writer.write(snapshot1, source_run_id=100, available_at=None)
-            writer.finalize_snapshots_for_run(100, "2024-01-20 18:00:00")
+            writer.write(snapshot1, source_run_id=991001, available_at=None)
+            writer.finalize_snapshots_for_run(991001, "2024-01-20 18:00:00")
 
             row_final = fetch_snapshot_row(conn, instrument_id, as_of_date)
             assert row_final["total_score"] == pytest.approx(0.25, rel=1e-6)
@@ -218,13 +221,13 @@ class TestEpaSnapshotImmutabilityIntegration:
                 total_score=0.99,
                 failure_score=0.99,
             )
-            writer.write(snapshot2, source_run_id=200, available_at="2024-01-21 10:00:00")
+            writer.write(snapshot2, source_run_id=991002, available_at="2024-01-21 10:00:00")
 
             # Verify immutability
             row_after = fetch_snapshot_row(conn, instrument_id, as_of_date)
             assert row_after["total_score"] == pytest.approx(0.25, rel=1e-6)
             assert row_after["failure_score"] == pytest.approx(0.10, rel=1e-6)
-            assert row_after["source_run_id"] == 100
+            assert row_after["source_run_id"] == 991001
             assert row_after["available_at"] == finalized_at
 
         finally:
@@ -236,7 +239,7 @@ class TestEpaSnapshotImmutabilityIntegration:
         conn = get_test_connection()
         instrument_id = 999992
         as_of_date = "2024-01-21"
-        run_ids = [100, 200]
+        run_ids = [992001, 992002]
 
         try:
             # Clean up first, then create fixtures for FK compliance
@@ -253,7 +256,7 @@ class TestEpaSnapshotImmutabilityIntegration:
                 as_of_date=as_of_date,
                 total_score=0.25,
             )
-            writer.write(snapshot1, source_run_id=100, available_at=None)
+            writer.write(snapshot1, source_run_id=992001, available_at=None)
 
             # Upsert with new values
             snapshot2 = create_test_snapshot(
@@ -261,12 +264,12 @@ class TestEpaSnapshotImmutabilityIntegration:
                 as_of_date=as_of_date,
                 total_score=0.50,
             )
-            writer.write(snapshot2, source_run_id=200, available_at=None)
+            writer.write(snapshot2, source_run_id=992002, available_at=None)
 
             # Verify repairability
             row = fetch_snapshot_row(conn, instrument_id, as_of_date)
             assert row["total_score"] == pytest.approx(0.50, rel=1e-6)
-            assert row["source_run_id"] == 200
+            assert row["source_run_id"] == 992002
             assert row["available_at"] is None
 
         finally:
@@ -278,7 +281,7 @@ class TestEpaSnapshotImmutabilityIntegration:
         conn = get_test_connection()
         instrument_id = 999993
         as_of_date = "2024-01-22"
-        run_ids = [100]
+        run_ids = [993001]
 
         try:
             # Clean up first, then create fixtures for FK compliance
@@ -293,7 +296,7 @@ class TestEpaSnapshotImmutabilityIntegration:
                 instrument_id=instrument_id,
                 as_of_date=as_of_date,
             )
-            writer.write(snapshot1, source_run_id=100, available_at=None)
+            writer.write(snapshot1, source_run_id=993001, available_at=None)
 
             snapshot2 = create_test_snapshot(
                 instrument_id=instrument_id,
@@ -303,7 +306,7 @@ class TestEpaSnapshotImmutabilityIntegration:
             writer.write(snapshot2, source_run_id=None, available_at=None)
 
             row = fetch_snapshot_row(conn, instrument_id, as_of_date)
-            assert row["source_run_id"] == 100
+            assert row["source_run_id"] == 993001
 
         finally:
             cleanup_test_data(conn, instrument_id, as_of_date, run_ids)

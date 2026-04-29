@@ -96,13 +96,16 @@ def create_test_instrument(conn, instrument_id: int):
 
 
 def create_test_pipeline_run(conn, run_id: int):
-    """Create pipeline_run row with specified ID for FK compliance."""
+    """Create pipeline_run row with specified ID for FK compliance.
+
+    Cleanup runs before this, so we can use plain INSERT (not INSERT IGNORE).
+    """
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     run_key = f"test-run-{run_id}"
     with conn.cursor() as cursor:
         cursor.execute(
             """
-            INSERT IGNORE INTO pipeline_run
+            INSERT INTO pipeline_run
             (id, run_id, run_key, run_path, created_at, status,
              summary_generated, decision_entry_count, decision_watch_count,
              decision_hold_count, decision_no_trade_count)
@@ -204,7 +207,7 @@ class TestSepaSnapshotImmutabilityIntegration:
         conn = get_test_connection()
         instrument_id = 999991
         as_of_date = "2024-01-15"
-        run_ids = [100, 200]
+        run_ids = [991001, 991002]
 
         try:
             # Clean up first, then create fixtures for FK compliance
@@ -222,14 +225,14 @@ class TestSepaSnapshotImmutabilityIntegration:
                 total_score=0.50,
                 market_score=0.60,
             )
-            writer.write(snapshot1, source_run_id=100, available_at=None)
+            writer.write(snapshot1, source_run_id=991001, available_at=None)
 
             # Step 2: Finalize the snapshot
-            writer.finalize_snapshots_for_run(100, "2024-01-15 18:00:00")
+            writer.finalize_snapshots_for_run(991001, "2024-01-15 18:00:00")
 
             # Verify: Row is finalized
             row_after_finalize = fetch_snapshot_row(conn, instrument_id, as_of_date)
-            assert row_after_finalize["source_run_id"] == 100
+            assert row_after_finalize["source_run_id"] == 991001
             assert row_after_finalize["available_at"] is not None
             assert row_after_finalize["total_score"] == pytest.approx(0.50, rel=1e-6)
             finalized_at = row_after_finalize["available_at"]
@@ -242,7 +245,7 @@ class TestSepaSnapshotImmutabilityIntegration:
                 total_score=0.99,  # Different!
                 market_score=0.99,  # Different!
             )
-            writer.write(snapshot2, source_run_id=200, available_at="2024-01-16 10:00:00")
+            writer.write(snapshot2, source_run_id=991002, available_at="2024-01-16 10:00:00")
 
             # Verify: Business fields unchanged (immutability!)
             row_after_upsert = fetch_snapshot_row(conn, instrument_id, as_of_date)
@@ -252,7 +255,7 @@ class TestSepaSnapshotImmutabilityIntegration:
                 "market_score should be immutable after finalize"
 
             # Verify: source_run_id unchanged
-            assert row_after_upsert["source_run_id"] == 100, \
+            assert row_after_upsert["source_run_id"] == 991001, \
                 "source_run_id should be immutable after finalize"
 
             # Verify: available_at unchanged (COALESCE protection)
@@ -273,7 +276,7 @@ class TestSepaSnapshotImmutabilityIntegration:
         conn = get_test_connection()
         instrument_id = 999992
         as_of_date = "2024-01-16"
-        run_ids = [100, 200]
+        run_ids = [992001, 992002]
 
         try:
             # Clean up first, then create fixtures for FK compliance
@@ -291,11 +294,11 @@ class TestSepaSnapshotImmutabilityIntegration:
                 total_score=0.50,
                 market_score=0.60,
             )
-            writer.write(snapshot1, source_run_id=100, available_at=None)
+            writer.write(snapshot1, source_run_id=992001, available_at=None)
 
             # Verify: Unfinalized state
             row1 = fetch_snapshot_row(conn, instrument_id, as_of_date)
-            assert row1["source_run_id"] == 100
+            assert row1["source_run_id"] == 992001
             assert row1["available_at"] is None
             assert row1["total_score"] == pytest.approx(0.50, rel=1e-6)
 
@@ -306,7 +309,7 @@ class TestSepaSnapshotImmutabilityIntegration:
                 total_score=0.75,  # Updated!
                 market_score=0.80,  # Updated!
             )
-            writer.write(snapshot2, source_run_id=200, available_at=None)
+            writer.write(snapshot2, source_run_id=992002, available_at=None)
 
             # Verify: Business fields updated (repairability!)
             row2 = fetch_snapshot_row(conn, instrument_id, as_of_date)
@@ -316,7 +319,7 @@ class TestSepaSnapshotImmutabilityIntegration:
                 "market_score should be updatable when unfinalized"
 
             # Verify: source_run_id updated to new non-null value
-            assert row2["source_run_id"] == 200, \
+            assert row2["source_run_id"] == 991002, \
                 "source_run_id should be updatable when unfinalized"
 
             # Verify: available_at still NULL
@@ -335,7 +338,7 @@ class TestSepaSnapshotImmutabilityIntegration:
         conn = get_test_connection()
         instrument_id = 999993
         as_of_date = "2024-01-17"
-        run_ids = [100]
+        run_ids = [993001]
 
         try:
             # Clean up first, then create fixtures for FK compliance
@@ -346,15 +349,15 @@ class TestSepaSnapshotImmutabilityIntegration:
 
             writer = SepaSnapshotWriter(conn)
 
-            # Step 1: Insert with source_run_id=100
+            # Step 1: Insert with source_run_id=993001
             snapshot1 = create_test_snapshot(
                 instrument_id=instrument_id,
                 as_of_date=as_of_date,
             )
-            writer.write(snapshot1, source_run_id=100, available_at=None)
+            writer.write(snapshot1, source_run_id=993001, available_at=None)
 
             row1 = fetch_snapshot_row(conn, instrument_id, as_of_date)
-            assert row1["source_run_id"] == 100
+            assert row1["source_run_id"] == 993001
 
             # Step 2: Upsert with source_run_id=NULL (malicious/forgotten)
             snapshot2 = create_test_snapshot(
@@ -366,7 +369,7 @@ class TestSepaSnapshotImmutabilityIntegration:
 
             # Verify: source_run_id preserved (CASE guard!)
             row2 = fetch_snapshot_row(conn, instrument_id, as_of_date)
-            assert row2["source_run_id"] == 100, \
+            assert row2["source_run_id"] == 993001, \
                 "source_run_id should NOT be deleted by NULL upsert"
 
         finally:

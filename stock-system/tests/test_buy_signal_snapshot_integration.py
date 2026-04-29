@@ -95,14 +95,14 @@ def create_test_instrument(conn, instrument_id: int):
 def create_test_pipeline_run(conn, run_id: int):
     """Create pipeline_run row with specified ID for FK compliance.
 
-    Uses INSERT IGNORE to avoid duplicate key errors if already exists.
+    Cleanup runs before this, so we can use plain INSERT (not INSERT IGNORE).
     """
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     run_key = f"test-run-{run_id}"
     with conn.cursor() as cursor:
         cursor.execute(
             """
-            INSERT IGNORE INTO pipeline_run
+            INSERT INTO pipeline_run
             (id, run_id, run_key, run_path, created_at, status,
              summary_generated, decision_entry_count, decision_watch_count,
              decision_hold_count, decision_no_trade_count)
@@ -114,7 +114,7 @@ def create_test_pipeline_run(conn, run_id: int):
                 run_key,
                 "/tmp/test",
                 now,
-                "completed",
+                "success",
                 0,
                 0,
                 0,
@@ -193,7 +193,7 @@ class TestBuySignalSnapshotImmutabilityIntegration:
         instrument_id = 999991
         as_of_date = "2024-01-25"
         finalized_at = "2024-01-25 18:00:00"
-        run_ids = [100, 200]
+        run_ids = [991001, 991002]  # High IDs aligned with instrument 999991
 
         try:
             # Clean up first, then create fixtures for FK compliance
@@ -211,7 +211,7 @@ class TestBuySignalSnapshotImmutabilityIntegration:
                 merged_score=0.65,
                 kronos_score=0.60,
             )
-            writer.write(snapshot1, source_run_id=100, available_at=finalized_at)
+            writer.write(snapshot1, source_run_id=991001, available_at=finalized_at)
 
             row_v1 = fetch_snapshot_row(conn, instrument_id, as_of_date)
             assert row_v1["merged_score"] == pytest.approx(0.65, rel=1e-6)
@@ -224,13 +224,13 @@ class TestBuySignalSnapshotImmutabilityIntegration:
                 merged_score=0.99,
                 kronos_score=0.99,
             )
-            writer.write(snapshot2, source_run_id=200, available_at="2024-01-26 10:00:00")
+            writer.write(snapshot2, source_run_id=991002, available_at="2024-01-26 10:00:00")
 
             # Verify immutability: v1 should remain unchanged
             row_after = fetch_snapshot_row(conn, instrument_id, as_of_date)
             assert row_after["merged_score"] == pytest.approx(0.65, rel=1e-6)
             assert row_after["kronos_score"] == pytest.approx(0.60, rel=1e-6)
-            assert row_after["source_run_id"] == 100
+            assert row_after["source_run_id"] == 991001
             assert row_after["available_at"] == finalized_at
 
         finally:
@@ -242,7 +242,7 @@ class TestBuySignalSnapshotImmutabilityIntegration:
         conn = get_test_connection()
         instrument_id = 999992
         as_of_date = "2024-01-26"
-        run_ids = [100, 200]
+        run_ids = [991001, 991002]
 
         try:
             # Clean up first, then create fixtures for FK compliance
@@ -259,7 +259,7 @@ class TestBuySignalSnapshotImmutabilityIntegration:
                 as_of_date=as_of_date,
                 merged_score=0.65,
             )
-            writer.write(snapshot1, source_run_id=100, available_at=None)
+            writer.write(snapshot1, source_run_id=991001, available_at=None)
 
             # Upsert with new values
             snapshot2 = create_test_snapshot(
@@ -267,12 +267,12 @@ class TestBuySignalSnapshotImmutabilityIntegration:
                 as_of_date=as_of_date,
                 merged_score=0.80,
             )
-            writer.write(snapshot2, source_run_id=200, available_at=None)
+            writer.write(snapshot2, source_run_id=991002, available_at=None)
 
             # Verify repairability
             row = fetch_snapshot_row(conn, instrument_id, as_of_date)
             assert row["merged_score"] == pytest.approx(0.80, rel=1e-6)
-            assert row["source_run_id"] == 200
+            assert row["source_run_id"] == 991002
             assert row["available_at"] is None
 
         finally:
@@ -284,7 +284,7 @@ class TestBuySignalSnapshotImmutabilityIntegration:
         conn = get_test_connection()
         instrument_id = 999993
         as_of_date = "2024-01-27"
-        run_ids = [100]
+        run_ids = [993001]
 
         try:
             # Clean up first, then create fixtures for FK compliance
@@ -299,7 +299,7 @@ class TestBuySignalSnapshotImmutabilityIntegration:
                 instrument_id=instrument_id,
                 as_of_date=as_of_date,
             )
-            writer.write(snapshot1, source_run_id=100, available_at=None)
+            writer.write(snapshot1, source_run_id=993001, available_at=None)
 
             snapshot2 = create_test_snapshot(
                 instrument_id=instrument_id,
@@ -309,7 +309,7 @@ class TestBuySignalSnapshotImmutabilityIntegration:
             writer.write(snapshot2, source_run_id=None, available_at=None)
 
             row = fetch_snapshot_row(conn, instrument_id, as_of_date)
-            assert row["source_run_id"] == 100
+            assert row["source_run_id"] == 993001
 
         finally:
             cleanup_test_data(conn, instrument_id, as_of_date, run_ids)
@@ -320,7 +320,7 @@ class TestBuySignalSnapshotImmutabilityIntegration:
         conn = get_test_connection()
         instrument_id = 999994
         as_of_date = date(2024, 1, 28)
-        run_ids = [42]
+        run_ids = [994001]
 
         try:
             # Clean up first, then create fixtures for FK compliance
@@ -343,7 +343,7 @@ class TestBuySignalSnapshotImmutabilityIntegration:
                 instrument_id=instrument_id,
                 as_of_date=as_of_date,
                 merged_payload=fake_payload,
-                source_run_id=42,
+                source_run_id=994001,
                 available_at=None,
             )
 
@@ -351,7 +351,7 @@ class TestBuySignalSnapshotImmutabilityIntegration:
             assert row["kronos_score"] == pytest.approx(0.6, rel=1e-6)
             assert row["sentiment_score"] == pytest.approx(0.7, rel=1e-6)
             assert row["merged_score"] == pytest.approx(0.65, rel=1e-6)
-            assert row["source_run_id"] == 42
+            assert row["source_run_id"] == 994001
             assert row["available_at"] is None
 
         finally:
