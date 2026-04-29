@@ -207,12 +207,12 @@ class TestSepaSnapshotImmutabilityIntegration:
         run_ids = [100, 200]
 
         try:
-            # Create fixtures for FK compliance
+            # Clean up first, then create fixtures for FK compliance
+            cleanup_test_data(conn, instrument_id, as_of_date, run_ids)
             create_test_instrument(conn, instrument_id)
             for rid in run_ids:
                 create_test_pipeline_run(conn, rid)
 
-            cleanup_test_data(conn, instrument_id, as_of_date)
             writer = SepaSnapshotWriter(conn)
 
             # Step 1: Insert unfinalized snapshot
@@ -276,12 +276,12 @@ class TestSepaSnapshotImmutabilityIntegration:
         run_ids = [100, 200]
 
         try:
-            # Create fixtures for FK compliance
+            # Clean up first, then create fixtures for FK compliance
+            cleanup_test_data(conn, instrument_id, as_of_date, run_ids)
             create_test_instrument(conn, instrument_id)
             for rid in run_ids:
                 create_test_pipeline_run(conn, rid)
 
-            cleanup_test_data(conn, instrument_id, as_of_date)
             writer = SepaSnapshotWriter(conn)
 
             # Step 1: Insert unfinalized snapshot
@@ -338,12 +338,12 @@ class TestSepaSnapshotImmutabilityIntegration:
         run_ids = [100]
 
         try:
-            # Create fixtures for FK compliance
+            # Clean up first, then create fixtures for FK compliance
+            cleanup_test_data(conn, instrument_id, as_of_date, run_ids)
             create_test_instrument(conn, instrument_id)
             for rid in run_ids:
                 create_test_pipeline_run(conn, rid)
 
-            cleanup_test_data(conn, instrument_id, as_of_date)
             writer = SepaSnapshotWriter(conn)
 
             # Step 1: Insert with source_run_id=100

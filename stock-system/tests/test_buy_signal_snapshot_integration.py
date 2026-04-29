@@ -196,12 +196,12 @@ class TestBuySignalSnapshotImmutabilityIntegration:
         run_ids = [100, 200]
 
         try:
-            # Create fixtures for FK compliance
+            # Clean up first, then create fixtures for FK compliance
+            cleanup_test_data(conn, instrument_id, as_of_date, run_ids)
             create_test_instrument(conn, instrument_id)
             for rid in run_ids:
                 create_test_pipeline_run(conn, rid)
 
-            cleanup_test_data(conn, instrument_id, as_of_date)
             writer = BuySignalSnapshotWriter(conn)
 
             # Insert v1 with available_at set directly (finalized at write time)
@@ -245,12 +245,12 @@ class TestBuySignalSnapshotImmutabilityIntegration:
         run_ids = [100, 200]
 
         try:
-            # Create fixtures for FK compliance
+            # Clean up first, then create fixtures for FK compliance
+            cleanup_test_data(conn, instrument_id, as_of_date, run_ids)
             create_test_instrument(conn, instrument_id)
             for rid in run_ids:
                 create_test_pipeline_run(conn, rid)
 
-            cleanup_test_data(conn, instrument_id, as_of_date)
             writer = BuySignalSnapshotWriter(conn)
 
             # Insert unfinalized
@@ -287,12 +287,12 @@ class TestBuySignalSnapshotImmutabilityIntegration:
         run_ids = [100]
 
         try:
-            # Create fixtures for FK compliance
+            # Clean up first, then create fixtures for FK compliance
+            cleanup_test_data(conn, instrument_id, as_of_date, run_ids)
             create_test_instrument(conn, instrument_id)
             for rid in run_ids:
                 create_test_pipeline_run(conn, rid)
 
-            cleanup_test_data(conn, instrument_id, as_of_date)
             writer = BuySignalSnapshotWriter(conn)
 
             snapshot1 = create_test_snapshot(
@@ -323,12 +323,12 @@ class TestBuySignalSnapshotImmutabilityIntegration:
         run_ids = [42]
 
         try:
-            # Create fixtures for FK compliance
+            # Clean up first, then create fixtures for FK compliance
+            cleanup_test_data(conn, instrument_id, as_of_date.isoformat(), run_ids)
             create_test_instrument(conn, instrument_id)
             for rid in run_ids:
                 create_test_pipeline_run(conn, rid)
 
-            cleanup_test_data(conn, instrument_id, as_of_date.isoformat())
             writer = BuySignalSnapshotWriter(conn)
 
             fake_payload = {
