@@ -43,6 +43,11 @@ def get_test_connection():
     from db.connection import database_config
     project_root = Path(__file__).parent.parent.parent
     cfg = database_config(project_root)
+    if cfg["database"] != "stock_project_test":
+        raise RuntimeError(
+            f"Integration tests must run against stock_project_test, not {cfg['database']}. "
+            "Set database=stock_project_test in your config or set SKIP_DB_TESTS=1 to skip."
+        )
     return pymysql.connect(
         host=cfg["host"],
         port=int(cfg["port"]),

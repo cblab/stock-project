@@ -40,6 +40,11 @@ def get_test_connection():
     from db.connection import database_config
     project_root = Path(__file__).parent.parent.parent
     cfg = database_config(project_root)
+    if cfg["database"] != "stock_project_test":
+        raise RuntimeError(
+            f"Integration tests must run against stock_project_test, not {cfg['database']}. "
+            "Set database=stock_project_test in your config or set SKIP_DB_TESTS=1 to skip."
+        )
     return pymysql.connect(
         host=cfg["host"],
         port=int(cfg["port"]),
@@ -94,30 +99,34 @@ class TestBuySignalSnapshotImmutabilityIntegration:
     """C10d: Real DB tests for finalized snapshot immutability."""
 
     def test_finalized_row_remains_immutable_after_later_upsert(self):
-        """C10d: Finalized rows cannot be changed by later upserts."""
+        """C10d: Finalized rows cannot be changed by later upserts.
+
+        BuySignal snapshots are finalized by setting available_at at write time,
+        unlike SEPA/EPA which use finalize_snapshots_for_run().
+        """
         conn = get_test_connection()
         instrument_id = 999991
         as_of_date = "2024-01-25"
+        finalized_at = "2024-01-25 18:00:00"
 
         try:
             cleanup_test_data(conn, instrument_id, as_of_date)
             writer = BuySignalSnapshotWriter(conn)
 
-            # Insert and finalize
+            # Insert v1 with available_at set directly (finalized at write time)
             snapshot1 = create_test_snapshot(
                 instrument_id=instrument_id,
                 as_of_date=as_of_date,
                 merged_score=0.65,
                 kronos_score=0.60,
             )
-            writer.write(snapshot1, source_run_id=100, available_at=None)
-            writer.finalize_snapshots_for_run(100, "2024-01-25 18:00:00")
+            writer.write(snapshot1, source_run_id=100, available_at=finalized_at)
 
-            row_final = fetch_snapshot_row(conn, instrument_id, as_of_date)
-            assert row_final["merged_score"] == pytest.approx(0.65, rel=1e-6)
-            finalized_at = row_final["available_at"]
+            row_v1 = fetch_snapshot_row(conn, instrument_id, as_of_date)
+            assert row_v1["merged_score"] == pytest.approx(0.65, rel=1e-6)
+            assert row_v1["available_at"] == finalized_at
 
-            # Attempt upsert with different values
+            # Attempt upsert v2 with different values
             snapshot2 = create_test_snapshot(
                 instrument_id=instrument_id,
                 as_of_date=as_of_date,
@@ -126,7 +135,7 @@ class TestBuySignalSnapshotImmutabilityIntegration:
             )
             writer.write(snapshot2, source_run_id=200, available_at="2024-01-26 10:00:00")
 
-            # Verify immutability
+            # Verify immutability: v1 should remain unchanged
             row_after = fetch_snapshot_row(conn, instrument_id, as_of_date)
             assert row_after["merged_score"] == pytest.approx(0.65, rel=1e-6)
             assert row_after["kronos_score"] == pytest.approx(0.60, rel=1e-6)
