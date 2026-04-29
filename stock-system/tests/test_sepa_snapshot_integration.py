@@ -117,7 +117,7 @@ def create_test_pipeline_run(conn, run_id: int):
                 run_key,
                 "/tmp/test",
                 now,
-                "completed",
+                "success",
                 0,
                 0,
                 0,
@@ -319,7 +319,7 @@ class TestSepaSnapshotImmutabilityIntegration:
                 "market_score should be updatable when unfinalized"
 
             # Verify: source_run_id updated to new non-null value
-            assert row2["source_run_id"] == 991002, \
+            assert row2["source_run_id"] == 992002, \
                 "source_run_id should be updatable when unfinalized"
 
             # Verify: available_at still NULL
