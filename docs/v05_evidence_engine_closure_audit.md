@@ -1,288 +1,321 @@
 # v0.5 Evidence Engine Closure Audit
 
-## 1. Scope
+Stand: 2026-04-29  
+Status: abgeschlossen
 
-### What v0.5 can do
+## A. Executive Closure Decision
 
-- map truth-layer trade data into `EvidenceTradeSample`
-- extract terminal campaigns and trade outcomes
-- evaluate eligibility conservatively
-- aggregate by entry and exit context
-- derive qualitative confidence from sample count
-- build a neutral, machine-readable readout
+```text
+v0.5 closed: yes
+```
 
-### What v0.5 cannot do
+Begründung:
 
-- no DB-level snapshot validation for `eligible_full`
-- no recommendations
-- no buy/sell decisions
-- no UI or API exposure
-- no persisted readouts
-- no forward-return analytics layer
+- `eligible_full` ist auf `main` nicht mehr nur modelliert, sondern über `SnapshotValidationService` technisch freigeschaltet.
+- `EvidenceEligibilityEvaluator` lässt `eligible_full` nur zu, wenn die DB-level Snapshot-/Run-Validierung erfolgreich ist.
+- Ungültige, fehlende oder seed-basierte Samples werden weiterhin konservativ auf `eligible_outcome_only` oder `excluded` zurückgestuft.
+- Die Writer-Provenance für SEPA, EPA und BuySignal ist vorhanden.
+- C10d deckt Immutability und Repairability sowohl als SQL-shape-Tests als auch per MariaDB-Integration ab.
+- Aggregation, Confidence und Readout bleiben neutral: keine Recommendation-Semantik, keine Buy/Sell-Aussagen, keine Forward-Return-Leakage in die Evidence-Klassifikation.
 
-## 2. Implemented Chunks
+Blocker:
 
-- **C1 Read Models**
-  - Evidence DTOs and supporting value objects
-- **C2 TradeOutcomeExtractor**
-  - truth layer -> `EvidenceTradeSample`
-- **C3 Eligibility Evaluator**
-  - `eligible_full`, `eligible_outcome_only`, `excluded`
-- **C4 EntryEvidenceAggregator**
-  - aggregation by entry context
-- **C5 ExitEvidenceAggregator**
-  - aggregation by exit context
-- **C6 ConfidenceCalculator**
-  - qualitative confidence from `n`
-- **C7 EvidenceReadoutBuilder**
-  - neutral readout over entry and exit buckets
-- **C8 Validation Fixtures**
-  - deterministic Evidence test fixtures
-- **C9 Snapshot Validation Foundation**
-  - run provenance and availability fields for future DB-level snapshot validation
+```text
+keine fachlichen oder technischen Blocker für den v0.5-Abschluss im aktuellen main
+```
 
-## 3. Snapshot Validation Gate
+Antwort auf die Kernfrage:
 
-### Table reality
+```text
+Nach aktuellem main kann das System Erfolg nicht mehr als eligible_full mit Snapshot-Daten erklären, die zum Entry-Zeitpunkt nicht nachweislich verfügbar waren.
+```
 
-Relevant snapshot tables:
+Nicht valide Snapshot-Kontexte bleiben zwar als `eligible_outcome_only` im Outcome-Layer nutzbar, werden aber nicht als voll validierte Entry-Evidence behandelt.
 
-- `instrument_buy_signal_snapshot`
-- `instrument_sepa_snapshot`
-- `instrument_epa_snapshot`
+Tooling-Hinweis:
 
-Relevant truth-layer tables:
+- GitNexus war verfügbar, der Index war jedoch stale.
+- Der Audit basiert deshalb primär auf aktuellem Code und aktuellen Tests, nicht auf dem Index-Stand.
 
-- `trade_event`
-- `trade_campaign`
-- `trade_migration_log`
+---
 
-Existing run tracking:
-
-- `pipeline_run`
-- `pipeline_run_item`
-
-### Available snapshot fields before C9
-
-All three snapshot tables had:
-
-- `id`
-- `instrument_id`
-- `as_of_date`
-- `created_at`
-- `updated_at`
-
-They did **not** have:
-
-- `available_at`
-- `snapshot_at`
-- `finalized_at`
-- `source_run_id`
-- a run completion guarantee on the row itself
-
-### What `trade_event` stores
-
-`trade_event` stores:
-
-- `buy_signal_snapshot_id`
-- `sepa_snapshot_id`
-- `epa_snapshot_id`
-- `instrument_id`
-- `event_timestamp`
-- `scoring_version`
-- `policy_version`
-- `model_version`
-- `macro_version`
-
-`trade_campaign` does not store buy/SEPA/EPA snapshot IDs. For entry evidence, the relevant snapshot linkage lives on `trade_event`.
-
-### Anti-hindsight checkability
-
-Already checkable:
-
-1. snapshot ID exists or not
-2. snapshot row exists
-3. snapshot `instrument_id` can be matched to `trade_event.instrument_id`
-4. snapshot has an `as_of_date`
-
-Not safely checkable before C9:
-
-1. exact availability time of the snapshot
-2. whether the snapshot belonged to a completed run
-3. whether the snapshot was already final before the entry event timestamp
-4. whether same-day rows were written before or after the event
-
-`TradeSnapshotResolver` is intentionally conservative and only uses:
-
-- matching `instrument_id`
-- `as_of_date < DATE(event_timestamp)`
-
-That is a day-level guard, not full anti-hindsight validation.
-
-### Current gate decision
-
-For the **current stored data**, the safe decision remains **Option B**:
-
-- snapshot IDs present but not DB-validated -> `eligible_outcome_only`
-- missing snapshots -> `eligible_outcome_only`
-- `eligible_full` stays blocked in practice
-- `EvidenceReadoutBuilder` should continue to warn `no_full_entry_evidence`
-
-This remains the correct v0.5 runtime behavior.
-
-## 4. Current Eligibility Semantics
-
-### `eligible_full`
-
-Meaning:
-
-- trade outcome is valid
-- snapshot context is fully validated against anti-hindsight rules
-
-Current v0.5 state:
-
-- reserved in the model
-- not safely unlocked against the current DB shape
+## B. Evidence Classes
 
 ### `eligible_outcome_only`
 
-Meaning:
+Bedeutung:
 
-- trade outcome is usable
-- snapshot context is missing, seed-based, or not anti-hindsight validated
+- Trade-Outcome ist verwendbar.
+- Snapshot-Kontext ist fehlend, seed-basiert oder anti-hindsight-seitig nicht voll validiert.
+- Das Sample darf in Outcome-Aggregationen einfließen, aber nicht als voll validierte Entry-Evidence gelten.
 
-This is currently the normal conservative path for real samples.
+### `eligible_full`
+
+Bedeutung:
+
+- Trade-Outcome ist verwendbar.
+- Zugehörige Entry-Snapshots sind DB-level gegen Anti-Hindsight- und Run-Provenance-Regeln validiert.
+- Nur diese Klasse darf als fachlich vollwertige Evidence für spätere Signal-Layer verwendet werden.
 
 ### `excluded`
 
-Meaning:
+Bedeutung:
 
-- non-terminal campaign state
-- missing `closed_at`
-- missing PnL
-- invalid time order
-- unknown campaign status
+- Sample ist für Aggregation unzulässig.
+- Beispiele: non-terminaler Campaign-State, `closed_at` fehlt, `realized_pnl_pct` fehlt, invalide Zeitreihenfolge, unbekannter State.
 
-### Why `outcome_only` is conservative
+---
 
-The engine must not treat a snapshot as historical evidence unless it can prove:
+## C. Anti-Hindsight Invariants
 
-1. the row existed
-2. the row belonged to the same instrument
-3. the row was already available before the entry event
-4. the producing run was complete
+Die aktuelle technische Prüfung sitzt in [`web/src/Service/Evidence/SnapshotValidationService.php`](../web/src/Service/Evidence/SnapshotValidationService.php).
 
-Before C9, those proofs were incomplete. Therefore `eligible_outcome_only` is the safe default.
+Explizit geprüft:
 
-## 5. Known Limitations
+1. Snapshot existiert:
+   - `snapshot_id` darf nicht `NULL` sein.
+   - Snapshot-Zeile muss im jeweiligen Snapshot-Table existieren.
+2. `instrument_id` matcht:
+   - `snapshot.instrument_id` muss dem erwarteten `instrument_id` des Samples entsprechen.
+3. `source_run_id` vorhanden:
+   - `snapshot.source_run_id` darf nicht `NULL` sein.
+4. `available_at` vorhanden:
+   - `snapshot.available_at` darf nicht `NULL` sein.
+5. `available_at <= entry timestamp`:
+   - Snapshot muss spätestens zum Entry-Zeitpunkt verfügbar gewesen sein.
+6. `pipeline_run` existiert:
+   - `pipeline_run.id = snapshot.source_run_id` muss über den Join auflösbar sein.
+7. `pipeline_run.status = success`:
+   - Nur erfolgreiche Runs sind als voll validierte Provenance zulässig.
+8. `pipeline_run.exit_code = 0`:
+   - Nicht nur Status, sondern auch Exit-Code muss sauber sein.
+9. `pipeline_run.finished_at` vorhanden:
+   - Abgeschlossene erfolgreiche Runs brauchen einen Abschlusszeitpunkt.
+10. `available_at >= pipeline_run.finished_at`:
+   - Snapshot kann nicht verfügbar sein, bevor der produzierende Run beendet wurde.
 
-- no active DB-level snapshot validation for `eligible_full`
-- no forward returns as evidence eligibility input
-- no recommendations
-- no UI
-- no DB persistence of readouts
-- decimal/float follow-up remains open, especially around neutral thresholds and ratio formatting
-- snapshot version provenance is still incomplete on the snapshot rows themselves
+Bewertung:
 
-## 6. Path to Signal Evidence
+- Diese Invarianten decken die relevante Anti-Hindsight-Kette fachlich vollständig ab.
+- Ein Snapshot mit falscher oder zu später Verfügbarkeit kann damit nicht `eligible_full` werden.
 
-### C9 design choice
+---
 
-For the foundation layer, the project should **reuse `pipeline_run`** instead of introducing a second `evidence_snapshot_run` table.
+## D. Writer Provenance
 
-Why this fits better:
+Geprüfte Dateien:
 
-- `pipeline_run` already exists and is the canonical local run record
-- it already has `status`, `started_at`, `finished_at`, and `exit_code`
-- buy-signal backfill already derives historical snapshot dates from `pipeline_run`
-- SEPA/EPA refresh jobs already use `pipeline_run` as lightweight tracking state
+- [`stock-system/src/sepa/persistence.py`](../stock-system/src/sepa/persistence.py)
+- [`stock-system/src/epa/persistence.py`](../stock-system/src/epa/persistence.py)
+- [`stock-system/src/db/buy_signal_snapshot.py`](../stock-system/src/db/buy_signal_snapshot.py)
+- passende Tests unter [`stock-system/tests`](../stock-system/tests)
 
-Creating a second run table would duplicate semantics that the project already has.
+### SEPA Writer
 
-### Minimal foundation fields
+- Schreibt `source_run_id` beim Write explizit mit.
+- Schreibt `available_at` nullable.
+- Finalisiert über `finalize_snapshots_for_run(source_run_id, finished_at)`.
+- `finalize_snapshots_for_run()` setzt `available_at` nur für Zeilen mit passender `source_run_id` und `available_at IS NULL`.
 
-Each snapshot table needs nullable provenance fields:
+Bewertung:
 
-- `source_run_id` -> FK to `pipeline_run.id`
-- `available_at` -> the timestamp from which the snapshot is safe to use for anti-hindsight validation
+- SEPA finalisiert `available_at` erst über den separaten Success-/Finished-Pfad.
 
-C9 adds these foundation columns to all three snapshot tables:
+### EPA Writer
 
-- `instrument_buy_signal_snapshot`
-- `instrument_sepa_snapshot`
-- `instrument_epa_snapshot`
+- Schreibt `source_run_id` beim Write explizit mit.
+- Schreibt `available_at` nullable.
+- Finalisiert über `finalize_snapshots_for_run(source_run_id, finished_at)`.
+- `finalize_snapshots_for_run()` setzt `available_at` nur für Zeilen mit passender `source_run_id` und `available_at IS NULL`.
 
-Doctrine mapping status in the current codebase:
+Bewertung:
 
-- `instrument_sepa_snapshot` has a Doctrine entity mapping
-- `instrument_epa_snapshot` has a Doctrine entity mapping
-- `instrument_buy_signal_snapshot` is currently DBAL/table-only and has no Doctrine entity in this codebase
+- EPA finalisiert `available_at` ebenfalls erst über den separaten Success-/Finished-Pfad.
 
-That buy-signal asymmetry is intentional for now at the ORM layer, but the migration still adds `source_run_id` and `available_at` there as well so future DB-level validation can treat all three snapshot families consistently.
+### BuySignal Writer
 
-These fields are intentionally nullable:
+- Schreibt `source_run_id` und `available_at` direkt in den Snapshot.
+- `write_from_pipeline_item()` reicht `source_run_id` und `available_at` transparent an `write()` durch.
 
-- no backfill is required for old rows
-- existing snapshots are **not** retroactively treated as validated
-- runtime behavior does not change yet
+Bewertung:
 
-### Why `available_at` matters
+- Der BuySignal-Writer selbst erzwingt `success` nicht aktiv im Write-Call.
+- Für Evidence-Sicherheit ist das ausreichend, weil `eligible_full` später nur über den Validator freigeschaltet wird und dieser `pipeline_run.status = success`, `exit_code = 0` und `finished_at` erzwingt.
+- Fachlich zählt daher nicht allein der Write, sondern die Kombination aus Provenance-Feldern plus nachgelagerter DB-level Validation.
 
-`as_of_date` alone is too weak.
+### Finalisierte Rows sind immutable
 
-To support future statements such as:
+Belegt durch:
 
-`SEPA >= 75 and EPA >= 70 had n = X, winRate = Y`
+SQL-shape-Tests:
 
-the engine must later prove that every referenced snapshot was already available before the entry event. `available_at` is the minimum field that makes that possible.
+- [`stock-system/tests/test_sepa_snapshot_writer.py`](../stock-system/tests/test_sepa_snapshot_writer.py)
+- [`stock-system/tests/test_epa_snapshot_writer.py`](../stock-system/tests/test_epa_snapshot_writer.py)
+- [`stock-system/tests/test_buy_signal_snapshot_writer.py`](../stock-system/tests/test_buy_signal_snapshot_writer.py)
 
-### When `eligible_full` becomes allowed
+MariaDB-Integration:
 
-`eligible_full` should only be unlocked once the validator can prove all of the following:
+- [`stock-system/tests/test_sepa_snapshot_integration.py`](../stock-system/tests/test_sepa_snapshot_integration.py)
+- [`stock-system/tests/test_epa_snapshot_integration.py`](../stock-system/tests/test_epa_snapshot_integration.py)
+- [`stock-system/tests/test_buy_signal_snapshot_integration.py`](../stock-system/tests/test_buy_signal_snapshot_integration.py)
 
-1. snapshot ID is present
-2. snapshot row exists
-3. snapshot `instrument_id` matches the trade sample
-4. `available_at` is not null
-5. `available_at <= entry event timestamp`
-6. `source_run_id` is present
-7. the linked `pipeline_run` is in a completed/success state
+Geprüfte Eigenschaften:
 
-If any of these checks fail, the sample must remain `eligible_outcome_only`.
+- Business-Felder bleiben nach Finalisierung stabil.
+- `source_run_id` bleibt nach Finalisierung stabil.
+- `available_at` bleibt nach Finalisierung stabil.
+- `updated_at` bleibt nach Finalisierung stabil.
 
-### Remaining v0.6 work after C9
+### Unfinalisierte Rows bleiben reparierbar
 
-C9 only creates the foundation. v0.6 still needs:
+Geprüfte Eigenschaften:
 
-- snapshot writers to populate `source_run_id`
-- snapshot writers to populate `available_at`
-- DB-level validation service using those fields
-- targeted tests that prove real `eligible_full` samples
-- only then: signal-bucket evidence such as `SEPA >= 75` / `EPA >= 70`
+- Business-Felder können vor Finalisierung noch aktualisiert werden.
+- `source_run_id` kann vor Finalisierung auf einen neuen non-null Run wechseln.
+- `NULL source_run_id` löscht eine bestehende `source_run_id` nicht.
 
-## 7. Required Follow-ups for v0.6
+---
 
-- implement DB-level snapshot validation against `source_run_id` and `available_at`
-- decide whether snapshot row version fields are also required for future audits
-- expose readout later via CLI/UI/API if wanted
-- optionally centralize warning codes
-- harden decimal/metric precision
-- add explicit `eligible_full` tests once real validated samples can exist
+## E. Eligibility Integration
 
-## 8. Test Evidence
+Geprüfte Dateien:
 
-Relevant test commands for the evidence engine:
+- [`web/src/Service/Evidence/EvidenceEligibilityEvaluator.php`](../web/src/Service/Evidence/EvidenceEligibilityEvaluator.php)
+- [`web/src/Service/Evidence/SnapshotValidationService.php`](../web/src/Service/Evidence/SnapshotValidationService.php)
+- [`web/tests/Service/Evidence/EvidenceEligibilityEvaluatorTest.php`](../web/tests/Service/Evidence/EvidenceEligibilityEvaluatorTest.php)
 
-```powershell
-.\tools\dev\test-web.ps1 tests/Service/Evidence/EvidenceEligibilityEvaluatorTest.php
-.\tools\dev\test-web.ps1 tests/Service/Evidence/EntryEvidenceAggregatorTest.php
-.\tools\dev\test-web.ps1 tests/Service/Evidence/ExitEvidenceAggregatorTest.php
-.\tools\dev\test-web.ps1 tests/Service/Evidence/EvidenceReadoutBuilderTest.php
-.\tools\dev\test-web.ps1 tests/Service/Evidence/Fixture/EvidenceTradeSampleFixtureTest.php
+Ergebnis:
+
+- `EvidenceEligibilityEvaluator` nutzt `SnapshotValidationService`, wenn dieser verdrahtet ist.
+- Validierte Snapshots können `eligible_full` erzeugen.
+- Invalidierte oder fehlende Snapshots downgraden auf `eligible_outcome_only`.
+- `migration`- und `manual`-Seed bleiben auch bei validen Snapshots `eligible_outcome_only`.
+- `excluded`-Regeln bleiben vorrangig vor Snapshot-Freigaben.
+
+Wichtige Reihenfolge:
+
+1. State-/Terminal-Prüfung
+2. Zeitreihenfolge
+3. Pflichtfelder (`closed_at`, `realized_pnl_pct`)
+4. Seed-Downgrade
+5. Missing-Snapshot-Downgrade
+6. Invalid-Snapshot-Downgrade
+7. nur dann `eligible_full`
+
+Bewertung:
+
+- Die Integration ist fachlich konsistent.
+- Erfolg kann damit nicht „durchrutschen“ und gleichzeitig als voll validierte Snapshot-Evidence erscheinen.
+
+---
+
+## F. Aggregation / Confidence / Readout
+
+Geprüfte Dateien:
+
+- [`web/src/Service/Evidence/EntryEvidenceAggregator.php`](../web/src/Service/Evidence/EntryEvidenceAggregator.php)
+- [`web/src/Service/Evidence/ExitEvidenceAggregator.php`](../web/src/Service/Evidence/ExitEvidenceAggregator.php)
+- [`web/src/Service/Evidence/EvidenceConfidenceCalculator.php`](../web/src/Service/Evidence/EvidenceConfidenceCalculator.php)
+- [`web/src/Service/Evidence/EvidenceReadoutBuilder.php`](../web/src/Service/Evidence/EvidenceReadoutBuilder.php)
+- zugehörige Tests unter [`web/tests/Service/Evidence`](../web/tests/Service/Evidence)
+
+Ergebnis:
+
+- `EntryEvidenceAggregator` arbeitet auf Eligibility-Klassen.
+- `ExitEvidenceAggregator` arbeitet auf Eligibility-Klassen.
+- Beide Aggregatoren kombinieren `eligible_full` und `eligible_outcome_only` für Outcome-Metriken, zählen die Zusammensetzung aber getrennt.
+- `EvidenceConfidenceCalculator` ist integriert und basiert auf `n` mit optionalem SEM-Cap.
+- `EvidenceReadoutBuilder` erzeugt Warnings/Codes wie:
+  - `contains_outcome_only_samples`
+  - `no_full_entry_evidence`
+  - `contains_excluded_samples`
+  - `low_confidence_evidence`
+- `EvidenceReadoutBuilder` fügt keine Recommendation-Semantik hinzu.
+
+Bewertung:
+
+- Der Readout bleibt neutral und maschinenlesbar.
+- Es gibt keine implizite Kauf-/Verkaufsempfehlung und keine Vorwärtsretouren-Leakage in die Decision-Semantik.
+
+---
+
+## G. Tests
+
+Relevante Testgruppen:
+
+- [`web/tests/Service/Evidence/EvidenceEligibilityEvaluatorTest.php`](../web/tests/Service/Evidence/EvidenceEligibilityEvaluatorTest.php)
+- [`web/tests/Service/Evidence/SnapshotValidationServiceTest.php`](../web/tests/Service/Evidence/SnapshotValidationServiceTest.php)
+- [`web/tests/Service/Evidence/EvidenceReadoutBuilderTest.php`](../web/tests/Service/Evidence/EvidenceReadoutBuilderTest.php)
+- [`web/tests/Service/Evidence/EntryEvidenceAggregatorTest.php`](../web/tests/Service/Evidence/EntryEvidenceAggregatorTest.php)
+- [`web/tests/Service/Evidence/ExitEvidenceAggregatorTest.php`](../web/tests/Service/Evidence/ExitEvidenceAggregatorTest.php)
+- [`web/tests/Service/Evidence/TradeOutcomeExtractorIntegrationTest.php`](../web/tests/Service/Evidence/TradeOutcomeExtractorIntegrationTest.php)
+- [`stock-system/tests/test_sepa_snapshot_writer.py`](../stock-system/tests/test_sepa_snapshot_writer.py)
+- [`stock-system/tests/test_epa_snapshot_writer.py`](../stock-system/tests/test_epa_snapshot_writer.py)
+- [`stock-system/tests/test_buy_signal_snapshot_writer.py`](../stock-system/tests/test_buy_signal_snapshot_writer.py)
+- [`stock-system/tests/test_sepa_snapshot_integration.py`](../stock-system/tests/test_sepa_snapshot_integration.py)
+- [`stock-system/tests/test_epa_snapshot_integration.py`](../stock-system/tests/test_epa_snapshot_integration.py)
+- [`stock-system/tests/test_buy_signal_snapshot_integration.py`](../stock-system/tests/test_buy_signal_snapshot_integration.py)
+
+Einordnung von C10a/b/c/d im aktuellen Stand:
+
+- C10a-C10c sind im aktuellen `main` als lauffähige Kette sichtbar:
+  - Snapshot-Validation-Service aktiv
+  - Eligibility-Integration aktiv
+  - Writer-Provenance-Felder aktiv
+- C10d ist durch die Writer-Immutability- und MariaDB-Integrationstests explizit abgesichert.
+
+---
+
+## H. Known Non-Blockers / Follow-ups
+
+### Non-Blocker
+
+1. `EvidenceTradeSample` nutzt `openedAt` als Entry-Zeitpunkt.
+   - `TradeOutcomeExtractor` verwendet aktuell `trade_campaign.opened_at`.
+   - Der kanonische Write-Pfad in [`web/src/Service/Trade/TradeEventWriter.php`](../web/src/Service/Trade/TradeEventWriter.php) setzt `opened_at` für `entry`/`migration_seed` direkt aus `event_timestamp`.
+   - Damit ist im aktuellen Truth-Layer-Write-Pfad kein akuter Hindsight-Spalt sichtbar.
+   - Als Follow-up bleibt dennoch sinnvoll, später optional direkt gegen den Entry-Event-Timestamp zu validieren oder die Invariante explizit zu dokumentieren.
+
+2. BuySignal Snapshot bleibt DBAL-/Table-only ohne Doctrine Entity.
+   - Das ist im aktuellen Stand kein Blocker, weil `SnapshotValidationService` den BuySignal-Snapshot bewusst per DBAL gegen `instrument_buy_signal_snapshot` validiert.
+
+3. Kein Backfill alter Snapshots.
+   - Alte Rows ohne Provenance bleiben korrekt `eligible_outcome_only`.
+   - Das ist konservativ und kein Closure-Blocker.
+
+4. Keine Snapshot-Versionierung für Policy/Scoring.
+   - `scoring_version`, `policy_version`, `model_version`, `macro_version` werden in Samples geführt, aber nicht als harter Eligibility-Gate verwendet.
+   - Das ist ein v0.6/v0.7-Thema, kein v0.5-Blocker.
+
+5. Keine Exposure Layer / API / UI.
+   - Gehört nicht zu v0.5 und blockiert den fachlichen Abschluss nicht.
+
+### Keine Blocker
+
+- Aus dem aktuellen `main` ergibt sich kein offener Punkt, der `eligible_full` fachlich unsicher machen würde.
+- Insbesondere werden ungültige Snapshot-Kontexte nicht auf `eligible_full` hochgestuft.
+
+---
+
+## I. v0.6 Gate
+
+Da `v0.5 closed = yes` gilt:
+
+```text
+v0.6 darf starten
 ```
 
-For the C9 audit/foundation chunk itself:
+v0.6 Scope:
 
-- if only docs change, no PHPUnit run is required
-- if PHP classes or entities change, targeted evidence tests should be rerun
-- if a migration is added, inspect config only; do not run production migrations during the audit
+- Signal Evidence Layer auf SEPA-/EPA-Buckets
+- optional BuySignal-Buckets
+- weiterhin keine Recommendation Engine
+- keine Buy-/Sell-UI
+- keine Forward-Return-Leakage
+
+Startbedingungen für v0.6:
+
+1. `eligible_full` bleibt der einzige zulässige Eingang für spätere signalbasierte Entry-Evidence.
+2. `eligible_outcome_only` darf nicht stillschweigend als Signal-Evidence behandelt werden.
+3. Neue Buckets müssen die bestehenden Warning-/Guardrail-Semantiken erhalten.
+4. Keine Rücknahme der C10d-Immutability-Regeln.

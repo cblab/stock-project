@@ -1,7 +1,7 @@
 # stock-project-project-map.md
 
-Stand: 2026-04-27  
-Status: kanonische Projektkarte für Navigation, Architektur- und Agentenarbeit
+Stand: 2026-04-29  
+Status: kanonische Projektkarte für Navigation, Architektur- und Agentenarbeit nach Abschluss von v0.5
 
 ## Zweck
 
@@ -40,7 +40,7 @@ web/
   Symfony Web-App, UI, Controller, Services, Doctrine, Twig, Tests
 
 stock-system/
-  Python-/Pipeline-Komponenten, Scoring-, Intake-, Reporting- und Datenlogik
+  Python-/Pipeline-Komponenten, Scoring-, Intake-, Reporting- und Snapshot-Logik
 
 docker/
   Compose-Erweiterungen, Images, Laufzeitkonfiguration
@@ -49,7 +49,7 @@ tools/
   lokale Hilfswerkzeuge, u. a. Agent Exec Proxy
 
 docs/
-  zusätzliche Dokumentation
+  zusätzliche Dokumentation, Projektkarte, Closure Audits
 
 AGENTS.md
   verbindliche Arbeitsregeln für Coding-Agenten
@@ -61,7 +61,10 @@ ARCHITECTURE_v04.md
   finaler v0.4 Truth-Layer-Architekturstand
 
 ARCHITECTURE_v05.md
-  v0.5 Evidence Engine Lite Architekturvertrag
+  finaler v0.5 Evidence-Engine-Architekturstand
+
+docs/v05_evidence_engine_closure_audit.md
+  Abschlussaudit für v0.5
 ```
 
 ---
@@ -70,26 +73,32 @@ ARCHITECTURE_v05.md
 
 Docker Compose ist die lokale Orchestrierung.
 
-Typische Dienste:
+Typische Dienste je nach Stack/Override:
 
 ```text
 db
 web
 phpmyadmin
 agent-runner
+optional job/migrate profiles
 ```
 
-Wichtige Ports:
+Wichtige lokale Ports in der üblichen Dev/Prod-Konfiguration:
 
 ```text
-Prod App:        http://127.0.0.1:8000
-Dev App:         http://127.0.0.1:8001
-Prod phpMyAdmin: http://127.0.0.1:8081
-Dev phpMyAdmin:  http://127.0.0.1:8082
-Agent Proxy:     http://localhost:8787
+Prod App:         http://127.0.0.1:8000
+Dev App:          http://127.0.0.1:8001
+Prod phpMyAdmin:  http://127.0.0.1:8081
+Dev phpMyAdmin:   http://127.0.0.1:8082
+Agent Proxy:      http://localhost:8787
 ```
 
-Der Agent Exec Proxy läuft im `agent-runner`-Kontext und stellt sichere, eng begrenzte Check-Endpunkte bereit.
+Achtung:
+
+```text
+Die DB muss nicht zwingend auf 127.0.0.1:3306 exposed sein.
+Wenn MariaDB nur im Docker-Netzwerk erreichbar ist, nutzen Container den Hostnamen db.
+```
 
 ---
 
@@ -127,13 +136,7 @@ POST /run/lint-container
 POST /run/composer-dump-autoload
 ```
 
-`/run/php-lint` braucht JSON:
-
-```json
-{
-  "file": "src/Service/Evidence/TradeOutcomeExtractor.php"
-}
-```
+Agenten führen keine freien Docker-Kommandos aus, wenn sie im Containerkontext laufen. Host-Schritte führt der Nutzer aus.
 
 ---
 
@@ -149,24 +152,24 @@ freie Shell
 direkte DB-Mutation
 Container-Neustart
 Migration Run
+Runtime Package Installation
 ```
 
-Host-Schritte werden vom Nutzer ausgeführt.
-
-Agenten dürfen Host-Befehle exakt nennen, aber nicht behaupten, sie selbst ausgeführt zu haben.
+Host-Schritte werden exakt genannt, aber nicht als vom Agenten ausgeführt behauptet.
 
 ---
 
 ## Pflichtablauf für Arbeitsaufträge
 
 1. Projektkarte/GitNexus für Lagebild nutzen.
-2. Relevante Dateien gezielt prüfen.
-3. Bestehende Patterns erkennen.
-4. Minimalen Diff erzeugen.
-5. Checks über Agent Exec Proxy durchführen.
-6. Prüflücken klar melden.
+2. Wenn GitNexus stale/defekt ist: direkte Dateiprüfung nutzen und Tooling-Risiko melden.
+3. Relevante Dateien gezielt prüfen.
+4. Bestehende Patterns übernehmen.
+5. Minimalen Diff erzeugen.
+6. Checks über Agent Exec Proxy oder explizit genannten Host-Runner durchführen.
+7. Prüflücken klar melden.
 
-Keine breiten Scans. Keine Scope-Ausweitung ohne Grund.
+Keine breiten Scans. Keine Scope-Ausweitung ohne Gate.
 
 ---
 
@@ -216,49 +219,49 @@ ARCHITECTURE_v04.md
 
 ## v0.5 Status
 
-v0.5 Evidence Engine Lite ist aktiv.
+v0.5 Evidence Engine Lite ist abgeschlossen.
 
-Ziel:
-
-```text
-read-only Evidence aus:
-1. Trade Outcome Evidence
-2. Signal Forward-Return Evidence
-```
-
-C1 ist abgeschlossen:
-
-```text
-Evidence Read Models
-EvidenceTradeSample
-EvidenceSignalSample
-EvidenceMetricSummary
-EvidenceSource
-SignalSource
-SignalFamily
-EvidenceEligibilityStatus
-EvidenceExclusionReason
-EvidenceDataQualityFlag
-EvidenceConfidenceLevel
-```
-
-Aktiver nächster Chunk:
-
-```text
-C2 Closed Trade Outcome Extractor
-```
-
-Danach parallel möglich:
-
-```text
-C6 Confidence Calculator
-C8 Validation Fixtures / Poison Pills
-```
-
-Kanonische Datei:
+Kanonische Dateien:
 
 ```text
 ARCHITECTURE_v05.md
+docs/v05_evidence_engine_closure_audit.md
+```
+
+Kernleistung:
+
+```text
+Trade-Samples aus Truth Layer lesen
+Eligibility klassifizieren
+Entry-/Exit-Kontexte aggregieren
+Confidence berechnen
+Readout mit Warning-Codes erzeugen
+SnapshotValidationService für eligible_full nutzen
+Writer-Provenance und Immutability absichern
+```
+
+Evidenzklassen:
+
+```text
+eligible_full
+eligible_outcome_only
+excluded
+```
+
+Zentrale Regel:
+
+```text
+eligible_full nur mit DB-validierten Snapshots.
+Wenn unsicher: eligible_outcome_only oder excluded.
+```
+
+C10-Abschluss:
+
+```text
+C10a Writer Provenance + Immutability   done
+C10b SnapshotValidationService          done
+C10c Eligibility Integration            done
+C10d Writer-Immutability Tests          done
 ```
 
 ---
@@ -271,22 +274,62 @@ Keine Write-Operationen auf trade_campaign/trade_event.
 Trade Evidence und Signal Evidence nicht vermischen.
 live/paper/pseudo nicht still vermischen.
 migration_seed/manual_seed markieren.
-Anti-Hindsight früh prüfen.
+Anti-Hindsight DB-level prüfen.
 Keine Wahrscheinlichkeit ohne n und Confidence.
+Keine Recommendation-Semantik.
 ```
 
-Signalquellen:
+Anti-Hindsight-Invarianten:
 
 ```text
-sepa
-epa
-buy_signal
-kronos
-sentiment
-custom
+Snapshot existiert
+instrument_id matcht
+source_run_id vorhanden
+available_at vorhanden
+available_at <= entry timestamp
+pipeline_run existiert
+pipeline_run.status = success
+pipeline_run.exit_code = 0
+pipeline_run.finished_at vorhanden
+available_at >= pipeline_run.finished_at
 ```
 
-Die Evidence Engine ist quellenagnostisch.
+---
+
+## v0.6 Status
+
+v0.6 ist der nächste aktive Entwicklungsabschnitt.
+
+Ziel:
+
+```text
+Signal Evidence Layer auf voll validierten Entry-Kontexten.
+```
+
+Regel:
+
+```text
+Nur eligible_full darf Eingang für signalbasierte Entry-Evidence sein.
+eligible_outcome_only darf nicht stillschweigend als Signal-Evidence verwendet werden.
+```
+
+Mögliche erste Buckets:
+
+```text
+SEPA >= 75
+EPA >= 70
+BuySignal decision = ENTRY/WATCH
+kombinierte Signalprofile
+```
+
+Nicht-Ziele:
+
+```text
+keine Buy/Sell-UI
+keine Recommendation Engine
+keine automatische Trades
+keine Forward-Return-Leakage
+```
 
 ---
 
@@ -301,15 +344,18 @@ FK-Kanten prüfen.
 ENUM-Werte prüfen.
 Keine nicht existierenden Spalten verwenden.
 Keine Fake-FK-IDs ohne referenzierte Zeilen.
+Keine Tests gegen stock_project, wenn stock_project_test gemeint ist.
 ```
 
-Wichtige v0.4 Tabellen:
+Wichtige Tabellen:
 
 ```text
+instrument
+pipeline_run
+pipeline_run_item
 trade_campaign
 trade_event
 trade_migration_log
-instrument
 instrument_buy_signal_snapshot
 instrument_sepa_snapshot
 instrument_epa_snapshot
@@ -317,35 +363,47 @@ instrument_epa_snapshot
 
 ---
 
-## Relevante Dateien für aktuelle v0.5-Arbeit
+## Relevante Dateien für v0.5/v0.6-Arbeit
 
-C1:
+Evidence Core:
 
 ```text
+web/src/Service/Evidence/EvidenceEligibilityEvaluator.php
+web/src/Service/Evidence/SnapshotValidationService.php
+web/src/Service/Evidence/TradeOutcomeExtractor.php
+web/src/Service/Evidence/EntryEvidenceAggregator.php
+web/src/Service/Evidence/ExitEvidenceAggregator.php
+web/src/Service/Evidence/EvidenceConfidenceCalculator.php
+web/src/Service/Evidence/EvidenceReadoutBuilder.php
 web/src/Service/Evidence/Model/
 ```
 
-C2:
+Trade Truth:
 
 ```text
-web/src/Service/Evidence/TradeOutcomeExtractor.php
-web/tests/Service/Evidence/TradeOutcomeExtractorIntegrationTest.php
-web/migrations/Version20260426043300.php
-web/migrations/Version20260419162000.php
+web/src/Service/Trade/TradeEventWriter.php
+web/src/Service/Trade/TradeEventValidator.php
+web/src/Service/Trade/TradeStateMachine.php
 ```
 
-C6:
+Snapshot Writer:
 
 ```text
-web/src/Service/Evidence/Model/EvidenceConfidenceLevel.php
-web/src/Service/Evidence/Model/EvidenceMetricSummary.php
+stock-system/src/sepa/persistence.py
+stock-system/src/epa/persistence.py
+stock-system/src/db/buy_signal_snapshot.py
 ```
 
-C8:
+Tests:
 
 ```text
 web/tests/Service/Evidence/
-web/tests/Service/Trade/
+stock-system/tests/test_sepa_snapshot_writer.py
+stock-system/tests/test_epa_snapshot_writer.py
+stock-system/tests/test_buy_signal_snapshot_writer.py
+stock-system/tests/test_sepa_snapshot_integration.py
+stock-system/tests/test_epa_snapshot_integration.py
+stock-system/tests/test_buy_signal_snapshot_integration.py
 ```
 
 ---
@@ -360,9 +418,12 @@ ARCHITECTURE_v04.md
   Warum und wie ist der Truth Layer gebaut?
 
 ARCHITECTURE_v05.md
-  Warum und wie wird Evidence Engine Lite gebaut?
+  Warum und wie ist Evidence Engine Lite gebaut und abgeschlossen?
 
-stock-project-project-map.md
+docs/v05_evidence_engine_closure_audit.md
+  Abschlussprüfung für v0.5
+
+docs/stock-project-project-map.md
   Wo liegt was, wie arbeitet ein Agent sicher im Repo?
 
 AGENTS.md
@@ -384,9 +445,10 @@ DB-Schema korrekt?
 FKs korrekt?
 ENUMs korrekt?
 Tests gegen reales Schema?
-Proxy-Checks vorhanden?
-lint-container grün?
+Proxy-Checks vorhanden oder Host-Prüflücke sauber gemeldet?
+lint-container grün, falls Code betroffen?
 Keine heimliche UI/Migration/Aggregation?
+Keine Recommendation-Semantik?
 ```
 
 PR-Urteile:
@@ -403,14 +465,28 @@ COMMENT
 
 Wenn Runtime-Verifikation nötig ist, exakte Host-Befehle nennen.
 
-Beispiele:
+Für cmder/cmd bevorzugt:
 
-```powershell
+```cmd
+cd /d E:\stock-project
+```
+
+Beispiel Health:
+
+```cmd
 curl http://localhost:8787/health
+```
 
-docker compose --env-file docker/prod.env -p stock-project-prod restart agent-runner
+Beispiel Symfony-Test im Container:
 
-docker compose --env-file docker/prod.env -p stock-project-dev -f compose.yaml -f docker/compose.dev.yml exec web sh -lc "cd /app/web && php bin/phpunit tests/Service/Evidence/TradeOutcomeExtractorIntegrationTest.php"
+```cmd
+docker compose --env-file docker/prod.env -p stock-project-dev -f compose.yaml -f docker/compose.dev.yml exec web sh -lc "cd /app/web && php bin/phpunit tests/Service/Evidence/EvidenceReadoutBuilderTest.php"
+```
+
+Beispiel Python-Integrationstest im Docker-Netzwerk, falls DB nicht auf Host-Port exposed ist:
+
+```cmd
+docker run --rm --network stock-project-dev_default -v E:\stock-project:/work -w /work -e "DATABASE_URL=mysql://USER:PASS@db:3306/stock_project_test?charset=utf8mb4" python:3.12-slim sh -lc "pip install -q pytest pymysql && python -m pytest stock-system/tests/test_sepa_snapshot_integration.py stock-system/tests/test_epa_snapshot_integration.py stock-system/tests/test_buy_signal_snapshot_integration.py -q"
 ```
 
 Agenten führen diese Host-Befehle nicht selbst aus.
@@ -421,8 +497,7 @@ Agenten führen diese Host-Befehle nicht selbst aus.
 
 ```text
 v0.4 abgeschlossen
-v0.5 C1 gemerged
-v0.5 C2 aktiv
-C6/C8 danach parallel
-Agent Exec Proxy als Check-Gate verbindlich
+v0.5 abgeschlossen
+v0.6 Signal Evidence Layer als nächster Schritt
+Agent Exec Proxy bleibt Check-Gate
 ```
